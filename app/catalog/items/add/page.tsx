@@ -1522,15 +1522,12 @@ const AddProductPage = () => {
 
                 {/* Processes Tab */}
                 {!isDesign && !isFinal && activeTab === 'processes' && (
-                  <div>
-                    <h3 className="text-lg font-medium mb-4">Production Process Sequence</h3>
-                    <ProcessSequenceEditor
-                      items={processItems}
-                      availableProcesses={availableProcesses}
-                      onChange={setProcessItems}
-                      disabled={isLoading}
-                    />
-                  </div>
+                  <ProcessSequenceEditor
+                    items={processItems}
+                    availableProcesses={availableProcesses}
+                    onChange={setProcessItems}
+                    disabled={isLoading}
+                  />
                 )}
 
                 {/* Form Actions */}

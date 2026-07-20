@@ -1653,24 +1653,21 @@ const EditProductPage = () => {
 
                 {/* Processes Tab */}
                 {!isDesign && !isFinal && activeTab === 'processes' && (
-                  <div>
-                    <h3 className="text-lg font-medium mb-4">Production Process Sequence</h3>
-                    <ProcessSequenceEditor
-                      items={formData.processes.map((proc) => ({
-                        processId:
-                          typeof proc.processId === 'object' &&
-                          proc.processId !== null &&
-                          'id' in proc.processId
-                            ? String((proc.processId as { id: string }).id)
-                            : String(proc.processId ?? ''),
-                      }))}
-                      availableProcesses={processes}
-                      onChange={(items) =>
-                        setFormData((prev) => ({ ...prev, processes: items }))
-                      }
-                      disabled={isLoading}
-                    />
-                  </div>
+                  <ProcessSequenceEditor
+                    items={formData.processes.map((proc) => ({
+                      processId:
+                        typeof proc.processId === 'object' &&
+                        proc.processId !== null &&
+                        'id' in proc.processId
+                          ? String((proc.processId as { id: string }).id)
+                          : String(proc.processId ?? ''),
+                    }))}
+                    availableProcesses={processes}
+                    onChange={(items) =>
+                      setFormData((prev) => ({ ...prev, processes: items }))
+                    }
+                    disabled={isLoading}
+                  />
                 )}
 
                 <div className="mt-6 flex justify-end space-x-4">
