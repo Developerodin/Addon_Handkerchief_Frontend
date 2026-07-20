@@ -6,6 +6,8 @@ import { toast, Toaster } from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import HelpIcon from '@/shared/components/HelpIcon';
+import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud';
+import CatalogRowActions from '@/shared/components/catalog/CatalogRowActions';
 
 interface Category {
   id: string;
@@ -27,6 +29,7 @@ interface ExcelRow {
 }
 
 const CategoriesPage = () => {
+  const { canCreate, canUpdate, canDelete, canImport, guardDelete } = useCatalogCrud('categories');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,6 +95,7 @@ const CategoriesPage = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (!guardDelete()) return;
     if (window.confirm('Are you sure you want to delete this category?')) {
       try {
         const response = await fetch(`${API_BASE_URL}/categories/${id}`, {
@@ -121,6 +125,7 @@ const CategoriesPage = () => {
   };
 
   const handleDeleteSelected = async () => {
+    if (!guardDelete()) return;
     if (selectedCategories.length === 0) return;
     
     if (window.confirm(`Are you sure you want to delete ${selectedCategories.length} selected category(s)?`)) {
@@ -421,6 +426,7 @@ const CategoriesPage = () => {
                 <i className="ri-arrow-down-s-line absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
               </div>
               <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls" onChange={handleImport} />
+              {canImport && (
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -428,6 +434,7 @@ const CategoriesPage = () => {
               >
                 <i className="ri-upload-2-line text-xs"></i> Import
               </button>
+              )}
               {importProgress !== null && (
                 <div className="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden flex items-center">
                   <div className="bg-primary h-full transition-all duration-200" style={{ width: `${importProgress}%` }}></div>
@@ -441,7 +448,7 @@ const CategoriesPage = () => {
               >
                 <i className="ri-download-2-line text-xs"></i> Export
               </button>
-              {selectedCategories.length > 0 && (
+              {canDelete && selectedCategories.length > 0 && (
                 <button
                   type="button"
                   className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded border transition-colors bg-red-50 text-red-600 border-red-100 hover:bg-red-100 shadow-sm"
@@ -450,12 +457,14 @@ const CategoriesPage = () => {
                   <i className="ri-delete-bin-line text-xs"></i> Delete ({selectedCategories.length})
                 </button>
               )}
+              {canCreate && (
               <Link
                 href="/catalog/categories/add"
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm"
               >
                 <i className="ri-add-line text-xs"></i> Add Category
               </Link>
+              )}
             </div>
           </div>
         </div>
@@ -479,9 +488,11 @@ const CategoriesPage = () => {
                 <i className="ri-folder-line text-xl text-gray-200"></i>
               </div>
               <h3 className="text-xs font-bold text-gray-400 mb-1">DATA EMPTY</h3>
+              {canCreate && (
               <Link href="/catalog/categories/add" className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm">
                 <i className="ri-add-line text-xs"></i> Add First Category
               </Link>
+              )}
             </div>
           ) : (
             <table className="w-full border-collapse border border-gray-200">
@@ -494,7 +505,9 @@ const CategoriesPage = () => {
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Parent Category</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Sort Order</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Status</th>
+                  {(canUpdate || canDelete) && (
                   <th className="px-1.5 py-3 text-right pr-[10px] text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -519,16 +532,15 @@ const CategoriesPage = () => {
                         {category.status}
                       </span>
                     </td>
+                    {(canUpdate || canDelete) && (
                     <td className="px-1.5 py-2.5 text-right pr-[10px] border border-gray-200">
-                      <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                        <Link href={`/catalog/categories/edit/${category.id}`} className="w-7 h-7 flex items-center justify-center bg-emerald-50 text-emerald-400 border border-emerald-100 rounded hover:bg-emerald-100 transition-colors" title="Edit">
-                          <i className="ri-pencil-line text-xs"></i>
-                        </Link>
-                        <button className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-400 border border-red-100 rounded hover:bg-red-100 transition-colors" onClick={() => handleDelete(category.id)} title="Delete">
-                          <i className="ri-delete-bin-line text-xs"></i>
-                        </button>
-                      </div>
+                      <CatalogRowActions
+                        segment="categories"
+                        editHref={`/catalog/categories/edit/${category.id}`}
+                        onDelete={() => handleDelete(category.id)}
+                      />
                     </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

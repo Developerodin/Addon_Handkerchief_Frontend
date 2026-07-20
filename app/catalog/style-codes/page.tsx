@@ -6,6 +6,8 @@ import Seo from '@/shared/layout-components/seo/seo'
 import { styleCodeService, StyleCode } from '@/shared/services/styleCodeService'
 import * as XLSX from 'xlsx'
 import { saveAs } from 'file-saver'
+import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud'
+import CatalogRowActions from '@/shared/components/catalog/CatalogRowActions'
 
 type Status = 'active' | 'inactive' | ''
 
@@ -48,6 +50,7 @@ const extractBomFromRow = (row: Record<string, unknown>): Array<{ rawMaterial: s
 }
 
 const StyleCodesPage = () => {
+  const { canCreate, canUpdate, canDelete, canImport, guardDelete } = useCatalogCrud('style-codes')
   const [rows, setRows] = useState<StyleCode[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [page, setPage] = useState(1)
@@ -100,6 +103,7 @@ const StyleCodesPage = () => {
   }
 
   const handleDelete = async (id: string) => {
+    if (!guardDelete()) return
     const confirm = window.confirm('Delete this style code?')
     if (!confirm) return
     try {
@@ -465,6 +469,8 @@ const StyleCodesPage = () => {
                 )}
                 Export All
               </button>
+              {canImport && (
+              <>
               <button
                 type="button"
                 onClick={handleImportClick}
@@ -514,13 +520,6 @@ const StyleCodesPage = () => {
                 className="hidden"
                 onChange={handleImport}
               />
-              {/* <input
-                ref={syncInputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                onChange={handleSyncFromExcel}
-              /> */}
               <input
                 ref={bomImportInputRef}
                 type="file"
@@ -528,6 +527,16 @@ const StyleCodesPage = () => {
                 className="hidden"
                 onChange={handleBomImport}
               />
+              </>
+              )}
+              {/* <input
+                ref={syncInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={handleSyncFromExcel}
+              /> */}
+              {canCreate && (
               <Link
                 href="/catalog/style-codes/add"
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm"
@@ -535,6 +544,7 @@ const StyleCodesPage = () => {
                 <i className="ri-add-line text-xs" />
                 Add Style Code
               </Link>
+              )}
             </div>
           </div>
         </div>
@@ -562,6 +572,7 @@ const StyleCodesPage = () => {
               </div>
               <h3 className="text-[11px] font-bold text-gray-400 mb-1">No style codes found</h3>
               <p className="text-[10px] text-gray-500">Try adjusting search or filters.</p>
+              {canCreate && (
               <Link
                 href="/catalog/style-codes/add"
                 className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm"
@@ -569,6 +580,7 @@ const StyleCodesPage = () => {
                 <i className="ri-add-line text-xs" />
                 Add First Style Code
               </Link>
+              )}
             </div>
           ) : (
             <table className="w-full border-collapse border border-gray-200">
@@ -580,7 +592,9 @@ const StyleCodesPage = () => {
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Brand</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Pack</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Status</th>
+                  {(canUpdate || canDelete) && (
                   <th className="px-1.5 py-3 text-right pr-[10px] text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -603,30 +617,17 @@ const StyleCodesPage = () => {
                         {row.status}
                       </span>
                     </td>
+                    {(canUpdate || canDelete) && (
                     <td className="px-1.5 py-2.5 text-right pr-[10px] border border-gray-200">
-                      <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                        <Link
-                          href={`/catalog/style-codes/${row.id}/edit`}
-                          className="w-7 h-7 flex items-center justify-center bg-emerald-50 text-emerald-600 border border-emerald-100 rounded hover:bg-emerald-100 transition-colors"
-                          title="Edit"
-                        >
-                          <i className="ri-pencil-line text-xs" />
-                        </Link>
-                        <button
-                          type="button"
-                          disabled={deletingId === row.id}
-                          onClick={() => handleDelete(row.id)}
-                          className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-500 border border-red-100 rounded hover:bg-red-100 transition-colors disabled:opacity-50"
-                          title="Delete"
-                        >
-                          {deletingId === row.id ? (
-                            <i className="ri-loader-4-line text-xs animate-spin" />
-                          ) : (
-                            <i className="ri-delete-bin-line text-xs" />
-                          )}
-                        </button>
-                      </div>
+                      <CatalogRowActions
+                        segment="style-codes"
+                        editHref={`/catalog/style-codes/${row.id}/edit`}
+                        onDelete={() => handleDelete(row.id)}
+                        deleteDisabled={deletingId === row.id}
+                        deleteLoading={deletingId === row.id}
+                      />
                     </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

@@ -9,6 +9,7 @@ import yarnCatalogService, { YarnCatalog } from '@/shared/services/yarnCatalogSe
 import { styleCodeService, StyleCode } from '@/shared/services/styleCodeService';
 import { StyleCodeSelectModal } from '@/app/catalog/style-codes/components/StyleCodeSelectModal';
 import { ProcessSequenceEditor } from '@/app/catalog/items/components/ProcessSequenceEditor';
+import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { useSelector } from 'react-redux';
 import { isDesignUser, isProductionUser, isFinalUser, shouldShowAttribute, shouldShowAttributeForFinal } from '@/shared/utils/userUtils';
 
@@ -1558,4 +1559,10 @@ const AddProductPage = () => {
   );
 };
 
-export default AddProductPage;
+export default function AddProductPageWrapper() {
+  return (
+    <RequireCrudPermission path="Catalog.Items" action="create">
+      <AddProductPage />
+    </RequireCrudPermission>
+  );
+}

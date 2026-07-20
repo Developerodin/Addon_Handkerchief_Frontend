@@ -1,8 +1,8 @@
-import { AUTH_TYPES } from '../types/authTypes';
 import Cookies from 'js-cookie';
+import { AUTH_TYPES } from '../types/authTypes';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
+import { clearAuthTokens, storeAuthTokens } from '@/shared/utils/authToken';
 import { parseApiResponse } from '@/shared/utils/apiResponse';
-
 export const authActions = {
   loginRequest: () => ({ type: AUTH_TYPES.LOGIN_REQUEST }),
   loginSuccess: (userData: any) => ({ type: AUTH_TYPES.LOGIN_SUCCESS, payload: userData }),
@@ -10,9 +10,7 @@ export const authActions = {
   authInitialized: () => ({ type: AUTH_TYPES.AUTH_INITIALIZED }),
 
   logout: () => async (dispatch: any) => {
-    Cookies.remove('refreshToken', { path: '/' });
-    Cookies.remove('accessToken', { path: '/' });
-    try {
+    clearAuthTokens();    try {
       await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     } catch {
       /* ignore */
@@ -21,9 +19,7 @@ export const authActions = {
   },
 
   sessionExpired: () => async (dispatch: any) => {
-    Cookies.remove('refreshToken', { path: '/' });
-    Cookies.remove('accessToken', { path: '/' });
-    try {
+    clearAuthTokens();    try {
       await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     } catch {
       /* ignore */
@@ -58,17 +54,7 @@ export const authActions = {
         credentials: 'include',
       });
 
-      Cookies.set('refreshToken', data.tokens.refresh.token, {
-        expires: 7,
-        path: '/',
-        sameSite: 'lax',
-      });
-
-      Cookies.set('accessToken', data.tokens.access.token, {
-        expires: 7,
-        path: '/',
-        sameSite: 'lax',
-      });
+      storeAuthTokens(data.tokens.access.token, data.tokens.refresh.token);
 
       dispatch(authActions.loginSuccess(data.user));
       return data;

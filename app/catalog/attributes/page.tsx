@@ -6,6 +6,8 @@ import * as XLSX from 'xlsx';
 import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import HelpIcon from '@/shared/components/HelpIcon';
+import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud';
+import CatalogRowActions from '@/shared/components/catalog/CatalogRowActions';
 
 interface AttributeValue {
   id: number;
@@ -40,6 +42,7 @@ interface ExcelAttribute {
 }
 
 const AttributesPage = () => {
+  const { canCreate, canUpdate, canDelete, canImport, guardDelete } = useCatalogCrud('attributes');
   const [selectedAttributes, setSelectedAttributes] = useState<number[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -143,6 +146,7 @@ const AttributesPage = () => {
   };
 
   const handleDelete = async (attributeId: number) => {
+    if (!guardDelete()) return;
     try {
       setIsDeleting(true);
       setDeleteId(attributeId);
@@ -306,6 +310,7 @@ const AttributesPage = () => {
 
   // Bulk delete handler
   const handleBulkDelete = async () => {
+    if (!guardDelete()) return;
     if (!window.confirm('Are you sure you want to delete all selected attributes? This action cannot be undone.')) return;
     setIsBulkDeleting(true);
     try {
@@ -432,9 +437,11 @@ const AttributesPage = () => {
                 <i className="ri-arrow-down-s-line absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
               </div>
               <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls" onChange={handleFileUpload} />
+              {canImport && (
               <button type="button" onClick={handleImportClick} disabled={isImporting} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-[11px] font-bold rounded hover:bg-emerald-700 transition-colors shadow-sm">
                 {isImporting ? <i className="ri-loader-4-line text-xs animate-spin"></i> : <i className="ri-upload-2-line text-xs"></i>} Import
               </button>
+              )}
               {importProgress !== null && (
                 <div className="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden flex items-center">
                   <div className="bg-primary h-full transition-all duration-200" style={{ width: `${importProgress}%` }}></div>
@@ -444,14 +451,16 @@ const AttributesPage = () => {
               <button type="button" onClick={handleExport} className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm">
                 <i className="ri-download-2-line text-xs"></i> Export
               </button>
-              {selectedAttributes.length > 0 && (
+              {canDelete && selectedAttributes.length > 0 && (
                 <button type="button" onClick={handleBulkDelete} disabled={isBulkDeleting} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded border transition-colors bg-red-50 text-red-600 border-red-100 hover:bg-red-100 shadow-sm">
                   <i className="ri-delete-bin-line text-xs"></i> Delete ({selectedAttributes.length})
                 </button>
               )}
+              {canCreate && (
               <Link href="/catalog/attributes/add" className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm">
                 <i className="ri-add-line text-xs"></i> Add Attribute
               </Link>
+              )}
             </div>
           </div>
         </div>
@@ -475,9 +484,11 @@ const AttributesPage = () => {
                 <i className="ri-list-check text-xl text-gray-200"></i>
               </div>
               <h3 className="text-xs font-bold text-gray-400 mb-1">DATA EMPTY</h3>
+              {canCreate && (
               <Link href="/catalog/attributes/add" className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm">
                 <i className="ri-add-line text-xs"></i> Add First Attribute
               </Link>
+              )}
             </div>
           ) : (
             <table className="w-full border-collapse border border-gray-200">
@@ -491,7 +502,9 @@ const AttributesPage = () => {
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Attribute Type</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Values</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Sort Order</th>
+                  {(canUpdate || canDelete) && (
                   <th className="px-1.5 py-3 text-right pr-[10px] text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -515,16 +528,17 @@ const AttributesPage = () => {
                       </div>
                     </td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{attribute.sortOrder}</td>
+                    {(canUpdate || canDelete) && (
                     <td className="px-1.5 py-2.5 text-right pr-[10px] border border-gray-200">
-                      <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                        <Link href={`/catalog/attributes/edit/${attribute.id}`} className="w-7 h-7 flex items-center justify-center bg-emerald-50 text-emerald-400 border border-emerald-100 rounded hover:bg-emerald-100 transition-colors" title="Edit">
-                          <i className="ri-pencil-line text-xs"></i>
-                        </Link>
-                        <button className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-400 border border-red-100 rounded hover:bg-red-100 transition-colors" onClick={() => confirmDelete(attribute.id)} title="Delete" disabled={isDeleting && deleteId === attribute.id}>
-                          {isDeleting && deleteId === attribute.id ? <i className="ri-loader-4-line text-xs animate-spin"></i> : <i className="ri-delete-bin-line text-xs"></i>}
-                        </button>
-                      </div>
+                      <CatalogRowActions
+                        segment="attributes"
+                        editHref={`/catalog/attributes/edit/${attribute.id}`}
+                        onDelete={() => confirmDelete(attribute.id)}
+                        deleteDisabled={isDeleting && deleteId === attribute.id}
+                        deleteLoading={isDeleting && deleteId === attribute.id}
+                      />
                     </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

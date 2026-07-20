@@ -9,6 +9,7 @@ import { styleCodeService, StyleCode } from '@/shared/services/styleCodeService'
 import { StyleCodeSelectModal } from '@/app/catalog/style-codes/components/StyleCodeSelectModal';
 import { ProcessSequenceEditor } from '@/app/catalog/items/components/ProcessSequenceEditor';
 import ProductImageUploadField from '@/app/catalog/items/components/ProductImageUploadField';
+import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { useSelector } from 'react-redux';
 import { isDesignUser, isProductionUser, isFinalUser, shouldShowAttribute, shouldShowAttributeForFinal } from '@/shared/utils/userUtils';
 
@@ -1701,4 +1702,10 @@ const EditProductPage = () => {
   );
 };
 
-export default EditProductPage; 
+export default function EditProductPageWrapper() {
+  return (
+    <RequireCrudPermission path="Catalog.Items" action="update">
+      <EditProductPage />
+    </RequireCrudPermission>
+  );
+} 

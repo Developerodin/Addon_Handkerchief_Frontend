@@ -7,6 +7,7 @@ import Seo from '@/shared/layout-components/seo/seo';
 import Image from 'next/image';
 import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
+import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 
 interface ProcessStep {
   stepTitle: string;
@@ -450,4 +451,10 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
   );
 };
 
-export default EditProcessPage; 
+export default function EditProcessPageWrapper({ params }: { params: { id: string } }) {
+  return (
+    <RequireCrudPermission path="Catalog.Processes" action="update">
+      <EditProcessPage params={params} />
+    </RequireCrudPermission>
+  );
+}

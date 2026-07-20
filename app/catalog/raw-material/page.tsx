@@ -6,6 +6,8 @@ import * as XLSX from 'xlsx';
 import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import HelpIcon from '@/shared/components/HelpIcon';
+import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud';
+import CatalogRowActions from '@/shared/components/catalog/CatalogRowActions';
 
 interface RawMaterial {
   id: string;
@@ -45,6 +47,7 @@ interface ExcelRow {
 }
 
 const RawMaterialPage = () => {
+  const { canCreate, canUpdate, canDelete, canImport, guardDelete } = useCatalogCrud('raw-material');
   const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -153,6 +156,7 @@ const RawMaterialPage = () => {
   };
 
   const handleDeleteSelected = async () => {
+    if (!guardDelete()) return;
     if (selectedMaterials.length === 0) return;
     
     if (window.confirm(`Are you sure you want to delete ${selectedMaterials.length} selected material(s)?`)) {
@@ -183,6 +187,7 @@ const RawMaterialPage = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (!guardDelete()) return;
     if (window.confirm('Are you sure you want to delete this material?')) {
       try {
         const response = await fetch(`${API_BASE_URL}/raw-materials/${id}`, {
@@ -428,6 +433,7 @@ const RawMaterialPage = () => {
                 <i className="ri-arrow-down-s-line absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
               </div>
               <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls" onChange={handleImport} />
+              {canImport && (
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -435,6 +441,7 @@ const RawMaterialPage = () => {
               >
                 <i className="ri-upload-2-line text-xs"></i> Import
               </button>
+              )}
               {importProgress !== null && (
                 <div className="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden flex items-center">
                   <div className="bg-primary h-full transition-all duration-200" style={{ width: `${importProgress}%` }}></div>
@@ -448,7 +455,7 @@ const RawMaterialPage = () => {
               >
                 <i className="ri-download-2-line text-xs"></i> Export
               </button>
-              {selectedMaterials.length > 0 && (
+              {canDelete && selectedMaterials.length > 0 && (
                 <button
                   type="button"
                   className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded border transition-colors bg-red-50 text-red-600 border-red-100 hover:bg-red-100 shadow-sm"
@@ -457,12 +464,14 @@ const RawMaterialPage = () => {
                   <i className="ri-delete-bin-line text-xs"></i> Delete ({selectedMaterials.length})
                 </button>
               )}
+              {canCreate && (
               <Link
                 href="/catalog/raw-material/add"
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm"
               >
                 <i className="ri-add-line text-xs"></i> Add Material
               </Link>
+              )}
             </div>
           </div>
         </div>
@@ -486,9 +495,11 @@ const RawMaterialPage = () => {
                 <i className="ri-stack-line text-xl text-gray-200"></i>
               </div>
               <h3 className="text-xs font-bold text-gray-400 mb-1">DATA EMPTY</h3>
+              {canCreate && (
               <Link href="/catalog/raw-material/add" className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm">
                 <i className="ri-add-line text-xs"></i> Add First Material
               </Link>
+              )}
             </div>
           ) : (
             <table className="w-full border-collapse border border-gray-200">
@@ -501,7 +512,9 @@ const RawMaterialPage = () => {
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Name</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Color</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Unit</th>
+                  {(canUpdate || canDelete) && (
                   <th className="px-1.5 py-3 text-right pr-[10px] text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -514,16 +527,15 @@ const RawMaterialPage = () => {
                     <td className="px-1.5 py-2.5 text-[12px] font-bold text-gray-900 border border-gray-200">{material.name}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{material.color}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{material.unit}</td>
+                    {(canUpdate || canDelete) && (
                     <td className="px-1.5 py-2.5 text-right pr-[10px] border border-gray-200">
-                      <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                        <Link href={`/catalog/raw-material/edit/${material.id}`} className="w-7 h-7 flex items-center justify-center bg-emerald-50 text-emerald-400 border border-emerald-100 rounded hover:bg-emerald-100 transition-colors" title="Edit">
-                          <i className="ri-pencil-line text-xs"></i>
-                        </Link>
-                        <button className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-400 border border-red-100 rounded hover:bg-red-100 transition-colors" onClick={() => handleDelete(material.id)} title="Delete">
-                          <i className="ri-delete-bin-line text-xs"></i>
-                        </button>
-                      </div>
+                      <CatalogRowActions
+                        segment="raw-material"
+                        editHref={`/catalog/raw-material/edit/${material.id}`}
+                        onDelete={() => handleDelete(material.id)}
+                      />
                     </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

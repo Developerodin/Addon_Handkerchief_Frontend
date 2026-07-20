@@ -80,6 +80,29 @@ export const normalizeCrud = (value: unknown): CrudPermissions => {
   return { ...EMPTY_CRUD };
 };
 
+/** Create, update, and delete all require read access. */
+export const applyCrudDependencies = (crud: CrudPermissions): CrudPermissions => {
+  const next = { ...crud };
+  if (next.create || next.update || next.delete) {
+    next.read = true;
+  }
+  if (!next.read) {
+    return { ...EMPTY_CRUD };
+  }
+  return next;
+};
+
+export const applyCrudChange = (
+  current: CrudPermissions,
+  key: CrudAction,
+  checked: boolean
+): CrudPermissions => {
+  if (key === 'read' && !checked) {
+    return { ...EMPTY_CRUD };
+  }
+  return applyCrudDependencies({ ...current, [key]: checked });
+};
+
 export const mergeNavigationWithDefaults = (
   partial?: Partial<NavigationPermissions>
 ): NavigationPermissions => {
@@ -88,14 +111,14 @@ export const mergeNavigationWithDefaults = (
   const catalog = buildCatalogDefaults();
   if (partial.Catalog) {
     for (const key of CATALOG_MODULES) {
-      catalog[key] = normalizeCrud(partial.Catalog[key]);
+      catalog[key] = applyCrudDependencies(normalizeCrud(partial.Catalog[key]));
     }
   }
 
   return {
-    Dashboard: normalizeCrud(partial.Dashboard),
+    Dashboard: applyCrudDependencies(normalizeCrud(partial.Dashboard)),
     Catalog: catalog,
-    Users: normalizeCrud(partial.Users),
+    Users: applyCrudDependencies(normalizeCrud(partial.Users)),
   };
 };
 
@@ -110,7 +133,7 @@ export const getCrudAtPath = (
     if (!current || typeof current !== 'object') return { ...EMPTY_CRUD };
     current = (current as Record<string, unknown>)[key];
   }
-  return normalizeCrud(current);
+  return applyCrudDependencies(normalizeCrud(current));
 };
 
 /** Map catalog route segment to permission key */

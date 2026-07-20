@@ -3,11 +3,10 @@
 import Link from "next/link";
 import React, { Fragment, useEffect, useState } from "react";
 import { ThemeChanger } from "../../redux/action";
-import { connect } from "react-redux";
+import { connect, useDispatch, useSelector } from "react-redux";
 import store from "@/shared/redux/store";
 import Modalsearch from "../modal-search/modalsearch";
 import { useRouter } from "next/navigation";
-import { useDispatch } from "react-redux";
 import { authActions } from "@/shared/redux/actions/authActions";
 
 const assetBase = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
@@ -15,7 +14,12 @@ const assetBase = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const Header = ({ local_varaiable, ThemeChanger }: any) => {
   const router = useRouter();
   const dispatch = useDispatch();
+  const user = useSelector((state: any) => state.auth.user);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  const displayName = user?.name?.trim() || user?.email?.split("@")[0] || "User";
+  const profileImage =
+    user?.profilePicture?.trim() || `${assetBase}/assets/images/faces/9.jpg`;
 
   const handleLogout = async (e?: React.MouseEvent) => {
     if (loggingOut) return;
@@ -283,15 +287,15 @@ const Header = ({ local_varaiable, ThemeChanger }: any) => {
                 >
                   <img
                     className="inline-block rounded-full "
-                    src={`${assetBase}/assets/images/faces/9.jpg`}
+                    src={profileImage}
                     width="32"
                     height="32"
-                    alt="User profile"
+                    alt={displayName}
                   />
                 </button>
                 <div className="md:block hidden dropdown-profile">
                   <p className="font-semibold mb-0 leading-none text-[#536485] text-[0.813rem] ">
-                    Admin
+                    {displayName}
                   </p>
                 </div>
                 <div

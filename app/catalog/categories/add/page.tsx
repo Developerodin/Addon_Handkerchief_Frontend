@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
+import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 
 interface Category {
   id: string;
@@ -306,4 +307,10 @@ const AddCategoryPage = () => {
   );
 };
 
-export default AddCategoryPage; 
+export default function AddCategoryPageWrapper() {
+  return (
+    <RequireCrudPermission path="Catalog.Categories" action="create">
+      <AddCategoryPage />
+    </RequireCrudPermission>
+  );
+} 

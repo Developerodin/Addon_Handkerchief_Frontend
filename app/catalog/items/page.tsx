@@ -13,6 +13,7 @@ import { isDesignUser, isProductionUser, isFinalUser, shouldShowAttribute, shoul
 import yarnCatalogService, { YarnCatalog } from '@/shared/services/yarnCatalogService';
 import { styleCodeService } from '@/shared/services/styleCodeService';
 import productService, { ProductBulkRow } from '@/shared/services/productService';
+import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud';
 
 interface StyleCode {
   styleCode?: string;
@@ -72,6 +73,7 @@ const API_ENDPOINTS = {
 
 const ProductListPage = () => {
   const { user } = useSelector((state: any) => state.auth);
+  const { canCreate, canUpdate, canDelete, canImport, guardDelete } = useCatalogCrud('items');
   const isDesign = isDesignUser(user);
   const isProduction = isProductionUser(user);
   const isFinal = isFinalUser(user);
@@ -279,6 +281,7 @@ const ProductListPage = () => {
   };
 
   const handleBulkDelete = async () => {
+    if (!guardDelete()) return;
     if (selectedProducts.length === 0) return;
     if (!window.confirm(`Are you sure you want to delete ${selectedProducts.length} selected product(s)?`)) return;
     toast.loading('Deleting selected products...');
@@ -296,6 +299,7 @@ const ProductListPage = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (!guardDelete()) return;
     if (!confirm('Are you sure you want to delete this product?')) return;
     toast.loading('Deleting product...');
     try {
@@ -2608,6 +2612,7 @@ const ProductListPage = () => {
                   accept=".xlsx,.xls"
                   onChange={handleProcessExcelImport}
                 />
+              {canImport && (
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -2617,6 +2622,7 @@ const ProductListPage = () => {
                 <i className="ri-file-excel-2-line text-xs"></i>
                 Import
               </button>
+              )}
               {importProgress !== null && (
                 <div className="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden flex items-center">
                   <div className="bg-primary h-full transition-all duration-200" style={{ width: `${importProgress}%` }}></div>
@@ -2638,17 +2644,18 @@ const ProductListPage = () => {
                   <span className="ml-1.5 text-[10px] text-gray-600 font-medium">{exportProgress}%</span>
                 </div>
               )}
-              {/* {selectedProducts.length > 0 && (
+              {canDelete && selectedProducts.length > 0 && (
                 <button
                   type="button"
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded border transition-colors ${"bg-red-50 text-red-600 border-red-100 hover:bg-red-100 shadow-sm"}`}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded border transition-colors bg-red-50 text-red-600 border-red-100 hover:bg-red-100 shadow-sm"
                   onClick={handleBulkDelete}
                   disabled={isLoading}
                 >
                   <i className="ri-delete-bin-line text-xs"></i>
                   Delete ({selectedProducts.length})
                 </button>
-              )} */}
+              )}
+              {canCreate && (
               <Link
                 href="/catalog/items/add"
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm"
@@ -2656,6 +2663,7 @@ const ProductListPage = () => {
                 <i className="ri-add-line text-xs"></i>
                 Add Product
               </Link>
+              )}
               <button
                 type="button"
                 onClick={() => setShowMoreExports(!showMoreExports)}
@@ -2690,9 +2698,11 @@ const ProductListPage = () => {
                       </button>
                     </>
                   )}
+                  {canImport && (
                   <button type="button" onClick={() => attributesFileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-100 text-[11px] font-bold rounded hover:bg-emerald-100" disabled={isLoading}>
                     <i className="ri-file-excel-2-line text-xs"></i> Import by Attributes
                   </button>
+                  )}
                   {!isDesign && !isFinal && (
                     <>
                       <button type="button" onClick={() => bomFileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-100 text-[11px] font-bold rounded hover:bg-emerald-100" disabled={isLoading}>
@@ -2750,7 +2760,9 @@ const ProductListPage = () => {
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Factory Code</th>
                   {isFinal && <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">EAN Code</th>}
                   {isFinal && <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Description</th>}
+                  {(canUpdate || canDelete) && (
                   <th className="px-1.5 py-3 text-right pr-[10px] text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -2780,16 +2792,22 @@ const ProductListPage = () => {
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{product.factoryCode || ''}</td>
                     {isFinal && <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{product.eanCode || ''}</td>}
                     {isFinal && <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-400 max-w-xs truncate border border-gray-200" title={product.description || ''}>{product.description || ''}</td>}
+                    {(canUpdate || canDelete) && (
                     <td className="px-1.5 py-2.5 text-right pr-[10px] border border-gray-200">
                       <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                        {canUpdate && (
                         <Link href={`/catalog/items/${product.id}/edit`} className="w-7 h-7 flex items-center justify-center bg-emerald-50 text-emerald-400 border border-emerald-100 rounded hover:bg-emerald-100 transition-colors" title="Edit">
                           <i className="ri-pencil-line text-xs"></i>
                         </Link>
-                        {/* <button className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-400 border border-red-100 rounded hover:bg-red-100 transition-colors" onClick={() => handleDelete(product.id)} title="Delete">
+                        )}
+                        {canDelete && (
+                        <button type="button" className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-400 border border-red-100 rounded hover:bg-red-100 transition-colors" onClick={() => handleDelete(product.id)} title="Delete">
                           <i className="ri-delete-bin-line text-xs"></i>
-                        </button> */}
+                        </button>
+                        )}
                       </div>
                     </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

@@ -57,7 +57,8 @@ export const moduleActivity = {
 
 export const styleCodeStatus = {
   labels: ['Active', 'Inactive', 'Draft'],
-  series: [468, 52, 22],
+  // Radial bar expects percentage values (0–100), not raw counts.
+  series: [86, 10, 4],
 };
 
 export const processUsage = {
@@ -77,13 +78,26 @@ export const recentActivity = [
 export const sparklineOptions = (color: string): ApexOptions => ({
   chart: {
     type: 'line',
+    width: 72,
+    height: 32,
     sparkline: { enabled: true },
     animations: { enabled: true, speed: 600 },
+    events: {
+      mounted: (chart) => {
+        chart.windowResizeHandler();
+      },
+    },
   },
   stroke: { curve: 'smooth', width: 2 },
   colors: [color],
   tooltip: { enabled: false },
 });
+
+const chartMountedEvent = {
+  mounted: (chart: { windowResizeHandler: () => void }) => {
+    chart.windowResizeHandler();
+  },
+};
 
 export const baseChartAnimations: ApexOptions = {
   chart: {
@@ -96,6 +110,7 @@ export const baseChartAnimations: ApexOptions = {
     },
     toolbar: { show: false },
     background: 'transparent',
+    events: chartMountedEvent,
   },
 };
 

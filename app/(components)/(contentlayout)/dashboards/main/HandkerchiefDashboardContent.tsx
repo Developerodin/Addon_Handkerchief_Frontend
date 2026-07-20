@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
@@ -25,6 +25,11 @@ function formatPct(value: number) {
 
 export default function HandkerchiefDashboardContent() {
   const [period, setPeriod] = useState<DashboardPeriod>("month");
+  const [chartsReady, setChartsReady] = useState(false);
+
+  useEffect(() => {
+    setChartsReady(true);
+  }, []);
 
   const kpis = dashboardKpis[period];
   const trend = monthlyCatalogTrend[period];
@@ -63,7 +68,7 @@ export default function HandkerchiefDashboardContent() {
         position: "top" as const,
         horizontalAlign: "right" as const,
         fontSize: "11px",
-        markers: { radius: 4, width: 10, height: 10 },
+        markers: { size: 4 },
       },
       tooltip: { theme: "dark", style: { fontSize: "12px" } },
       fill: {
@@ -116,6 +121,9 @@ export default function HandkerchiefDashboardContent() {
       chart: { ...baseChartAnimations.chart, type: "bar" as const, height: 280, stacked: true },
       plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: "58%" } },
       colors: ["#7c3aed", "#a78bfa"],
+      yaxis: {
+        labels: { style: { colors: "#64748b", fontSize: "11px" } },
+      },
       xaxis: {
         categories: moduleActivity.categories,
         labels: { style: { colors: "#64748b", fontSize: "11px" } },
@@ -237,13 +245,16 @@ export default function HandkerchiefDashboardContent() {
                     <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${palette.bg} ${palette.text}`}>
                       <i className={`${kpi.icon} text-base`} />
                     </span>
-                    <ReactApexChart
-                      options={sparklineOptions(palette.spark)}
-                      series={[{ data: [...kpi.spark] }]}
-                      type="line"
-                      height={32}
-                      width={72}
-                    />
+                    {chartsReady && (
+                      <ReactApexChart
+                        key={`${kpi.label}-${period}`}
+                        options={sparklineOptions(palette.spark)}
+                        series={[{ data: [...kpi.spark] }]}
+                        type="line"
+                        width={72}
+                        height={32}
+                      />
+                    )}
                   </div>
                 </div>
               );
@@ -257,16 +268,20 @@ export default function HandkerchiefDashboardContent() {
               </h3>
               <span className="text-[10px] text-gray-400">Items added · Updates · Imports</span>
             </div>
-            <ReactApexChart
-              options={monthlyOptions}
-              series={[
-                { name: "Items Added", data: trend.itemsAdded },
-                { name: "Updates", data: trend.updates },
-                { name: "Imports", data: trend.imports },
-              ]}
-              type="bar"
-              height={280}
-            />
+            {chartsReady && (
+              <ReactApexChart
+                key={`trend-${period}`}
+                options={monthlyOptions}
+                series={[
+                  { name: "Items Added", data: trend.itemsAdded },
+                  { name: "Updates", data: trend.updates },
+                  { name: "Imports", data: trend.imports },
+                ]}
+                type="bar"
+                width="100%"
+                height={280}
+              />
+            )}
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
@@ -274,27 +289,33 @@ export default function HandkerchiefDashboardContent() {
               <h3 className="text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-3">
                 Items by Category
               </h3>
-              <ReactApexChart
-                options={categoryDonutOptions}
-                series={itemsByCategory.series}
-                type="donut"
-                height={260}
-              />
+              {chartsReady && (
+                <ReactApexChart
+                  options={categoryDonutOptions}
+                  series={itemsByCategory.series}
+                  type="donut"
+                  width="100%"
+                  height={260}
+                />
+              )}
             </div>
 
             <div className="rounded-lg border border-gray-100 p-3">
               <h3 className="text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-3">
                 Module Activity
               </h3>
-              <ReactApexChart
-                options={moduleBarOptions}
-                series={[
-                  { name: "Created", data: moduleActivity.creates },
-                  { name: "Updated", data: moduleActivity.updates },
-                ]}
-                type="bar"
-                height={280}
-              />
+              {chartsReady && (
+                <ReactApexChart
+                  options={moduleBarOptions}
+                  series={[
+                    { name: "Created", data: moduleActivity.creates },
+                    { name: "Updated", data: moduleActivity.updates },
+                  ]}
+                  type="bar"
+                  width="100%"
+                  height={280}
+                />
+              )}
             </div>
           </div>
 
@@ -303,24 +324,30 @@ export default function HandkerchiefDashboardContent() {
               <h3 className="text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-3">
                 Process Usage Score
               </h3>
-              <ReactApexChart
-                options={processAreaOptions}
-                series={[{ name: "Usage", data: processUsage.values }]}
-                type="area"
-                height={260}
-              />
+              {chartsReady && (
+                <ReactApexChart
+                  options={processAreaOptions}
+                  series={[{ name: "Usage", data: processUsage.values }]}
+                  type="area"
+                  width="100%"
+                  height={260}
+                />
+              )}
             </div>
 
             <div className="rounded-lg border border-gray-100 p-3">
               <h3 className="text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-3">
                 Style Code Status
               </h3>
-              <ReactApexChart
-                options={styleRadialOptions}
-                series={styleCodeStatus.series}
-                type="radialBar"
-                height={260}
-              />
+              {chartsReady && (
+                <ReactApexChart
+                  options={styleRadialOptions}
+                  series={styleCodeStatus.series}
+                  type="radialBar"
+                  width="100%"
+                  height={260}
+                />
+              )}
             </div>
           </div>
 

@@ -5,6 +5,7 @@ import Seo from '@/shared/layout-components/seo/seo';
 import { toast, Toaster } from 'react-hot-toast';
 import Image from 'next/image';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
+import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import * as XLSX from 'xlsx';
 
 interface AttributeValue {
@@ -401,4 +402,10 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
   );
 };
 
-export default EditAttributePage; 
+export default function EditAttributePageWrapper({ params }: { params: { id: string } }) {
+  return (
+    <RequireCrudPermission path="Catalog.Attributes" action="update">
+      <EditAttributePage params={params} />
+    </RequireCrudPermission>
+  );
+}

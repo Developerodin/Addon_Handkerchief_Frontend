@@ -6,6 +6,7 @@ import Seo from '@/shared/layout-components/seo/seo';
 import Image from 'next/image';
 import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
+import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 
 interface RawMaterialForm {
   name: string;
@@ -26,7 +27,7 @@ interface RawMaterialForm {
   imagePreview?: string;
 }
 
-export default function AddRawMaterial() {
+function AddRawMaterial() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<RawMaterialForm>({
@@ -411,5 +412,13 @@ export default function AddRawMaterial() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AddRawMaterialPageWrapper() {
+  return (
+    <RequireCrudPermission path="Catalog.Raw Material" action="create">
+      <AddRawMaterial />
+    </RequireCrudPermission>
   );
 }

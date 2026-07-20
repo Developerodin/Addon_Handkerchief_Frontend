@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Seo from '@/shared/layout-components/seo/seo';
 import { toast, Toaster } from 'react-hot-toast';
+import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 
 interface Category {
@@ -15,7 +16,7 @@ interface Category {
   image?: string;
 }
 
-export default function EditCategoryPage({ params }: { params: { id: string } }) {
+function EditCategoryPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [parentCategories, setParentCategories] = useState<Category[]>([]);
@@ -275,4 +276,12 @@ export default function EditCategoryPage({ params }: { params: { id: string } })
       </div>
     </div>
   );
-} 
+}
+
+export default function EditCategoryPageWrapper({ params }: { params: { id: string } }) {
+  return (
+    <RequireCrudPermission path="Catalog.Categories" action="update">
+      <EditCategoryPage params={params} />
+    </RequireCrudPermission>
+  );
+}

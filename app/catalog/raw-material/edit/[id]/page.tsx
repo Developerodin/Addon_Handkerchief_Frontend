@@ -5,6 +5,7 @@ import Seo from '@/shared/layout-components/seo/seo';
 import { toast, Toaster } from 'react-hot-toast';
 import Image from 'next/image';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
+import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 
 interface RawMaterial {
   id: string;
@@ -25,7 +26,7 @@ interface RawMaterial {
   image: string | null;
 }
 
-export default function EditRawMaterial({ params }: { params: { id: string } }) {
+function EditRawMaterial({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [material, setMaterial] = useState<RawMaterial>({
@@ -440,4 +441,12 @@ export default function EditRawMaterial({ params }: { params: { id: string } }) 
       </div>
     </div>
   );
-} 
+}
+
+export default function EditRawMaterialPageWrapper({ params }: { params: { id: string } }) {
+  return (
+    <RequireCrudPermission path="Catalog.Raw Material" action="update">
+      <EditRawMaterial params={params} />
+    </RequireCrudPermission>
+  );
+}

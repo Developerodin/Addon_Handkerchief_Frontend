@@ -8,6 +8,8 @@ import Image from 'next/image';
 import * as XLSX from 'xlsx';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import HelpIcon from '@/shared/components/HelpIcon';
+import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud';
+import CatalogRowActions from '@/shared/components/catalog/CatalogRowActions';
 
 interface ProcessStep {
   stepTitle: string;
@@ -36,6 +38,7 @@ interface ExcelRow {
 }
 
 const ProcessesPage = () => {
+  const { canCreate, canUpdate, canDelete, canImport, guardDelete } = useCatalogCrud('processes');
   const [processes, setProcesses] = useState<Process[]>([]);
   const [selectedProcesses, setSelectedProcesses] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
@@ -101,6 +104,7 @@ const ProcessesPage = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (!guardDelete()) return;
     if (window.confirm('Are you sure you want to delete this process?')) {
       setIsDeleting(true);
       const loadingToast = toast.loading('Deleting process...');
@@ -133,6 +137,7 @@ const ProcessesPage = () => {
   };
 
   const handleDeleteSelected = async () => {
+    if (!guardDelete()) return;
     if (selectedProcesses.length === 0) return;
     if (window.confirm(`Are you sure you want to delete ${selectedProcesses.length} selected process(es)?`)) {
       setIsBulkDeleting(true);
@@ -458,9 +463,11 @@ const ProcessesPage = () => {
                 <i className="ri-arrow-down-s-line absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
               </div>
               <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls" onChange={handleImport} />
+              {canImport && (
               <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-[11px] font-bold rounded hover:bg-emerald-700 transition-colors shadow-sm">
                 <i className="ri-upload-2-line text-xs"></i> Import
               </button>
+              )}
               {importProgress !== null && (
                 <div className="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden flex items-center">
                   <div className="bg-primary h-full transition-all duration-200" style={{ width: `${importProgress}%` }}></div>
@@ -473,14 +480,16 @@ const ProcessesPage = () => {
               <button type="button" onClick={handleExport} className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm">
                 <i className="ri-download-2-line text-xs"></i> Export
               </button>
-              {selectedProcesses.length > 0 && (
+              {canDelete && selectedProcesses.length > 0 && (
                 <button type="button" onClick={handleDeleteSelected} disabled={isBulkDeleting} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded border transition-colors bg-red-50 text-red-600 border-red-100 hover:bg-red-100 shadow-sm">
                   <i className="ri-delete-bin-line text-xs"></i> Delete ({selectedProcesses.length})
                 </button>
               )}
+              {canCreate && (
               <Link href="/catalog/processes/add" className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm">
                 <i className="ri-add-line text-xs"></i> Add Process
               </Link>
+              )}
             </div>
           </div>
         </div>
@@ -504,9 +513,11 @@ const ProcessesPage = () => {
                 <i className="ri-settings-line text-xl text-gray-200"></i>
               </div>
               <h3 className="text-xs font-bold text-gray-400 mb-1">DATA EMPTY</h3>
+              {canCreate && (
               <Link href="/catalog/processes/add" className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm">
                 <i className="ri-add-line text-xs"></i> Add First Process
               </Link>
+              )}
             </div>
           ) : (
             <table className="w-full border-collapse border border-gray-200">
@@ -520,7 +531,9 @@ const ProcessesPage = () => {
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Steps</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Sort Order</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Status</th>
+                  {(canUpdate || canDelete) && (
                   <th className="px-1.5 py-3 text-right pr-[10px] text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -547,16 +560,16 @@ const ProcessesPage = () => {
                     <td className="px-1.5 py-2.5 border border-gray-200">
                       <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-bold rounded uppercase tracking-tight ${process.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{process.status}</span>
                     </td>
+                    {(canUpdate || canDelete) && (
                     <td className="px-1.5 py-2.5 text-right pr-[10px] border border-gray-200">
-                      <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                        <Link href={`/catalog/processes/edit/${process.id}`} className="w-7 h-7 flex items-center justify-center bg-emerald-50 text-emerald-400 border border-emerald-100 rounded hover:bg-emerald-100 transition-colors" title="Edit">
-                          <i className="ri-pencil-line text-xs"></i>
-                        </Link>
-                        <button className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-400 border border-red-100 rounded hover:bg-red-100 transition-colors" onClick={() => handleDelete(process.id)} title="Delete" disabled={isDeleting}>
-                          <i className="ri-delete-bin-line text-xs"></i>
-                        </button>
-                      </div>
+                      <CatalogRowActions
+                        segment="processes"
+                        editHref={`/catalog/processes/edit/${process.id}`}
+                        onDelete={() => handleDelete(process.id)}
+                        deleteDisabled={isDeleting}
+                      />
                     </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

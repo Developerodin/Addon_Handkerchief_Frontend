@@ -8,6 +8,9 @@ import {
   FULL_CRUD,
   NavigationPermissions as NavType,
   mergeNavigationWithDefaults,
+  applyCrudChange,
+  applyCrudDependencies,
+  CrudAction,
 } from '@/shared/types/permissions';
 
 interface Props {
@@ -55,13 +58,20 @@ function CrudChecks({
           key={key}
           htmlFor={`${idPrefix}-${key}`}
           className="inline-flex items-center gap-1.5 cursor-pointer select-none"
+          title={
+            key === 'read'
+              ? 'Turning off Read clears Create, Update, and Delete for this section.'
+              : key !== 'read'
+                ? 'Requires Read access for this section.'
+                : undefined
+          }
         >
           <input
             id={`${idPrefix}-${key}`}
             type="checkbox"
             checked={value[key]}
             disabled={disabled}
-            onChange={(e) => onChange({ ...value, [key]: e.target.checked })}
+            onChange={(e) => onChange(applyCrudChange(value, key as CrudAction, e.target.checked))}
             className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-3.5 w-3.5"
           />
           <span className="text-[11px] font-medium text-gray-600">{label}</span>
@@ -140,13 +150,13 @@ export default function NavigationPermissionsEditor({ navigation, onChange, disa
   const safeNav = mergeNavigationWithDefaults(navigation);
 
   const updateTopLevel = (key: 'Dashboard' | 'Users', crud: CrudPermissions) => {
-    onChange({ ...safeNav, [key]: crud });
+    onChange({ ...safeNav, [key]: applyCrudDependencies(crud) });
   };
 
   const updateCatalog = (module: (typeof CATALOG_MODULES)[number], crud: CrudPermissions) => {
     onChange({
       ...safeNav,
-      Catalog: { ...safeNav.Catalog, [module]: crud },
+      Catalog: { ...safeNav.Catalog, [module]: applyCrudDependencies(crud) },
     });
   };
 
@@ -174,7 +184,8 @@ export default function NavigationPermissionsEditor({ navigation, onChange, disa
         <div>
           <h3 className="text-sm font-bold text-gray-800">Navigation Permissions</h3>
           <p className="text-[11px] text-gray-500 mt-0.5">
-            Grant Create / Read / Update / Delete per section — same structure as Addon.
+            Grant Create / Read / Update / Delete per section. Create, Update, and Delete
+            automatically require Read — you cannot assign them without Read access.
           </p>
         </div>
         <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-wide">

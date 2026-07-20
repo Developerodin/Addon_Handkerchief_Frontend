@@ -7,6 +7,7 @@ import Seo from '@/shared/layout-components/seo/seo'
 import { styleCodeService, StyleCode } from '@/shared/services/styleCodeService'
 import { API_BASE_URL } from '@/shared/data/utilities/api'
 import { RawMaterialBomTable, RawMaterialBomItem } from '@/app/catalog/items/components/RawMaterialBomTable'
+import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission'
 
 type Status = 'active' | 'inactive'
 
@@ -302,4 +303,10 @@ const EditStyleCodePage = () => {
   )
 }
 
-export default EditStyleCodePage
+export default function EditStyleCodePageWrapper() {
+  return (
+    <RequireCrudPermission path="Catalog.Style Codes" action="update">
+      <EditStyleCodePage />
+    </RequireCrudPermission>
+  )
+}
