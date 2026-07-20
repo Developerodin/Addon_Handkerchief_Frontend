@@ -12,6 +12,20 @@ interface MenuItem {
   children?: MenuItem[];
 }
 
+/** Fresh copies so sidebar mutations never stick on shared menu definitions. */
+function cloneMenuItem(item: MenuItem): MenuItem {
+  return {
+    ...item,
+    active: false,
+    selected: false,
+    children: item.children?.map(cloneMenuItem),
+  };
+}
+
+export function cloneMenuTree(items: MenuItem[]): MenuItem[] {
+  return items.map((item) => (item.menutitle ? { ...item } : cloneMenuItem(item)));
+}
+
 export const useNavigationMenu = (menuItems: MenuItem[]): MenuItem[] => {
   const { hasPermission, hasSubPermission, isLoading } = useNavigation();
 
@@ -31,15 +45,16 @@ export const useNavigationMenu = (menuItems: MenuItem[]): MenuItem[] => {
         return false;
       })
       .map((item) => {
+        if (item.menutitle) return { ...item };
         if (item.type === 'sub' && item.children) {
-          return {
+          return cloneMenuItem({
             ...item,
             children: item.children.filter(
               (child) => child.path && hasSubPermission(item.path || '/catalog', child.title)
             ),
-          };
+          });
         }
-        return item;
+        return cloneMenuItem(item);
       });
   }, [menuItems, hasPermission, hasSubPermission, isLoading]);
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/shared/redux/store';
 import {
@@ -53,12 +53,12 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children
     setIsLoading(false);
   }, [user, authInitialized]);
 
-  const hasCrudPermission = (path: string, action: CrudAction): boolean => {
+  const hasCrudPermission = useCallback((path: string, action: CrudAction): boolean => {
     const crud = getCrudAtPath(permissions, path);
     return Boolean(crud[action]);
-  };
+  }, [permissions]);
 
-  const hasPermission = (path: string): boolean => {
+  const hasPermission = useCallback((path: string): boolean => {
     if (!permissions) return false;
 
     if (path === '/dashboards/main' || path === '/dashboard') {
@@ -80,19 +80,22 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children
     }
 
     return false;
-  };
+  }, [permissions, hasCrudPermission]);
 
-  const hasSubPermission = (parent: string, child: string): boolean => {
+  const hasSubPermission = useCallback((parent: string, child: string): boolean => {
     if (parent === '/catalog') {
       return hasCrudPermission(`Catalog.${child}`, 'read');
     }
     return false;
-  };
+  }, [hasCrudPermission]);
+
+  const contextValue = useMemo(
+    () => ({ permissions, hasPermission, hasSubPermission, hasCrudPermission, isLoading }),
+    [permissions, hasPermission, hasSubPermission, hasCrudPermission, isLoading]
+  );
 
   return (
-    <NavigationContext.Provider
-      value={{ permissions, hasPermission, hasSubPermission, hasCrudPermission, isLoading }}
-    >
+    <NavigationContext.Provider value={contextValue}>
       {children}
     </NavigationContext.Provider>
   );

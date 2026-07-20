@@ -8,6 +8,7 @@ import SimpleBar from 'simplebar-react';
 import Menuloop from "./menuloop";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMenuItems } from "./nav";
+import { cloneMenuTree } from "@/shared/hooks/useNavigationMenu";
 import { useNavigation } from "@/shared/contextapi/navigationContext";
 
 const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
@@ -21,7 +22,9 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 		setMounted(true);
 	}, []);
 
-	const path = usePathname()	
+	const pathname = usePathname();
+	const searchParams = useSearchParams();
+	const searchString = searchParams?.toString() || '';
 
 	function closeMenu(keepSelectedActive = false) {
 		console.log('🔴 ========== closeMenu CALLED ==========');
@@ -112,57 +115,49 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 	}
 
 	useEffect(() => {
-		console.log('🔄 Menu items filtered, updating state', { 
-			filteredLength: filteredMenuItems?.length,
-			currentLength: menuitems?.length 
-		});
-		// Preserve active/selected state when menu items are re-filtered
-		if (filteredMenuItems && menuitems.length > 0) {
+		if (isLoading) return;
+
+		if (!filteredMenuItems?.length) {
+			setMenuitems([]);
+			return;
+		}
+
+		const items = cloneMenuTree(filteredMenuItems);
+
+		// Preserve open/active state when permissions re-filter the menu (not on first load).
+		if (menuitems.length > 0) {
 			const preserveMenuState = (newItems: any[], oldItems: any[]) => {
 				newItems.forEach((newItem: any) => {
 					if (!newItem || newItem.menutitle) {
-						// Skip menu titles but process children
 						if (newItem?.children && oldItems.length > 0) {
 							preserveMenuState(newItem.children, oldItems);
 						}
 						return;
 					}
-					// Match by title first (for menus without paths like Master Catalog), then by path
 					const oldItem = oldItems.find((old: any) => {
 						if (!old || old.menutitle) return false;
-						// For menus without paths, match by title
 						if (!newItem.path && !old.path) {
 							return old.title === newItem.title;
 						}
-						// For menus with paths, match by path or title
 						return old.path === newItem.path || old.title === newItem.title;
 					});
 					if (oldItem) {
-						console.log('🔄 Preserving state for:', newItem.title, {
-							oldActive: oldItem.active,
-							oldSelected: oldItem.selected,
-							newActive: newItem.active,
-							newSelected: newItem.selected
-						});
-						// Preserve active and selected state
 						newItem.active = oldItem.active;
 						newItem.selected = oldItem.selected;
 						if (newItem.children && oldItem.children) {
 							preserveMenuState(newItem.children, oldItem.children);
 						}
-					} else {
-						console.log('🔄 No matching old item found for:', newItem.title, {
-							hasPath: !!newItem.path,
-							path: newItem.path
-						});
 					}
 				});
 			};
-			preserveMenuState(filteredMenuItems, menuitems);
-			console.log('✅ Preserved menu state after filtering');
+			preserveMenuState(items, menuitems);
 		}
-		setMenuitems(filteredMenuItems || []);
-	}, [filteredMenuItems]);
+
+		let currentPath = pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+		const currentFullUrl = searchString ? `${currentPath}?${searchString}` : currentPath;
+		setMenuUsingUrl(currentPath, currentFullUrl, items);
+	// eslint-disable-next-line react-hooks/exhaustive-deps -- sync when menu permissions load/change, not on every navigation
+	}, [filteredMenuItems, isLoading]);
 
 	useEffect(() => {
 
@@ -192,9 +187,6 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 	}, []);
 
 	const router = useRouter();
-	const pathname = usePathname()
-	const searchParams = useSearchParams();
-	const searchString = searchParams?.toString() || '';
 
 	function Onhover() {
 
@@ -525,7 +517,8 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 	let hasParent = false;
 	let hasParentLevel = 0;
 
-	function setSubmenu(event: any, targetObject: any, menuItems = menuitems) {
+	function setSubmenu(event: any, targetObject: any, menuItems = menuitems, rootItems?: any[]) {
+		const menuRoot = rootItems ?? menuItems;
 		console.log('🟣 setSubmenu() called', {
 			hasEvent: !!event,
 			targetTitle: targetObject?.title,
@@ -540,7 +533,7 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 					console.log('✅ Setting menu item active:', item.title);
 					item.active = true;
 					item.selected = true;
-					setMenuAncestorsActive(item);
+					setMenuAncestorsActive(item, menuRoot);
 				} else if (!item.active && !item.selected) {
 					item.active = false; // Set active to false for items not matching the target
 					item.selected = false; // Set active to false for items not matching the target
@@ -548,7 +541,7 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 					removeActiveOtherMenus(item);
 				}
 				if (item.children && item.children.length > 0) {
-					setSubmenu(event, targetObject, item.children);
+					setSubmenu(event, targetObject, item.children, menuRoot);
 				}
 			}
 		}
@@ -574,8 +567,8 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 		return null; // Object not found
 	}
 
-	function setMenuAncestorsActive(targetObject: any) {
-		const parent = getParentObject(menuitems, targetObject);
+	function setMenuAncestorsActive(targetObject: any, rootItems = menuitems) {
+		const parent = getParentObject(rootItems, targetObject);
 		const theme = store.getState();
 		if (parent) {
 			if (hasParentLevel > 2) {
@@ -584,7 +577,7 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 			parent.active = true;
 			parent.selected = true;
 			hasParentLevel += 1;
-			setMenuAncestorsActive(parent);
+			setMenuAncestorsActive(parent, rootItems);
 		}
 		else if (!hasParent) {
 			if (theme.dataVerticalStyle == 'doublemenu') {
@@ -613,14 +606,17 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 		}
 	}
 
-	function setMenuUsingUrl(currentPath: any, currentFullUrl?: string) {
+	function setMenuUsingUrl(currentPath: any, currentFullUrl?: string, sourceItems?: any[]) {
 		console.log('🔵 ========== setMenuUsingUrl CALLED ==========');
 		console.log('🔵 setMenuUsingUrl() called', { currentPath, currentFullUrl });
 		hasParent = false;
 		hasParentLevel = 1;
+		const items = sourceItems ?? (menuitems.length > 0 ? menuitems : filteredMenuItems);
+		if (!items?.length) return;
+
 		// Check current url and trigger the setSidemenu method to active the menu.
-		const setSubmenuRecursively = (items: any) => {
-			items?.forEach((item: any) => {
+		const setSubmenuRecursively = (menuList: any) => {
+			menuList?.forEach((item: any) => {
 				const itemPathBase = item.path?.split('?')[0] || '';
 				const itemHasQuery = item.path?.includes('?');
 				const isMatch = itemHasQuery
@@ -632,7 +628,7 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 					// Mark this item as selected and active, and keep parent menus open
 					item.selected = true;
 					item.active = true;
-					setSubmenu(null, item);
+					setSubmenu(null, item, items);
 				} else {
 					// Only reset selected state - don't reset active if it's a parent
 					// But don't reset if it's a parent menu without a path (like Master Catalog)
@@ -665,14 +661,9 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 					if (hasSelectedChild) {
 						console.log('🔵 ✅ Keeping parent menu open:', item.title, 'hasSelectedChild:', hasSelectedChild);
 						item.active = true;
-						// Also set selected to true for parent menus with selected children
-						if (!item.path) {
-							item.selected = true;
-							console.log('🔵 ✅ Set parent menu selected (no path):', item.title);
-						}
-					} else if (!item.path && item.type === 'sub') {
-						// For parent menus without paths, only reset selected if no children are selected
-						console.log('🔵 No selected children - resetting parent:', item.title);
+						item.selected = true;
+					} else if (item.type === 'sub') {
+						item.active = false;
 						item.selected = false;
 					}
 					console.log('🔵 Parent menu final state:', {
@@ -683,9 +674,8 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 				}
 			});
 		};
-		// Use current menuitems state, not filteredMenuItems
-		setSubmenuRecursively(menuitems.length > 0 ? menuitems : filteredMenuItems);
-		setMenuitems((arr: any) => [...arr]);
+		setSubmenuRecursively(items);
+		setMenuitems([...items]);
 		console.log('🔵 setMenuUsingUrl() completed');
 		console.log('🔵 =========================================');
 	}
