@@ -28,7 +28,7 @@ const AddCategoryPage = () => {
     name: '',
     description: '',
     parent: '',
-    sortOrder: '1',
+    sortOrder: '',
     status: 'active' as 'active' | 'inactive'
   });
 
@@ -36,7 +36,7 @@ const AddCategoryPage = () => {
   useEffect(() => {
     const fetchParentCategories = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/categories`, {
+        const response = await fetch(`${API_BASE_URL}/categories?page=1&limit=100000`, {
           headers: {
             'Accept': 'application/json',
           },
@@ -79,6 +79,16 @@ const AddCategoryPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.sortOrder.trim()) {
+      alert('Sort order is required');
+      return;
+    }
+    const sortOrder = parseInt(formData.sortOrder, 10);
+    if (isNaN(sortOrder) || sortOrder < 1) {
+      alert('Sort order must be a valid number');
+      return;
+    }
     
     try {
       setIsLoading(true);
@@ -107,7 +117,7 @@ const AddCategoryPage = () => {
         name: formData.name,
         parent: formData.parent || undefined,
         description: formData.description || undefined,
-        sortOrder: parseInt(formData.sortOrder),
+        sortOrder,
         status: formData.status,
         image: imageUrl || undefined
       };
@@ -124,14 +134,16 @@ const AddCategoryPage = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create category');
+        const message = errorData.message || 'Failed to create category';
+        alert(message);
+        return;
       }
 
       toast.success('Category created successfully');
       router.push('/catalog/categories');
     } catch (err) {
       console.error('Error creating category:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to create category');
+      alert(err instanceof Error ? err.message : 'Failed to create category');
     } finally {
       setIsLoading(false);
     }
@@ -256,10 +268,9 @@ const AddCategoryPage = () => {
                       id="sortOrder"
                       name="sortOrder"
                       className="form-control"
-                      placeholder="Enter sort order"
+                      placeholder="Enter sort order index..."
                       value={formData.sortOrder}
                       onChange={handleInputChange}
-                      required
                       min="1"
                     />
                   </div>

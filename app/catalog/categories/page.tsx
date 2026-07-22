@@ -12,12 +12,21 @@ import CatalogRowActions from '@/shared/components/catalog/CatalogRowActions';
 interface Category {
   id: string;
   name: string;
-  parent?: string | null;
+  parent?: string | null | { id: string; name: string };
   description?: string;
   sortOrder: number;
   status: 'active' | 'inactive';
   image?: string;
 }
+
+const getParentCategoryName = (
+  parent: Category['parent'],
+  nameMap: Record<string, string> = {}
+): string | null => {
+  if (!parent) return null;
+  if (typeof parent === 'object') return parent.name;
+  return nameMap[parent] || null;
+};
 
 interface ExcelRow {
   'ID'?: string;
@@ -40,6 +49,7 @@ const CategoriesPage = () => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalResults, setTotalResults] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [categoryNameMap, setCategoryNameMap] = useState<Record<string, string>>({});
   const [importProgress, setImportProgress] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -74,6 +84,24 @@ const CategoriesPage = () => {
   }, [currentPage, itemsPerPage, searchQuery]);
 
   useEffect(() => {
+    const fetchCategoryNames = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/categories?page=1&limit=100000`);
+        if (!response.ok) return;
+        const data = await response.json();
+        const map: Record<string, string> = {};
+        (data.results || []).forEach((cat: Category) => {
+          map[cat.id] = cat.name;
+        });
+        setCategoryNameMap(map);
+      } catch {
+        // Non-critical lookup for parent names
+      }
+    };
+    fetchCategoryNames();
+  }, []);
+
+  useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery]);
 
@@ -81,7 +109,7 @@ const CategoriesPage = () => {
     if (selectAll) {
       setSelectedCategories([]);
     } else {
-      setSelectedCategories(filteredCategories.map(cat => cat.id));
+      setSelectedCategories(categories.map(cat => cat.id));
     }
     setSelectAll(!selectAll);
   };
@@ -177,15 +205,37 @@ const CategoriesPage = () => {
     }
   };
 
-  // Filter categories based on search query
-  const filteredCategories = categories.filter(category =>
-    category.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // Calculate current categories for the current page
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentCategories = filteredCategories.slice(startIndex, endIndex);
+  const handleExportTemplate = () => {
+    try {
+      const sampleData = [
+        {
+          'Category Name': 'Electronics',
+          'Description': 'Electronic products and accessories',
+          'Parent Category': 'None',
+          'Sort Order': 1,
+          'Status': 'active',
+        },
+        {
+          'Category Name': 'Mobile Phones',
+          'Description': 'Smartphones and mobile devices',
+          'Parent Category': 'Electronics',
+          'Sort Order': 1,
+          'Status': 'active',
+        },
+      ];
+      const ws = XLSX.utils.json_to_sheet(sampleData);
+      ws['!cols'] = [
+        { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 10 }, { wch: 10 },
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Category Template');
+      XLSX.writeFile(wb, 'category_import_template.xlsx');
+      toast.success('Template downloaded successfully');
+    } catch (error) {
+      console.error('Error creating template:', error);
+      toast.error('Failed to download template');
+    }
+  };
 
   const handleExport = async () => {
     try {
@@ -198,7 +248,9 @@ const CategoriesPage = () => {
         'ID': category.id,
         'Category Name': category.name,
         'Description': category.description || '',
-        'Parent Category': exportSource.find((p: Category) => p.id === category.parent)?.name || 'None',
+        'Parent Category': getParentCategoryName(category.parent, categoryNameMap)
+          || exportSource.find((p: Category) => p.id === category.parent)?.name
+          || 'None',
         'Sort Order': category.sortOrder,
         'Status': category.status
       }));
@@ -443,6 +495,13 @@ const CategoriesPage = () => {
               )}
               <button
                 type="button"
+                onClick={handleExportTemplate}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 text-[#495057] text-[11px] font-bold rounded hover:bg-gray-50 transition-colors shadow-sm"
+              >
+                <i className="ri-file-download-line text-xs"></i> Template
+              </button>
+              <button
+                type="button"
                 onClick={handleExport}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm"
               >
@@ -482,7 +541,7 @@ const CategoriesPage = () => {
               </div>
               <p className="text-[12px] font-medium text-red-600">{error}</p>
             </div>
-          ) : currentCategories.length === 0 ? (
+          ) : categories.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
                 <i className="ri-folder-line text-xl text-gray-200"></i>
@@ -511,17 +570,21 @@ const CategoriesPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {currentCategories.map((category: Category) => (
+                {categories.map((category: Category) => {
+                  const parentName = getParentCategoryName(category.parent, categoryNameMap);
+                  return (
                   <tr key={category.id} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="pl-[10px] pr-1 py-2.5 border border-gray-200">
                       <input type="checkbox" checked={selectedCategories.includes(category.id)} onChange={() => handleCategorySelect(category.id)} className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" />
                     </td>
                     <td className="px-1.5 py-2.5 text-[12px] font-bold text-gray-900 border border-gray-200">{category.name}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">
-                      {category.parent ? (
+                      {parentName ? (
                         <span className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-100 text-gray-700">
-                          {categories.find(c => c.id === category.parent)?.name || category.parent}
+                          {parentName}
                         </span>
+                      ) : category.parent ? (
+                        <span className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-100 text-gray-400">—</span>
                       ) : (
                         <span className="inline-flex px-1.5 py-0.5 text-[9px] font-bold rounded uppercase tracking-tight bg-gray-100 text-gray-500">Root</span>
                       )}
@@ -542,7 +605,8 @@ const CategoriesPage = () => {
                     </td>
                     )}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}

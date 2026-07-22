@@ -102,10 +102,13 @@ const ProductListPage = () => {
   const processesFileInputRef = useRef<HTMLInputElement>(null);
   const styleCodesFileInputRef = useRef<HTMLInputElement>(null);
   const processExcelFileInputRef = useRef<HTMLInputElement>(null);
+  const fetchGenerationRef = useRef(0);
 
   useEffect(() => {
-    fetchProducts();
+    const controller = new AbortController();
+    fetchProducts(controller.signal);
     fetchCategories();
+    return () => controller.abort();
   }, [currentPage, itemsPerPage, searchQuery, styleCodeSearch]);
 
   // Fetch style codes once for resolving IDs in modal/export
@@ -121,7 +124,14 @@ const ProductListPage = () => {
     }).catch(() => setStyleCodeLookup([]));
   }, []);
 
-  const fetchProducts = async () => {
+  const isRequestCancelled = (error: unknown, signal?: AbortSignal) => {
+    if (signal?.aborted) return true;
+    if (!axios.isAxiosError(error)) return false;
+    return error.code === 'ERR_CANCELED' || error.message === 'canceled';
+  };
+
+  const fetchProducts = async (signal?: AbortSignal) => {
+    const generation = ++fetchGenerationRef.current;
     setIsLoading(true);
     try {
       const params = new URLSearchParams({
@@ -130,24 +140,22 @@ const ProductListPage = () => {
       });
       if (searchQuery.trim()) params.set('search', searchQuery.trim());
       if (styleCodeSearch.trim()) params.set('styleCode', styleCodeSearch.trim());
-      const response = await axios.get(`${API_ENDPOINTS.products}?${params.toString()}`);
+      const response = await axios.get(`${API_ENDPOINTS.products}?${params.toString()}`, { signal });
       const data = response.data as ProductsResponse;
-      
-      // Debug: Log the first product to see its structure
-      if (data.results && data.results.length > 0) {
-        console.log('First product structure:', data.results[0]);
-        console.log('Category type:', typeof data.results[0].category);
-        console.log('Category value:', data.results[0].category);
-      }
-      
-      setProducts(data.results);
-      setTotalPages(data.totalPages);
-      setTotalResults(data.totalResults);
+
+      if (generation !== fetchGenerationRef.current) return;
+
+      setProducts(data.results ?? []);
+      setTotalPages(data.totalPages ?? 1);
+      setTotalResults(data.totalResults ?? 0);
     } catch (error) {
+      if (isRequestCancelled(error, signal) || generation !== fetchGenerationRef.current) return;
       console.error('Error fetching products:', error);
       toast.error('Error fetching products. Please try again.');
     } finally {
-      setIsLoading(false);
+      if (generation === fetchGenerationRef.current && !signal?.aborted) {
+        setIsLoading(false);
+      }
     }
   };
 

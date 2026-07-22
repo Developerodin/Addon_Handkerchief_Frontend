@@ -39,28 +39,38 @@ export const isTokenExpired = (token: string): boolean => {
   }
 };
 
+let refreshInFlight: Promise<string | null> | null = null;
+
 export const refreshAccessToken = async (): Promise<string | null> => {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return null;
+  if (refreshInFlight) return refreshInFlight;
 
-  try {
-    const response = await fetch(`${API_BASE_URL}/auth/refresh-tokens`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    });
+  refreshInFlight = (async () => {
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) return null;
 
-    if (!response.ok) return null;
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh-tokens`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
 
-    const data = await response.json();
-    const accessToken = data?.access?.token;
-    if (!accessToken) return null;
+      if (!response.ok) return null;
 
-    storeAuthTokens(accessToken, data?.refresh?.token);
-    return accessToken;
-  } catch {
-    return null;
-  }
+      const data = await response.json();
+      const accessToken = data?.access?.token;
+      if (!accessToken) return null;
+
+      storeAuthTokens(accessToken, data?.refresh?.token);
+      return accessToken;
+    } catch {
+      return null;
+    }
+  })().finally(() => {
+    refreshInFlight = null;
+  });
+
+  return refreshInFlight;
 };
 
 export const getValidAccessToken = async (): Promise<string | null> => {

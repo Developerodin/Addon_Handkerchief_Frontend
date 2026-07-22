@@ -62,7 +62,7 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
 
     const fetchParentCategories = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/categories`);
+        const response = await fetch(`${API_BASE_URL}/categories?page=1&limit=100000`);
         if (!response.ok) throw new Error('Failed to fetch categories');
         const data = await response.json();
         // Filter out the current category and its children to prevent circular references
@@ -123,7 +123,10 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update category');
+        const message = errorData.message || 'Failed to update category';
+        toast.dismiss(loadingToast);
+        alert(message);
+        return;
       }
 
       // If we have a new image, upload it separately
@@ -145,7 +148,8 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
       router.push('/catalog/categories');
     } catch (error) {
       console.error('Error updating category:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to update category', { id: loadingToast });
+      toast.dismiss(loadingToast);
+      alert(error instanceof Error ? error.message : 'Failed to update category');
     }
   };
 
