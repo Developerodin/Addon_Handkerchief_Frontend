@@ -93,7 +93,7 @@ export default function Signinbasic() {
               </div>
 
               <h2 className="text-2xl text-white text-center mb-8">
-                Admin Login
+                Addon Handkerchief
               </h2>
 
               {error && (

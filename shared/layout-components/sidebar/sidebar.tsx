@@ -953,7 +953,7 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 						href="/dashboards/main"
 						className="header-logo"
 					>
-						<span className="text-2xl font-bold text-white">Addon</span>
+						<span className="text-xl font-bold text-white">Addon Handkerchief</span>
 					</Link>
 				</div>
 
