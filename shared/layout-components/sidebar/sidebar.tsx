@@ -951,9 +951,13 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 				<div className="main-sidebar-header">
 					<Link
 						href="/dashboards/main"
-						className="header-logo"
+						className="header-logo flex w-full items-center justify-center py-2 text-center"
+						aria-label="Addon Handkerchief home"
 					>
-						<span className="text-xl font-bold text-white">Addon Handkerchief</span>
+						<span className="flex flex-col items-center gap-0.5 text-sm font-semibold text-white leading-tight">
+							<span>Addon</span>
+							<span>Handkerchief</span>
+						</span>
 					</Link>
 				</div>
 
