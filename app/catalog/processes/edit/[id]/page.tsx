@@ -7,6 +7,7 @@ import Seo from '@/shared/layout-components/seo/seo';
 import Image from 'next/image';
 import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
+import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 
 interface ProcessStep {
@@ -133,21 +134,22 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
     const loadingToast = toast.loading('Updating process...');
 
     try {
-      // Clean steps data by removing createdAt and updatedAt fields
+      const imageUrl = await uploadOptionalImage(formData.image);
+
       const cleanSteps = formData.steps.map(step => ({
         stepTitle: step.stepTitle,
         stepDescription: step.stepDescription,
         duration: step.duration
       }));
 
-      // First, update the process data
       const processData = {
         name: formData.name,
         type: formData.type,
         description: formData.description,
         sortOrder: formData.sortOrder,
         status: formData.status,
-        steps: cleanSteps
+        steps: cleanSteps,
+        ...(imageUrl ? { image: imageUrl } : {}),
       };
 
       const response = await fetch(`${API_BASE_URL}/processes/${params.id}`, {
@@ -162,21 +164,6 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to update process');
-      }
-
-      // If there's a new image, upload it
-      if (formData.image) {
-        const imageFormData = new FormData();
-        imageFormData.append('image', formData.image);
-
-        const imageResponse = await fetch(`${API_BASE_URL}/processes/${params.id}/image`, {
-          method: 'PATCH',
-          body: imageFormData,
-        });
-
-        if (!imageResponse.ok) {
-          toast.error('Process updated but failed to upload image');
-        }
       }
 
       toast.success('Process updated successfully', { id: loadingToast });

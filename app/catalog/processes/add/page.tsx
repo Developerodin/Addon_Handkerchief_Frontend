@@ -7,7 +7,9 @@ import Seo from '@/shared/layout-components/seo/seo';
 import Image from 'next/image';
 import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
+import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
+import { filterDigitsOnly } from '@/shared/utils/formInputFilters';
 
 interface ProcessStep {
   stepTitle: string;
@@ -42,9 +44,17 @@ const AddProcessPage = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    if (name === 'sortOrder') {
+      const filtered = filterDigitsOnly(value);
+      setFormData(prev => ({
+        ...prev,
+        sortOrder: filtered === '' ? 0 : parseInt(filtered, 10),
+      }));
+      return;
+    }
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'sortOrder' ? parseInt(value) || 0 : value
+      [name]: value,
     }));
   };
 
@@ -58,13 +68,21 @@ const AddProcessPage = () => {
 
   const handleStepChange = (index: number, field: keyof ProcessStep, value: string) => {
     const newSteps = [...formData.steps];
-    newSteps[index] = {
-      ...newSteps[index],
-      [field]: field === 'duration' ? parseInt(value) || 0 : value
-    };
+    if (field === 'duration') {
+      const filtered = filterDigitsOnly(value);
+      newSteps[index] = {
+        ...newSteps[index],
+        duration: filtered === '' ? 0 : parseInt(filtered, 10),
+      };
+    } else {
+      newSteps[index] = {
+        ...newSteps[index],
+        [field]: value,
+      };
+    }
     setFormData(prev => ({
       ...prev,
-      steps: newSteps
+      steps: newSteps,
     }));
   };
 
@@ -91,14 +109,16 @@ const AddProcessPage = () => {
     const loadingToast = toast.loading('Creating process...');
 
     try {
-      // First, create the process
+      const imageUrl = await uploadOptionalImage(formData.image);
+
       const processData = {
         name: formData.name,
         type: formData.type,
         description: formData.description,
         sortOrder: formData.sortOrder,
         status: formData.status,
-        steps: formData.steps
+        steps: formData.steps,
+        ...(imageUrl ? { image: imageUrl } : {}),
       };
 
       const response = await fetch(`${API_BASE_URL}/processes`, {
@@ -113,23 +133,6 @@ const AddProcessPage = () => {
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to create process');
-      }
-
-      const result = await response.json();
-
-      // If there's an image, upload it
-      if (formData.image) {
-        const imageFormData = new FormData();
-        imageFormData.append('image', formData.image);
-
-        const imageResponse = await fetch(`${API_BASE_URL}/processes/${result.id}/image`, {
-          method: 'PATCH',
-          body: imageFormData,
-        });
-
-        if (!imageResponse.ok) {
-          toast.error('Process created but failed to upload image');
-        }
       }
 
       toast.success('Process created successfully', { id: loadingToast });
@@ -217,12 +220,13 @@ const AddProcessPage = () => {
                       <div className="form-group">
                         <label htmlFor="sortOrder" className="form-label">Sort Order</label>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           id="sortOrder"
                           name="sortOrder"
                           className="form-control"
                           placeholder="Enter sort order"
-                          value={formData.sortOrder}
+                          value={formData.sortOrder === 0 ? '' : String(formData.sortOrder)}
                           onChange={handleInputChange}
                           disabled={isSubmitting}
                         />
@@ -338,9 +342,10 @@ const AddProcessPage = () => {
                           <div className="form-group">
                             <label className="form-label required">Duration (min)</label>
                             <input
-                              type="number"
+                              type="text"
+                              inputMode="numeric"
                               className="form-control"
-                              value={step.duration}
+                              value={step.duration === 0 ? '' : String(step.duration)}
                               onChange={(e) => handleStepChange(index, 'duration', e.target.value)}
                               required
                               disabled={isSubmitting}

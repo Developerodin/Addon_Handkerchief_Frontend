@@ -8,6 +8,7 @@ import { API_BASE_URL } from '@/shared/data/utilities/api';
 import HelpIcon from '@/shared/components/HelpIcon';
 import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud';
 import CatalogRowActions from '@/shared/components/catalog/CatalogRowActions';
+import CatalogPageSizeSelect from '@/shared/components/catalog/CatalogPageSizeSelect';
 
 interface RawMaterial {
   id: string;
@@ -152,6 +153,58 @@ const RawMaterialPage = () => {
     } catch (error) {
       console.error('Error exporting raw materials:', error);
       toast.error('Failed to export raw materials');
+    }
+  };
+
+  const handleExportTemplate = () => {
+    try {
+      const sampleData = [
+        {
+          'Name': 'Cotton Yarn 40s',
+          'Group Name': 'Yarn',
+          'Type': 'Threads',
+          'Description': 'Premium cotton yarn for knitting',
+          'Brand': 'Sample Brand',
+          'Count/Size': '40',
+          'Material': 'Cotton',
+          'Color': 'White',
+          'Shade': 'Natural',
+          'Unit': 'Kilograms',
+          'MRP': '500',
+          'HSN Code': '52051200',
+          'GST %': '12',
+          'Article No.': 'ART-001',
+        },
+        {
+          'Name': 'Polybag Medium',
+          'Group Name': 'Packing Material',
+          'Type': 'Polybags',
+          'Description': 'Medium size polybag for packaging',
+          'Brand': 'PackWell',
+          'Count/Size': '100',
+          'Material': 'Plastic',
+          'Color': 'Transparent',
+          'Shade': 'Clear',
+          'Unit': 'Pcs',
+          'MRP': '2.50',
+          'HSN Code': '39232990',
+          'GST %': '18',
+          'Article No.': 'ART-002',
+        },
+      ];
+      const ws = XLSX.utils.json_to_sheet(sampleData);
+      ws['!cols'] = [
+        { wch: 20 }, { wch: 18 }, { wch: 12 }, { wch: 30 }, { wch: 15 },
+        { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
+        { wch: 10 }, { wch: 12 }, { wch: 8 }, { wch: 12 },
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Raw Material Template');
+      XLSX.writeFile(wb, 'raw_material_import_template.xlsx');
+      toast.success('Template downloaded successfully');
+    } catch (error) {
+      console.error('Error creating template:', error);
+      toast.error('Failed to download template');
     }
   };
 
@@ -350,8 +403,8 @@ const RawMaterialPage = () => {
       <Toaster position="top-right" />
       <Seo title="Raw Material"/>
 
-      <div className="bg-white shadow-sm border border-gray-100 overflow-hidden mx-0">
-        <div className="p-[10px]">
+      <div className="bg-white shadow-sm border border-gray-100 mx-0 catalog-list-card">
+        <div className="p-[10px] catalog-list-toolbar">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-2">
               <div className="w-[3px] h-5 bg-purple-600 rounded-full"></div>
@@ -415,23 +468,13 @@ const RawMaterialPage = () => {
                 />
                 <i className="ri-search-line absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
               </div>
-              <div className="relative group">
-                <select
-                  value={itemsPerPage}
-                  onChange={e => {
-                    setItemsPerPage(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  className="bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-gray-300 appearance-none cursor-pointer"
-                >
-                  <option value={10}>Show 10</option>
-                  <option value={50}>Show 50</option>
-                  <option value={100}>Show 100</option>
-                  <option value={500}>Show 500</option>
-                  <option value={1000}>Show 1000</option>
-                </select>
-                <i className="ri-arrow-down-s-line absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
-              </div>
+              <CatalogPageSizeSelect
+                value={itemsPerPage}
+                onChange={(value) => {
+                  setItemsPerPage(value);
+                  setCurrentPage(1);
+                }}
+              />
               <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls" onChange={handleImport} />
               {canImport && (
               <button
@@ -448,6 +491,13 @@ const RawMaterialPage = () => {
                   <span className="ml-1.5 text-[10px] text-gray-600 font-medium">{importProgress}%</span>
                 </div>
               )}
+              <button
+                type="button"
+                onClick={handleExportTemplate}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 text-[#495057] text-[11px] font-bold rounded hover:bg-gray-50 transition-colors shadow-sm"
+              >
+                <i className="ri-file-download-line text-xs"></i> Template
+              </button>
               <button
                 type="button"
                 onClick={handleExport}

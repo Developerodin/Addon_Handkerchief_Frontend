@@ -14,6 +14,7 @@ import yarnCatalogService, { YarnCatalog } from '@/shared/services/yarnCatalogSe
 import { styleCodeService } from '@/shared/services/styleCodeService';
 import productService, { ProductBulkRow } from '@/shared/services/productService';
 import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud';
+import CatalogPageSizeSelect from '@/shared/components/catalog/CatalogPageSizeSelect';
 
 interface StyleCode {
   styleCode?: string;
@@ -2442,8 +2443,8 @@ const ProductListPage = () => {
     <div className="main-content !p-[10px]">
       <Seo title="Products"/>
 
-      <div className="bg-white shadow-sm border border-gray-100 overflow-hidden mx-0">
-        <div className="p-[10px]">
+      <div className="bg-white shadow-sm border border-gray-100 mx-0 catalog-list-card">
+        <div className="p-[10px] catalog-list-toolbar">
           {/* Header Section */}
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-2">
@@ -2550,24 +2551,13 @@ const ProductListPage = () => {
                 <i className="ri-search-line absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
               </div>
 
-              {/* Items per page */}
-              <div className="relative group">
-                <select
-                  value={itemsPerPage}
-                  onChange={e => {
-                    setItemsPerPage(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  className="bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-gray-300 appearance-none cursor-pointer"
-                >
-                  <option value={10}>Show 10</option>
-                  <option value={50}>Show 50</option>
-                  <option value={100}>Show 100</option>
-                  <option value={500}>Show 500</option>
-                  <option value={1000}>Show 1000</option>
-                </select>
-                <i className="ri-arrow-down-s-line absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
-              </div>
+              <CatalogPageSizeSelect
+                value={itemsPerPage}
+                onChange={(value) => {
+                  setItemsPerPage(value);
+                  setCurrentPage(1);
+                }}
+              />
 
               <button
                 type="button"

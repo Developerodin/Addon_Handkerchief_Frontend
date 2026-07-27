@@ -7,6 +7,7 @@ import Seo from '@/shared/layout-components/seo/seo';
 import Image from 'next/image';
 import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
+import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 
 // Types
@@ -150,25 +151,27 @@ const AddAttributePage = () => {
         return;
       }
 
-      // Prepare payload
+      // Upload option value images to S3 (optional per value)
+      const optionValues = await Promise.all(
+        formData.values.map(async (value) => {
+          const optionValue: ApiOptionValue = {
+            name: value.name.trim(),
+            sortOrder: parseInt(value.sortOrder),
+          };
+          const imageUrl = await uploadOptionalImage(value.image);
+          if (imageUrl) {
+            optionValue.image = imageUrl;
+          }
+          return optionValue;
+        })
+      );
+
       const payload: AttributePayload = {
         name: formData.name.trim(),
         type: formData.type,
         attributeType: formData.attributeType,
         sortOrder: parseInt(formData.sortOrder),
-        optionValues: formData.values.map(value => {
-          const optionValue: ApiOptionValue = {
-            name: value.name.trim(),
-            sortOrder: parseInt(value.sortOrder)
-          };
-          
-          // Only add image to payload if it exists
-          if (value.image) {
-            optionValue.image = URL.createObjectURL(value.image);
-          }
-          
-          return optionValue;
-        })
+        optionValues,
       };
 
       console.log('Submitting payload:', payload);
@@ -411,10 +414,11 @@ const AddAttributePage = () => {
                     <div className="mt-4">
                       <button
                         type="button"
-                        className="btn btn-primary"
+                        className="ti-btn ti-btn-primary"
                         onClick={addValueField}
                         disabled={isSubmitting}
                       >
+                        <i className="ri-add-line me-2"></i>
                         Add Option Value
                       </button>
                     </div>
@@ -423,7 +427,7 @@ const AddAttributePage = () => {
                   <div className="flex justify-end space-x-4 mt-6">
                     <button
                       type="button"
-                      className="btn btn-outline-secondary"
+                      className="ti-btn ti-btn-secondary"
                       onClick={() => router.back()}
                       disabled={isSubmitting}
                     >
@@ -431,10 +435,17 @@ const AddAttributePage = () => {
                     </button>
                     <button
                       type="submit"
-                      className="btn btn-primary"
+                      className="ti-btn ti-btn-primary"
                       disabled={isSubmitting}
                     >
-                      {isSubmitting ? 'Saving...' : 'Save'}
+                      {isSubmitting ? (
+                        <>
+                          <span className="animate-spin inline-block h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"></span>
+                          Saving...
+                        </>
+                      ) : (
+                        'Save'
+                      )}
                     </button>
                   </div>
                 </div>

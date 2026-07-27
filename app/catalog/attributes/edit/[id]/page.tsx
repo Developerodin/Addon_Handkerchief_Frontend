@@ -5,6 +5,7 @@ import Seo from '@/shared/layout-components/seo/seo';
 import { toast, Toaster } from 'react-hot-toast';
 import Image from 'next/image';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
+import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import * as XLSX from 'xlsx';
 
@@ -28,6 +29,7 @@ interface Attribute {
 type OptionValueForm = {
   name: string;
   image: File | null;
+  imageUrl?: string | null;
   sortOrder: number;
   id?: number;
   _id?: string;
@@ -79,6 +81,7 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
           optionValues: data.optionValues.map((value: AttributeValue) => ({
             name: value.name,
             image: null,
+            imageUrl: value.image || null,
             sortOrder: value.sortOrder,
             id: value.id,
             _id: value._id
@@ -123,7 +126,7 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
       ...prev,
       optionValues: [
         ...prev.optionValues,
-        { name: '', image: null, sortOrder: prev.optionValues.length } as OptionValueForm
+        { name: '', image: null, imageUrl: null, sortOrder: prev.optionValues.length } as OptionValueForm
       ]
     }));
   };
@@ -142,16 +145,24 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
       setIsSaving(true);
       setError(null);
 
-      // Prepare form data
+      const optionValues = await Promise.all(
+        formData.optionValues.map(async (option) => {
+          const uploadedUrl = await uploadOptionalImage(option.image);
+          const image = uploadedUrl ?? option.imageUrl ?? undefined;
+          return {
+            name: option.name,
+            sortOrder: option.sortOrder,
+            ...(image ? { image } : {}),
+          };
+        })
+      );
+
       const updateData = {
         name: formData.name,
         type: formData.type,
         attributeType: formData.attributeType || 'Manufacturing',
         sortOrder: formData.sortOrder,
-        optionValues: formData.optionValues.map(option => ({
-          name: option.name,
-          sortOrder: option.sortOrder
-        }))
+        optionValues,
       };
 
       const response = await fetch(`${API_BASE_URL}/product-attributes/${params.id}`, {
@@ -331,7 +342,7 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
                   {formData.optionValues.map((option, index) => (
                     <div
                       key={index}
-                      className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-4 items-end p-4 border rounded-lg"
+                      className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-4 items-end p-4 border rounded-lg"
                     >
                       <div className="min-w-0">
                         <label className="form-label">Name</label>
@@ -353,6 +364,46 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
                           onChange={(e) => handleOptionChange(index, 'sortOrder', parseInt(e.target.value))}
                           disabled={isSaving}
                         />
+                      </div>
+                      <div className="min-w-0">
+                        <label className="form-label">Image (Optional)</label>
+                        <div className="relative w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg overflow-hidden">
+                          {option.image || option.imageUrl ? (
+                            <div className="relative w-full h-full">
+                              <Image
+                                src={option.image ? URL.createObjectURL(option.image) : (option.imageUrl as string)}
+                                alt="Preview"
+                                fill
+                                className="object-contain rounded-lg"
+                              />
+                              <button
+                                type="button"
+                                className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 shadow-sm hover:bg-red-600"
+                                onClick={() => {
+                                  handleOptionChange(index, 'image', null);
+                                  handleOptionChange(index, 'imageUrl', null);
+                                }}
+                                disabled={isSaving}
+                              >
+                                <i className="ri-close-line"></i>
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="text-center h-full flex flex-col items-center justify-center">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleOptionChange(index, 'image', file);
+                                }}
+                                disabled={isSaving}
+                              />
+                              <i className="ri-upload-cloud-2-line text-xl text-gray-400"></i>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <button
                         type="button"

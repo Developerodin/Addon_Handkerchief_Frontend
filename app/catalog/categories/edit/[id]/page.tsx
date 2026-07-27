@@ -5,6 +5,7 @@ import Seo from '@/shared/layout-components/seo/seo';
 import { toast, Toaster } from 'react-hot-toast';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
+import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 
 interface Category {
   id: string;
@@ -103,13 +104,15 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
     const loadingToast = toast.loading('Updating category...');
 
     try {
-      // Create the request body as a JSON object
+      const imageUrl = await uploadOptionalImage(imageFile);
+
       const requestBody = {
         name: formData.name,
         description: formData.description || '',
         sortOrder: parseInt(formData.sortOrder.toString()),
         status: formData.status,
-        parent: formData.parent || null
+        parent: formData.parent || null,
+        ...(imageUrl ? { image: imageUrl } : {}),
       };
 
       const response = await fetch(`${API_BASE_URL}/categories/${params.id}`, {
@@ -127,21 +130,6 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
         toast.dismiss(loadingToast);
         alert(message);
         return;
-      }
-
-      // If we have a new image, upload it separately
-      if (imageFile) {
-        const imageFormData = new FormData();
-        imageFormData.append('image', imageFile);
-
-        const imageResponse = await fetch(`${API_BASE_URL}/categories/${params.id}/image`, {
-          method: 'PATCH',
-          body: imageFormData,
-        });
-
-        if (!imageResponse.ok) {
-          toast.error('Category updated but failed to upload image');
-        }
       }
 
       toast.success('Category updated successfully', { id: loadingToast });

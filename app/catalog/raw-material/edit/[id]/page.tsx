@@ -5,6 +5,7 @@ import Seo from '@/shared/layout-components/seo/seo';
 import { toast, Toaster } from 'react-hot-toast';
 import Image from 'next/image';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
+import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 
 interface RawMaterial {
@@ -119,7 +120,8 @@ function EditRawMaterial({ params }: { params: { id: string } }) {
     try {
       setIsLoading(true);
 
-      // Send the update request with JSON data
+      const imageUrl = await uploadOptionalImage(selectedImage);
+
       const response = await fetch(`${API_BASE_URL}/raw-materials/${params.id}`, {
         method: 'PATCH',
         headers: {
@@ -140,29 +142,14 @@ function EditRawMaterial({ params }: { params: { id: string } }) {
           mrp: material.mrp,
           hsnCode: material.hsnCode,
           gst: material.gst,
-          articleNo: material.articleNo
+          articleNo: material.articleNo,
+          ...(imageUrl ? { image: imageUrl } : {}),
         })
       });
 
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to update material');
-      }
-
-      // If image is selected, upload it separately
-      if (selectedImage) {
-        const formData = new FormData();
-        formData.append('image', selectedImage);
-
-        const imageResponse = await fetch(`${API_BASE_URL}/raw-materials/${params.id}/image`, {
-          method: 'PATCH',
-          body: formData,
-        });
-
-        if (!imageResponse.ok) {
-          const errorData = await imageResponse.json();
-          throw new Error(errorData.message || 'Failed to update image');
-        }
       }
 
       toast.success('Material updated successfully');

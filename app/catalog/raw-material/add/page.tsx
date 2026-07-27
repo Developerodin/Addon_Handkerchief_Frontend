@@ -6,7 +6,9 @@ import Seo from '@/shared/layout-components/seo/seo';
 import Image from 'next/image';
 import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
+import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
+import { filterDecimalInput, filterDigitsOnly, filterTextOnly } from '@/shared/utils/formInputFilters';
 
 interface RawMaterialForm {
   name: string;
@@ -53,6 +55,8 @@ function AddRawMaterial() {
     setIsSubmitting(true);
 
     try {
+      const imageUrl = await uploadOptionalImage(formData.image);
+
       const requestData = {
         name: formData.name,
         groupName: formData.groupName,
@@ -68,7 +72,7 @@ function AddRawMaterial() {
         hsnCode: formData.hsnCode,
         gst: formData.gst,
         articleNo: formData.articleNo,
-        image: 'null',
+        ...(imageUrl ? { image: imageUrl } : {}),
       };
 
       const response = await fetch(`${API_BASE_URL}/raw-materials`, {
@@ -100,6 +104,30 @@ function AddRawMaterial() {
     setFormData(prev => ({
       ...prev,
       [name]: value,
+    }));
+  };
+
+  const handleTextOnlyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: filterTextOnly(value),
+    }));
+  };
+
+  const handleDigitsOnlyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: filterDigitsOnly(value),
+    }));
+  };
+
+  const handleDecimalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: filterDecimalInput(value),
     }));
   };
 
@@ -234,7 +262,7 @@ function AddRawMaterial() {
                       type="text"
                       name="name"
                       value={formData.name}
-                      onChange={handleChange}
+                      onChange={handleTextOnlyChange}
                       className="form-control"
                       required
                     />
@@ -260,7 +288,7 @@ function AddRawMaterial() {
                       type="text"
                       name="brand"
                       value={formData.brand}
-                      onChange={handleChange}
+                      onChange={handleTextOnlyChange}
                       className="form-control"
                       required
                     />
@@ -273,8 +301,9 @@ function AddRawMaterial() {
                       type="text"
                       name="countSize"
                       value={formData.countSize}
-                      onChange={handleChange}
+                      onChange={handleDigitsOnlyChange}
                       className="form-control"
+                      inputMode="numeric"
                       required
                     />
                   </div>
@@ -349,8 +378,9 @@ function AddRawMaterial() {
                       type="text"
                       name="mrp"
                       value={formData.mrp}
-                      onChange={handleChange}
+                      onChange={handleDecimalChange}
                       className="form-control"
+                      inputMode="decimal"
                       required
                     />
                   </div>
@@ -375,8 +405,9 @@ function AddRawMaterial() {
                       type="text"
                       name="gst"
                       value={formData.gst}
-                      onChange={handleChange}
+                      onChange={handleDecimalChange}
                       className="form-control"
+                      inputMode="decimal"
                       required
                     />
                   </div>

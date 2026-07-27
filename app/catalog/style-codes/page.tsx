@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx'
 import { saveAs } from 'file-saver'
 import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud'
 import CatalogRowActions from '@/shared/components/catalog/CatalogRowActions'
+import CatalogPageSizeSelect from '@/shared/components/catalog/CatalogPageSizeSelect'
 
 type Status = 'active' | 'inactive' | ''
 
@@ -401,8 +402,8 @@ const StyleCodesPage = () => {
       <Seo title="Style Codes" />
       <Toaster position="top-right" />
 
-      <div className="bg-white shadow-sm border border-gray-100 overflow-hidden mx-0 relative">
-        <div className="p-[10px]">
+      <div className="bg-white shadow-sm border border-gray-100 mx-0 catalog-list-card relative">
+        <div className="p-[10px] catalog-list-toolbar">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-2">
               <div className="w-[3px] h-5 bg-purple-600 rounded-full" />
@@ -431,15 +432,11 @@ const StyleCodesPage = () => {
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
-              <select
+              <CatalogPageSizeSelect
                 value={limit}
-                onChange={(e) => handleLimitChange(Number(e.target.value))}
-                className="bg-white border border-gray-200 text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-gray-300"
-              >
-                {[10, 20, 50, 100].map((opt) => (
-                  <option key={opt} value={opt}>Show {opt}</option>
-                ))}
-              </select>
+                onChange={handleLimitChange}
+                options={[10, 20, 50, 100]}
+              />
               <button
                 type="button"
                 onClick={handleDownloadTemplate}

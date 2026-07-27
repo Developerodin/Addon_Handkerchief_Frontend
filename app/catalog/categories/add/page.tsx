@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
+import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 
 interface Category {
@@ -93,24 +94,8 @@ const AddCategoryPage = () => {
     try {
       setIsLoading(true);
 
-      // First, if there's an image, upload it
-      let imageUrl = null;
-      if (selectedImage) {
-        const formData = new FormData();
-        formData.append('image', selectedImage);
-
-        const imageResponse = await fetch(`${API_BASE_URL}/upload`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!imageResponse.ok) {
-          throw new Error('Failed to upload image');
-        }
-
-        const imageData = await imageResponse.json();
-        imageUrl = imageData.url; // Assuming the API returns the image URL
-      }
+      // Upload image to S3 first (optional)
+      const imageUrl = await uploadOptionalImage(selectedImage);
 
       // Prepare category data
       const categoryData = {
@@ -119,7 +104,7 @@ const AddCategoryPage = () => {
         description: formData.description || undefined,
         sortOrder,
         status: formData.status,
-        image: imageUrl || undefined
+        ...(imageUrl ? { image: imageUrl } : {}),
       };
 
       // Create category

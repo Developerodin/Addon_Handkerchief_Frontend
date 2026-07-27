@@ -4,6 +4,7 @@ import Seo from '@/shared/layout-components/seo/seo';
 import Link from 'next/link';
 import axios from 'axios';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
+import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import HelpIcon from '@/shared/components/HelpIcon';
 import yarnCatalogService, { YarnCatalog } from '@/shared/services/yarnCatalogService';
 import { styleCodeService, StyleCode } from '@/shared/services/styleCodeService';
@@ -648,27 +649,17 @@ const AddProductPage = () => {
           }));
       }
 
-      // Create FormData only if there's an image
-      let requestData: any;
-      let headers: { 'Content-Type'?: string } = {
-        'Content-Type': 'application/json'
-      };
-
-      if (productImage) {
-        requestData = new FormData();
-        requestData.append('data', JSON.stringify(productData));
-        requestData.append('image', productImage);
-        delete headers['Content-Type']; // Let browser set the correct multipart boundary
-      } else {
-        requestData = productData;
+      const imageUrl = await uploadOptionalImage(productImage);
+      if (imageUrl) {
+        productData.image = imageUrl;
       }
 
-      // Send request
       console.log('=== SENDING REQUEST ===');
-      console.log('Request Data:', requestData);
-      console.log('Headers:', headers);
-      
-      const response = await axios.post(API_ENDPOINTS.createProduct, requestData, { headers });
+      console.log('Request Data:', productData);
+
+      const response = await axios.post(API_ENDPOINTS.createProduct, productData, {
+        headers: { 'Content-Type': 'application/json' },
+      });
 
       console.log('=== RESPONSE RECEIVED ===');
       console.log('Product created:', response.data);
