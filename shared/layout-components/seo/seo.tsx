@@ -3,7 +3,7 @@ import React, { useEffect } from 'react'
 
 const Seo = ({ title }:any) => {
   useEffect(() => {
-    document.title = `Addons - ${title}`
+    document.title = `Addon Handkerchief - ${title}`
   }, [])
   
   return (
