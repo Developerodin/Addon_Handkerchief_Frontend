@@ -5,6 +5,7 @@ import { ThemeChanger } from "../../redux/action";
 import Link from "next/link";
 import store from "@/shared/redux/store";
 import SimpleBar from 'simplebar-react';
+import HelpSupportSidebarCard from './HelpSupportSidebarCard';
 import Menuloop from "./menuloop";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMenuItems } from "./nav";
@@ -946,7 +947,7 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 					}
 					menuClose(e.nativeEvent); 
 				}}></div>
-			<aside className="app-sidebar" id="sidebar" onMouseOver={() => Onhover()}
+			<aside className="app-sidebar app-sidebar--with-help-card" id="sidebar" onMouseOver={() => Onhover()}
 				onMouseLeave={() => Outhover()}>
 				<div className="main-sidebar-header">
 					<Link
@@ -1104,6 +1105,7 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 							</div>
 						</nav>
 				</SimpleBar>
+				<HelpSupportSidebarCard />
 			</aside>
 		</Fragment>
 	);

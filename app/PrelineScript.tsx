@@ -1,11 +1,12 @@
-"use client";
-import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+'use client';
 
-import { IStaticMethods } from "preline/preline";
+import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
+
 declare global {
   interface Window {
-    HSStaticMethods: IStaticMethods;
+    HSStaticMethods?: { autoInit: () => void };
+    HSOverlay?: { autoInit: () => void };
   }
 }
 
@@ -14,9 +15,19 @@ export default function PrelineScript() {
 
   useEffect(() => {
     const loadPreline = async () => {
-      await import("preline/preline");
+      try {
+        const preline = await import('preline/dist/preline.js');
+        const api = preline.default ?? preline;
 
-      window.HSStaticMethods.autoInit();
+        if (typeof window !== 'undefined' && api?.HSStaticMethods) {
+          window.HSStaticMethods = api.HSStaticMethods;
+          window.HSOverlay = api.HSOverlay;
+          api.HSStaticMethods.autoInit?.();
+          api.HSOverlay?.autoInit?.();
+        }
+      } catch (error) {
+        console.error('Error initializing Preline:', error);
+      }
     };
 
     loadPreline();

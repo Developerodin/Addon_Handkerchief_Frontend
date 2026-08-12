@@ -35,12 +35,13 @@ function getAccessToken(): string | null {
   }
 }
 
+export const MAX_UPLOAD_FILE_SIZE_MB = 25;
+export const MAX_UPLOAD_FILE_SIZE_BYTES = MAX_UPLOAD_FILE_SIZE_MB * 1024 * 1024;
+
 export class FileUploadService {
   static async uploadFile(file: File): Promise<UploadedFile> {
-    // Validate file size (5MB limit)
-    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
-    if (file.size > maxSize) {
-      throw new Error('File size exceeds 5MB limit');
+    if (file.size > MAX_UPLOAD_FILE_SIZE_BYTES) {
+      throw new Error(`File size exceeds ${MAX_UPLOAD_FILE_SIZE_MB}MB limit`);
     }
 
     const formData = new FormData();

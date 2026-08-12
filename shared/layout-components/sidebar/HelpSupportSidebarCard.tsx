@@ -2,6 +2,8 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/shared/redux/store';
 import { useNavigation, canAccessHelpSupport } from '@/shared/contextapi/navigationContext';
 
 const HELP_SUPPORT_PATH = '/help-and-support';
@@ -11,8 +13,23 @@ const HELP_SUPPORT_PATH = '/help-and-support';
  */
 export default function HelpSupportSidebarCard() {
   const { permissions, isLoading } = useNavigation();
+  const user = useSelector((state: RootState) => state.auth.user);
+  const allowed = canAccessHelpSupport(permissions, user?.role);
 
-  if (isLoading || !canAccessHelpSupport(permissions)) {
+  if (isLoading) {
+    return (
+      <div className="help-support-sidebar-card" aria-hidden>
+        <div className="help-support-sidebar-card__link animate-pulse opacity-60">
+          <span className="help-support-sidebar-card__icon" />
+          <span className="help-support-sidebar-card__content">
+            <span className="help-support-sidebar-card__title">Help & Support</span>
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!allowed) {
     return null;
   }
 
@@ -30,7 +47,7 @@ export default function HelpSupportSidebarCard() {
         </span>
         <span className="help-support-sidebar-card__content">
           <span className="help-support-sidebar-card__title">Help & Support</span>
-          <span className="help-support-sidebar-card__subtitle">Raise a ticket · Get help</span>
+          <span className="help-support-sidebar-card__subtitle">Files · Tasks · Tickets</span>
         </span>
         <span className="help-support-sidebar-card__arrow" aria-hidden>
           <i className="ri-external-link-line" />

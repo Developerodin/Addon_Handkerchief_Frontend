@@ -36,6 +36,7 @@ export interface NavigationPermissions {
   Dashboard: CrudPermissions;
   Catalog: Record<CatalogModule, CrudPermissions>;
   Users: CrudPermissions;
+  'Help & Support': boolean;
 }
 
 export type UserRole = 'user' | 'accounts' | 'admin' | 'super_admin';
@@ -63,6 +64,7 @@ export const DEFAULT_NAVIGATION: NavigationPermissions = {
   Dashboard: { ...EMPTY_CRUD },
   Catalog: buildCatalogDefaults(),
   Users: { ...EMPTY_CRUD },
+  'Help & Support': true,
 };
 
 export const normalizeCrud = (value: unknown): CrudPermissions => {
@@ -119,6 +121,10 @@ export const mergeNavigationWithDefaults = (
     Dashboard: applyCrudDependencies(normalizeCrud(partial.Dashboard)),
     Catalog: catalog,
     Users: applyCrudDependencies(normalizeCrud(partial.Users)),
+    'Help & Support':
+      typeof partial['Help & Support'] === 'boolean'
+        ? partial['Help & Support']
+        : true,
   };
 };
 

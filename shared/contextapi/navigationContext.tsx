@@ -20,7 +20,7 @@ interface NavigationContextType {
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
-const CACHE_VERSION = '1';
+const CACHE_VERSION = '2';
 
 interface NavigationProviderProps {
   children: ReactNode;
@@ -42,6 +42,15 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children
     }
 
     const merged = mergeNavigationWithDefaults(user.navigation);
+
+    // Re-merge when cache version changes so Help & Support flag updates apply
+    if (typeof window !== 'undefined') {
+      const cachedVersion = localStorage.getItem('navigationPermissionsVersion');
+      if (cachedVersion !== CACHE_VERSION) {
+        localStorage.removeItem('navigationPermissions');
+      }
+    }
+
     setPermissions(merged);
 
     if (typeof window !== 'undefined') {
@@ -110,3 +119,18 @@ export const useNavigation = (): NavigationContextType => {
 };
 
 export { mergeNavigationWithDefaults };
+
+/**
+ * Whether Help & Support hub is enabled for this user.
+ * Explicit false disables; missing/legacy nav defaults to allowed for hub roles.
+ */
+export function canAccessHelpSupport(
+  permissions: { 'Help & Support'?: boolean } | null | undefined,
+  role?: string
+): boolean {
+  if (permissions?.['Help & Support'] === true) return true;
+  if (permissions?.['Help & Support'] === false) return false;
+  const normalized = role?.trim().toLowerCase().replace(/\s+/g, '_');
+  if (normalized === 'superadmin') return true;
+  return ['user', 'accounts', 'admin', 'super_admin'].includes(normalized || '');
+}
