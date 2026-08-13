@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Seo from '@/shared/layout-components/seo/seo';
 import Image from 'next/image';
@@ -8,47 +8,77 @@ import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
-import { filterDecimalInput, filterDigitsOnly, filterTextOnly } from '@/shared/utils/formInputFilters';
+import { filterDecimalInput } from '@/shared/utils/formInputFilters';
 
-interface RawMaterialForm {
+const PACKAGING_TYPES = [
+  'polybag',
+  'carton-120',
+  'bundle tag',
+  'sticker',
+  'insert card',
+  'embroidery carton',
+  'sewing thread',
+  'embroidery thread',
+  'other',
+] as const;
+
+interface FabricSupplier {
+  id: string;
   name: string;
-  groupName: string;
+}
+
+interface PackagingMaterialForm {
+  name: string;
   type: string;
-  description: string;
-  brand: string;
-  countSize: string;
-  material: string;
-  color: string;
-  shade: string;
+  sizeSpec: string;
   unit: string;
-  mrp: string;
+  supplier: string;
+  supplierName: string;
+  rate: string;
   hsnCode: string;
   gst: string;
-  articleNo: string;
+  minimumStock: string;
+  description: string;
+  status: 'active' | 'inactive';
   image?: File;
   imagePreview?: string;
 }
 
-function AddRawMaterial() {
+function AddPackagingMaterial() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [formData, setFormData] = useState<RawMaterialForm>({
+  const [suppliers, setSuppliers] = useState<FabricSupplier[]>([]);
+  const [formData, setFormData] = useState<PackagingMaterialForm>({
     name: '',
-    groupName: '',
     type: '',
-    description: '',
-    brand: '',
-    countSize: '',
-    material: '',
-    color: '',
-    shade: '',
+    sizeSpec: '',
     unit: '',
-    mrp: '',
+    supplier: '',
+    supplierName: '',
+    rate: '',
     hsnCode: '',
     gst: '',
-    articleNo: '',
+    minimumStock: '',
+    description: '',
+    status: 'active',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/fabric-suppliers?limit=500&status=active`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        setSuppliers(Array.isArray(data.results) ? data.results : []);
+      } catch {
+        // Non-critical; supplier select stays empty
+      }
+    };
+    fetchSuppliers();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,22 +86,21 @@ function AddRawMaterial() {
 
     try {
       const imageUrl = await uploadOptionalImage(formData.image);
+      const selectedSupplier = suppliers.find(s => s.id === formData.supplier);
 
       const requestData = {
-        name: formData.name,
-        groupName: formData.groupName,
+        name: formData.name.trim(),
         type: formData.type,
-        description: formData.description,
-        brand: formData.brand,
-        countSize: formData.countSize,
-        material: formData.material,
-        color: formData.color,
-        shade: formData.shade,
+        sizeSpec: formData.sizeSpec.trim(),
         unit: formData.unit,
-        mrp: formData.mrp,
-        hsnCode: formData.hsnCode,
-        gst: formData.gst,
-        articleNo: formData.articleNo,
+        supplier: formData.supplier || null,
+        supplierName: formData.supplierName.trim() || selectedSupplier?.name || '',
+        rate: formData.rate === '' ? 0 : Number(formData.rate),
+        hsnCode: formData.hsnCode.trim(),
+        gst: formData.gst.trim(),
+        minimumStock: formData.minimumStock === '' ? 0 : Number(formData.minimumStock),
+        description: formData.description.trim(),
+        status: formData.status,
         ...(imageUrl ? { image: imageUrl } : {}),
       };
 
@@ -81,19 +110,19 @@ function AddRawMaterial() {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: JSON.stringify(requestData)
+        body: JSON.stringify(requestData),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to add raw material');
+        throw new Error(errorData.message || 'Failed to add packaging material');
       }
 
-      toast.success('Raw material added successfully');
+      toast.success('Packaging material added successfully');
       router.push('/catalog/raw-material');
     } catch (error) {
-      console.error('Error adding raw material:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to add raw material');
+      console.error('Error adding packaging material:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to add packaging material');
     } finally {
       setIsSubmitting(false);
     }
@@ -101,26 +130,17 @@ function AddRawMaterial() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleTextOnlyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: filterTextOnly(value),
-    }));
-  };
-
-  const handleDigitsOnlyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: filterDigitsOnly(value),
-    }));
+    setFormData(prev => {
+      if (name === 'supplier') {
+        const selected = suppliers.find(s => s.id === value);
+        return {
+          ...prev,
+          supplier: value,
+          supplierName: selected?.name || (value ? prev.supplierName : prev.supplierName),
+        };
+      }
+      return { ...prev, [name]: value };
+    });
   };
 
   const handleDecimalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -149,27 +169,24 @@ function AddRawMaterial() {
   return (
     <div className="main-content">
       <Toaster position="top-right" />
-      <Seo title="Add Raw Material" />
-      
+      <Seo title="Add Packaging material" />
+
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12">
-          {/* Page Header */}
           <div className="box !bg-transparent border-0 shadow-none">
             <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Add Raw Material</h1>
+              <h1 className="box-title text-2xl font-semibold">Add Packaging material</h1>
             </div>
           </div>
 
-          {/* Form Box */}
           <div className="box">
             <div className="box-body">
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Image Upload - Optional */}
                   <div className="form-group col-span-2">
                     <label className="form-label">Image (Optional)</label>
                     <div className="flex items-center space-x-4">
-                      <div 
+                      <div
                         className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-primary transition-colors duration-150"
                         onClick={handleImageClick}
                       >
@@ -199,31 +216,20 @@ function AddRawMaterial() {
                     </div>
                   </div>
 
-                  {/* Group Name Dropdown */}
                   <div className="form-group">
-                    <label className="form-label">Group Name</label>
-                    <select
-                      name="groupName"
-                      value={formData.groupName}
+                    <label className="form-label">Name <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
                       onChange={handleChange}
                       className="form-control"
                       required
-                    >
-                      <option value="">Select Group</option>
-                      <option value="Embroidery">Embroidery</option>
-                      <option value="Packing Material">Packing Material</option>
-                      <option value="Yarn">Yarn</option>
-                      <option value="Finished Goods">Finished Goods</option>
-                      <option value="Stationary">Stationary</option>
-                      <option value="Household">Household</option>
-                      <option value="Machine Tools">Machine Tools</option>
-                      <option value="Maintenance">Maintenance</option>
-                    </select>
+                    />
                   </div>
 
-                  {/* Type Dropdown */}
                   <div className="form-group">
-                    <label className="form-label">Type</label>
+                    <label className="form-label">Type <span className="text-red-500">*</span></label>
                     <select
                       name="type"
                       value={formData.type}
@@ -232,124 +238,26 @@ function AddRawMaterial() {
                       required
                     >
                       <option value="">Select Type</option>
-                      <option value="Threads">Threads</option>
-                      <option value="Tag">Tag</option>
-                      <option value="Polybags">Polybags</option>
-                      <option value="Box">Box</option>
-                      <option value="Stands">Stands</option>
-                      <option value="Socks">Socks</option>
-                      <option value="Stickers">Stickers</option>
+                      {PACKAGING_TYPES.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
                     </select>
                   </div>
 
-                   {/* Article No */}
-                   <div className="form-group">
-                    <label className="form-label">Article No</label>
+                  <div className="form-group">
+                    <label className="form-label">Size / Spec</label>
                     <input
                       type="text"
-                      name="articleNo"
-                      value={formData.articleNo}
+                      name="sizeSpec"
+                      value={formData.sizeSpec}
                       onChange={handleChange}
                       className="form-control"
-                      required
+                      placeholder="e.g. 12x16, 120 pcs"
                     />
                   </div>
 
-                  {/* Name */}
                   <div className="form-group">
-                    <label className="form-label">Name</label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleTextOnlyChange}
-                      className="form-control"
-                      required
-                    />
-                  </div>
-
-                  {/* Description */}
-                  <div className="form-group">
-                    <label className="form-label">Description</label>
-                    <textarea
-                      name="description"
-                      value={formData.description}
-                      onChange={handleChange}
-                      className="form-control"
-                      rows={2}
-                      required
-                    ></textarea>
-                  </div>
-
-                  {/* Brand */}
-                  <div className="form-group">
-                    <label className="form-label">Brand</label>
-                    <input
-                      type="text"
-                      name="brand"
-                      value={formData.brand}
-                      onChange={handleTextOnlyChange}
-                      className="form-control"
-                      required
-                    />
-                  </div>
-
-                  {/* Count/Size */}
-                  <div className="form-group">
-                    <label className="form-label">Count/Size</label>
-                    <input
-                      type="text"
-                      name="countSize"
-                      value={formData.countSize}
-                      onChange={handleDigitsOnlyChange}
-                      className="form-control"
-                      inputMode="numeric"
-                      required
-                    />
-                  </div>
-
-                  {/* Material */}
-                  <div className="form-group">
-                    <label className="form-label">Material</label>
-                    <input
-                      type="text"
-                      name="material"
-                      value={formData.material}
-                      onChange={handleChange}
-                      className="form-control"
-                      required
-                    />
-                  </div>
-
-                  {/* Color */}
-                  <div className="form-group">
-                    <label className="form-label">Color</label>
-                    <input
-                      type="text"
-                      name="color"
-                      value={formData.color}
-                      onChange={handleChange}
-                      className="form-control"
-                      required
-                    />
-                  </div>
-
-                  {/* Shade */}
-                  <div className="form-group">
-                    <label className="form-label">Shade</label>
-                    <input
-                      type="text"
-                      name="shade"
-                      value={formData.shade}
-                      onChange={handleChange}
-                      className="form-control"
-                      required
-                    />
-                  </div>
-
-                  {/* Unit Dropdown */}
-                  <div className="form-group">
-                    <label className="form-label">Unit</label>
+                    <label className="form-label">Unit <span className="text-red-500">*</span></label>
                     <select
                       name="unit"
                       value={formData.unit}
@@ -358,34 +266,57 @@ function AddRawMaterial() {
                       required
                     >
                       <option value="">Select Unit</option>
-                      <option value="Meter">Meter</option>
                       <option value="Pcs">Pcs</option>
+                      <option value="Meter">Meter</option>
                       <option value="Kilograms">Kilograms</option>
                       <option value="Grams">Grams</option>
                       <option value="Liter">Liter</option>
-                      <option value="Pairs">Pairs</option>
                       <option value="Packet">Packet</option>
                       <option value="Packs">Packs</option>
+                      <option value="Roll">Roll</option>
+                      <option value="Cone">Cone</option>
                     </select>
                   </div>
 
-                 
-
-                  {/* MRP */}
                   <div className="form-group">
-                    <label className="form-label">MRP</label>
+                    <label className="form-label">Supplier</label>
+                    <select
+                      name="supplier"
+                      value={formData.supplier}
+                      onChange={handleChange}
+                      className="form-control"
+                    >
+                      <option value="">Select Supplier (optional)</option>
+                      {suppliers.map(supplier => (
+                        <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Supplier Name (fallback)</label>
                     <input
                       type="text"
-                      name="mrp"
-                      value={formData.mrp}
-                      onChange={handleDecimalChange}
+                      name="supplierName"
+                      value={formData.supplierName}
+                      onChange={handleChange}
                       className="form-control"
-                      inputMode="decimal"
-                      required
+                      placeholder="Free-text if not in list"
                     />
                   </div>
 
-                  {/* HSN Code */}
+                  <div className="form-group">
+                    <label className="form-label">Rate</label>
+                    <input
+                      type="text"
+                      name="rate"
+                      value={formData.rate}
+                      onChange={handleDecimalChange}
+                      className="form-control"
+                      inputMode="decimal"
+                    />
+                  </div>
+
                   <div className="form-group">
                     <label className="form-label">HSN Code</label>
                     <input
@@ -394,13 +325,11 @@ function AddRawMaterial() {
                       value={formData.hsnCode}
                       onChange={handleChange}
                       className="form-control"
-                      required
                     />
                   </div>
 
-                  {/* GST % */}
                   <div className="form-group">
-                    <label className="form-label">GST %</label>
+                    <label className="form-label">GST</label>
                     <input
                       type="text"
                       name="gst"
@@ -408,12 +337,46 @@ function AddRawMaterial() {
                       onChange={handleDecimalChange}
                       className="form-control"
                       inputMode="decimal"
-                      required
                     />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Minimum Stock</label>
+                    <input
+                      type="text"
+                      name="minimumStock"
+                      value={formData.minimumStock}
+                      onChange={handleDecimalChange}
+                      className="form-control"
+                      inputMode="decimal"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Status</label>
+                    <select
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                      className="form-control"
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group md:col-span-2">
+                    <label className="form-label">Description</label>
+                    <textarea
+                      name="description"
+                      value={formData.description}
+                      onChange={handleChange}
+                      className="form-control"
+                      rows={3}
+                    ></textarea>
                   </div>
                 </div>
 
-                {/* Form Actions */}
                 <div className="flex justify-end space-x-4">
                   <button
                     type="button"
@@ -433,7 +396,7 @@ function AddRawMaterial() {
                         Adding...
                       </>
                     ) : (
-                      'Add Raw Material'
+                      'Add Packaging material'
                     )}
                   </button>
                 </div>
@@ -446,10 +409,10 @@ function AddRawMaterial() {
   );
 }
 
-export default function AddRawMaterialPageWrapper() {
+export default function AddPackagingMaterialPageWrapper() {
   return (
-    <RequireCrudPermission path="Catalog.Raw Material" action="create">
-      <AddRawMaterial />
+    <RequireCrudPermission path="Catalog.Packaging materials" action="create">
+      <AddPackagingMaterial />
     </RequireCrudPermission>
   );
 }

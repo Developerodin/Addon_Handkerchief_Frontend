@@ -272,7 +272,7 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
 
 export default function EditCategoryPageWrapper({ params }: { params: { id: string } }) {
   return (
-    <RequireCrudPermission path="Catalog.Categories" action="update">
+    <RequireCrudPermission path="Catalog.Category" action="update">
       <EditCategoryPage params={params} />
     </RequireCrudPermission>
   );

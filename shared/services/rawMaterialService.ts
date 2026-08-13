@@ -3,19 +3,27 @@ import { API_BASE_URL } from '@/shared/data/utilities/api';
 export interface RawMaterial {
   id: string;
   name: string;
-  groupName: string;
   type: string;
-  description: string;
-  brand: string;
-  countSize: string;
-  material: string;
-  color: string;
-  shade: string;
+  sizeSpec?: string;
   unit: string;
-  mrp: string;
-  hsnCode: string;
-  gst: string;
-  articleNo: string;
+  supplier?: string | { id: string; name: string } | null;
+  supplierName?: string;
+  rate?: number;
+  hsnCode?: string;
+  gst?: string;
+  minimumStock?: number;
+  description?: string;
+  status?: 'active' | 'inactive';
+  image?: string | null;
+  // Legacy optional fields
+  groupName?: string;
+  brand?: string;
+  countSize?: string;
+  material?: string;
+  color?: string;
+  shade?: string;
+  mrp?: string;
+  articleNo?: string;
 }
 
 export interface RawMaterialListResponse {
@@ -27,7 +35,7 @@ export interface RawMaterialListResponse {
 }
 
 /**
- * Fetch raw materials with pagination and optional search (for modal with table + pagination).
+ * Fetch packaging materials (API: /raw-materials) with pagination and optional search.
  */
 export async function listRawMaterialsPaginated(options: {
   page: number;
@@ -42,7 +50,7 @@ export async function listRawMaterialsPaginated(options: {
   );
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.message || 'Failed to fetch raw materials');
+    throw new Error(err.message || 'Failed to fetch packaging materials');
   }
   const data: RawMaterialListResponse = await response.json();
   const results = Array.isArray(data.results) ? data.results : [];
@@ -55,7 +63,7 @@ export async function listRawMaterialsPaginated(options: {
   };
 }
 
-/** Fetch all raw materials (no pagination - for dropdowns). */
+/** Fetch all packaging materials (no pagination - for dropdowns). */
 export async function listRawMaterials(options?: { search?: string }): Promise<RawMaterial[]> {
   const res = await listRawMaterialsPaginated({ page: 1, limit: 10000, search: options?.search });
   return res.results;

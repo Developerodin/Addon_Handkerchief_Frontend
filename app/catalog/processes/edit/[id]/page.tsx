@@ -9,6 +9,7 @@ import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
+import { filterDigitsOnly } from '@/shared/utils/formInputFilters';
 
 interface ProcessStep {
   stepTitle: string;
@@ -18,20 +19,59 @@ interface ProcessStep {
 
 interface ProcessFormData {
   name: string;
+  code: string;
   description: string;
   type: string;
+  department: string;
+  floor: string;
+  standardTime: number;
+  machineType: string;
+  standardRate: number;
+  qcCheckpoint: boolean;
+  reworkEligible: boolean;
   sortOrder: number;
   image: File | null;
   status: 'active' | 'inactive';
   steps: ProcessStep[];
 }
 
+const DEPARTMENT_OPTIONS = [
+  { value: '', label: 'Select Department' },
+  { value: 'store', label: 'Store' },
+  { value: 'cutting', label: 'Cutting' },
+  { value: 'hemming', label: 'Hemming' },
+  { value: 'checking', label: 'Checking' },
+  { value: 'ironing', label: 'Ironing' },
+  { value: 'packing', label: 'Packing' },
+  { value: 'dispatch', label: 'Dispatch' },
+  { value: 'embroidery', label: 'Embroidery' },
+];
+
+const MACHINE_TYPE_OPTIONS = [
+  { value: '', label: 'Select Machine Type' },
+  { value: 'cutting', label: 'Cutting' },
+  { value: 'half-moon', label: 'Half-moon' },
+  { value: 'vertical-hemming', label: 'Vertical Hemming' },
+  { value: 'horizontal-hemming', label: 'Horizontal Hemming' },
+  { value: 'embroidery', label: 'Embroidery' },
+  { value: 'ironing', label: 'Ironing' },
+  { value: 'none', label: 'None' },
+];
+
 const EditProcessPage = ({ params }: { params: { id: string } }) => {
   const router = useRouter();
   const [formData, setFormData] = useState<ProcessFormData>({
     name: '',
+    code: '',
     description: '',
     type: '',
+    department: '',
+    floor: '',
+    standardTime: 0,
+    machineType: '',
+    standardRate: 0,
+    qcCheckpoint: false,
+    reworkEligible: false,
     sortOrder: 0,
     image: null,
     status: 'active',
@@ -60,12 +100,20 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
         
         setFormData({
           name: data.name,
+          code: data.code || '',
           description: data.description || '',
           type: data.type,
-          sortOrder: data.sortOrder,
+          department: data.department || '',
+          floor: data.floor || '',
+          standardTime: data.standardTime ?? 0,
+          machineType: data.machineType || '',
+          standardRate: data.standardRate ?? 0,
+          qcCheckpoint: Boolean(data.qcCheckpoint),
+          reworkEligible: Boolean(data.reworkEligible),
+          sortOrder: data.sortOrder ?? 0,
           image: null,
           status: data.status,
-          steps: data.steps || []
+          steps: data.steps?.length ? data.steps : [{ stepTitle: '', stepDescription: '', duration: 0 }]
         });
 
         if (data.image) {
@@ -85,9 +133,25 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    if (name === 'sortOrder' || name === 'standardTime') {
+      const filtered = filterDigitsOnly(value);
+      setFormData(prev => ({
+        ...prev,
+        [name]: filtered === '' ? 0 : parseInt(filtered, 10),
+      }));
+      return;
+    }
+    if (name === 'standardRate') {
+      const cleaned = value.replace(/[^\d.]/g, '');
+      setFormData(prev => ({
+        ...prev,
+        standardRate: cleaned === '' ? 0 : parseFloat(cleaned) || 0,
+      }));
+      return;
+    }
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'sortOrder' ? parseInt(value) || 0 : value
+      [name]: value,
     }));
   };
 
@@ -101,13 +165,21 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
 
   const handleStepChange = (index: number, field: keyof ProcessStep, value: string) => {
     const newSteps = [...formData.steps];
-    newSteps[index] = {
-      ...newSteps[index],
-      [field]: field === 'duration' ? parseInt(value) || 0 : value
-    };
+    if (field === 'duration') {
+      const filtered = filterDigitsOnly(value);
+      newSteps[index] = {
+        ...newSteps[index],
+        duration: filtered === '' ? 0 : parseInt(filtered, 10),
+      };
+    } else {
+      newSteps[index] = {
+        ...newSteps[index],
+        [field]: value,
+      };
+    }
     setFormData(prev => ({
       ...prev,
-      steps: newSteps
+      steps: newSteps,
     }));
   };
 
@@ -144,8 +216,16 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
 
       const processData = {
         name: formData.name,
+        code: formData.code,
         type: formData.type,
-        description: formData.description,
+        description: formData.description || ' ',
+        department: formData.department,
+        floor: formData.floor,
+        standardTime: formData.standardTime,
+        machineType: formData.machineType,
+        standardRate: formData.standardRate,
+        qcCheckpoint: formData.qcCheckpoint,
+        reworkEligible: formData.reworkEligible,
         sortOrder: formData.sortOrder,
         status: formData.status,
         steps: cleanSteps,
@@ -188,7 +268,7 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
     <div>
       <Toaster position="top-right" />
       <Seo title="Edit Process" />
-      <Pageheader currentpage="Edit Process" activepage="Processes" mainpage="Edit Process" />
+      <Pageheader currentpage="Edit Process" activepage="Process Master" mainpage="Edit Process" />
       
       <div className="grid grid-cols-12 gap-6">
         <div className="xl:col-span-12 col-span-12">
@@ -199,7 +279,6 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
             <div className="box-body">
               <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 gap-6">
-                  {/* Basic Information */}
                   <div className="grid grid-cols-12 gap-4">
                     <div className="col-span-12 md:col-span-6">
                       <div className="form-group">
@@ -213,6 +292,22 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
                           value={formData.name}
                           onChange={handleInputChange}
                           required
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-6">
+                      <div className="form-group">
+                        <label htmlFor="code" className="form-label">Code</label>
+                        <input
+                          type="text"
+                          id="code"
+                          name="code"
+                          className="form-control"
+                          placeholder="e.g. CUT, HEM"
+                          value={formData.code}
+                          onChange={handleInputChange}
                           disabled={isSubmitting}
                         />
                       </div>
@@ -239,6 +334,24 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
                       </div>
                     </div>
 
+                    <div className="col-span-12 md:col-span-6">
+                      <div className="form-group">
+                        <label htmlFor="department" className="form-label">Department</label>
+                        <select
+                          id="department"
+                          name="department"
+                          className="form-select"
+                          value={formData.department}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                        >
+                          {DEPARTMENT_OPTIONS.map((opt) => (
+                            <option key={opt.value || 'empty'} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
                     <div className="col-span-12">
                       <div className="form-group">
                         <label htmlFor="description" className="form-label">Description</label>
@@ -255,23 +368,92 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
                       </div>
                     </div>
 
-                    <div className="col-span-12 md:col-span-6">
+                    <div className="col-span-12 md:col-span-4">
                       <div className="form-group">
-                        <label htmlFor="sortOrder" className="form-label">Sort Order</label>
+                        <label htmlFor="floor" className="form-label">Floor</label>
                         <input
-                          type="number"
-                          id="sortOrder"
-                          name="sortOrder"
+                          type="text"
+                          id="floor"
+                          name="floor"
                           className="form-control"
-                          placeholder="Enter sort order"
-                          value={formData.sortOrder}
+                          placeholder="e.g. 1, 2"
+                          value={formData.floor}
                           onChange={handleInputChange}
                           disabled={isSubmitting}
                         />
                       </div>
                     </div>
 
-                    <div className="col-span-12 md:col-span-6">
+                    <div className="col-span-12 md:col-span-4">
+                      <div className="form-group">
+                        <label htmlFor="standardTime" className="form-label">Standard Time (min)</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          id="standardTime"
+                          name="standardTime"
+                          className="form-control"
+                          placeholder="Minutes"
+                          value={formData.standardTime === 0 ? '' : String(formData.standardTime)}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-4">
+                      <div className="form-group">
+                        <label htmlFor="machineType" className="form-label">Machine Type</label>
+                        <select
+                          id="machineType"
+                          name="machineType"
+                          className="form-select"
+                          value={formData.machineType}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                        >
+                          {MACHINE_TYPE_OPTIONS.map((opt) => (
+                            <option key={opt.value || 'empty'} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-4">
+                      <div className="form-group">
+                        <label htmlFor="standardRate" className="form-label">Standard Rate</label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          id="standardRate"
+                          name="standardRate"
+                          className="form-control"
+                          placeholder="Rate"
+                          value={formData.standardRate === 0 ? '' : String(formData.standardRate)}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-4">
+                      <div className="form-group">
+                        <label htmlFor="sortOrder" className="form-label">Sort Order</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          id="sortOrder"
+                          name="sortOrder"
+                          className="form-control"
+                          placeholder="Enter sort order"
+                          value={formData.sortOrder === 0 ? '' : String(formData.sortOrder)}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-4">
                       <div className="form-group">
                         <label htmlFor="status" className="form-label">Status</label>
                         <select
@@ -285,6 +467,36 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
                           <option value="active">Active</option>
                           <option value="inactive">Inactive</option>
                         </select>
+                      </div>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-6">
+                      <div className="form-group">
+                        <label className="form-label flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="form-checkbox rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                            checked={formData.qcCheckpoint}
+                            onChange={(e) => setFormData(prev => ({ ...prev, qcCheckpoint: e.target.checked }))}
+                            disabled={isSubmitting}
+                          />
+                          QC Checkpoint
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-6">
+                      <div className="form-group">
+                        <label className="form-label flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="form-checkbox rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                            checked={formData.reworkEligible}
+                            onChange={(e) => setFormData(prev => ({ ...prev, reworkEligible: e.target.checked }))}
+                            disabled={isSubmitting}
+                          />
+                          Rework Eligible
+                        </label>
                       </div>
                     </div>
 
@@ -332,7 +544,6 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
                     </div>
                   </div>
 
-                  {/* Process Steps */}
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <h6 className="text-base font-semibold">Process Steps</h6>
@@ -380,9 +591,10 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
                           <div className="form-group">
                             <label className="form-label required">Duration (min)</label>
                             <input
-                              type="number"
+                              type="text"
+                              inputMode="numeric"
                               className="form-control"
-                              value={step.duration}
+                              value={step.duration === 0 ? '' : String(step.duration)}
                               onChange={(e) => handleStepChange(index, 'duration', e.target.value)}
                               required
                               disabled={isSubmitting}
@@ -440,7 +652,7 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
 
 export default function EditProcessPageWrapper({ params }: { params: { id: string } }) {
   return (
-    <RequireCrudPermission path="Catalog.Processes" action="update">
+    <RequireCrudPermission path="Catalog.Process Master" action="update">
       <EditProcessPage params={params} />
     </RequireCrudPermission>
   );

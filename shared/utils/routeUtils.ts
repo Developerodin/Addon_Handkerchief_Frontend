@@ -1,4 +1,4 @@
-import type { NavigationPermissions } from '@/shared/types/permissions';
+import type { NavigationPermissions, CatalogModule } from '@/shared/types/permissions';
 
 const hasRead = (crud?: { read?: boolean } | boolean): boolean => {
   if (crud === true) return true;
@@ -14,13 +14,20 @@ export const getFirstAvailableRoute = (permissions: NavigationPermissions | null
 
   if (hasRead(permissions.Dashboard)) return '/dashboards/main';
 
-  const catalogRoutes: { path: string; key: keyof NavigationPermissions['Catalog'] }[] = [
+  const catalogRoutes: { path: string; key: CatalogModule }[] = [
     { path: '/catalog/items', key: 'Items' },
-    { path: '/catalog/categories', key: 'Categories' },
-    { path: '/catalog/raw-material', key: 'Raw Material' },
-    { path: '/catalog/processes', key: 'Processes' },
-    { path: '/catalog/attributes', key: 'Attributes' },
-    { path: '/catalog/style-codes', key: 'Style Codes' },
+    { path: '/catalog/categories', key: 'Category' },
+    { path: '/catalog/style-codes', key: 'Style codes' },
+    { path: '/catalog/fabric', key: 'Fabric master' },
+    { path: '/catalog/fabric-suppliers', key: 'Fabric Suppliers' },
+    { path: '/catalog/raw-material', key: 'Packaging materials' },
+    { path: '/catalog/processes', key: 'Process Master' },
+    { path: '/catalog/attributes', key: 'Attributes Master' },
+    { path: '/catalog/machines', key: 'Machines & Configuration' },
+    { path: '/catalog/workers', key: 'Workers / Operators' },
+    { path: '/catalog/storage-racks', key: 'Storage Racks' },
+    { path: '/catalog/containers', key: 'Containers Master' },
+    { path: '/catalog/label-templates', key: 'Label Templates & Device Registry' },
   ];
 
   for (const { path, key } of catalogRoutes) {

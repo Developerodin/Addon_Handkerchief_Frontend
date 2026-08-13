@@ -2,12 +2,18 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { rawMaterialService, RawMaterial } from '@/shared/services/rawMaterialService';
+import {
+  PackagingBomItem,
+  BomSectionCard,
+  BomSectionHeader,
+  BomTableShell,
+  BOM_TABLE_HEAD,
+  BomSelectButton,
+  BomNumberInput,
+  BomDeleteButton,
+} from './ProductBomShared';
 
-export interface RawMaterialBomItem {
-  rawMaterialId: string;
-  rawMaterialName?: string;
-  quantity: number;
-}
+export type RawMaterialBomItem = PackagingBomItem;
 
 interface RawMaterialBomTableProps {
   items: RawMaterialBomItem[];
@@ -17,19 +23,16 @@ interface RawMaterialBomTableProps {
 
 const ITEMS_PER_PAGE = 20;
 
-/** Get stable id from API (backend may return id or _id). */
 function getMaterialId(m: RawMaterial | Record<string, unknown>): string {
   const row = m as Record<string, unknown>;
   return (row.id as string) ?? (row._id as string) ?? '';
 }
 
-/** Get display name. */
 function getMaterialName(m: RawMaterial | Record<string, unknown>): string {
   const row = m as Record<string, unknown>;
   return (row.name as string) ?? '';
 }
 
-/** BOM-style table: each row = raw material (select from modal) + quantity. Add/remove rows. Modal like yarn: table + search + pagination. */
 export function RawMaterialBomTable({ items, onChange, disabled }: RawMaterialBomTableProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
@@ -61,12 +64,10 @@ export function RawMaterialBomTable({ items, onChange, disabled }: RawMaterialBo
     }
   }, []);
 
-  // When modal opens, reset page and search
   useEffect(() => {
     if (modalOpen) setCurrentPage(1);
   }, [modalOpen]);
 
-  // Debounced search: sync searchInput -> search after 500ms, reset to page 1
   useEffect(() => {
     if (!modalOpen) return;
     const t = setTimeout(() => {
@@ -76,7 +77,6 @@ export function RawMaterialBomTable({ items, onChange, disabled }: RawMaterialBo
     return () => clearTimeout(t);
   }, [modalOpen, searchInput]);
 
-  // Fetch when modal is open and page/search change
   useEffect(() => {
     if (!modalOpen) return;
     fetchMaterials(currentPage, search);
@@ -101,10 +101,12 @@ export function RawMaterialBomTable({ items, onChange, disabled }: RawMaterialBo
     const name = getMaterialName(material);
     if (!id) return;
     const next = [...items];
+    const rate = Number((material as RawMaterial).rate ?? 0) || 0;
     next[selectedRowIndex] = {
       rawMaterialId: id,
       rawMaterialName: name,
       quantity: next[selectedRowIndex]?.quantity ?? 0,
+      unitCost: next[selectedRowIndex]?.unitCost || rate,
     };
     onChange(next);
     closeModal();
@@ -117,7 +119,7 @@ export function RawMaterialBomTable({ items, onChange, disabled }: RawMaterialBo
   };
 
   const addRow = () => {
-    onChange([...items, { rawMaterialId: '', rawMaterialName: '', quantity: 0 }]);
+    onChange([...items, { rawMaterialId: '', rawMaterialName: '', quantity: 0, unitCost: 0 }]);
   };
 
   const removeRow = (index: number) => {
@@ -125,90 +127,92 @@ export function RawMaterialBomTable({ items, onChange, disabled }: RawMaterialBo
   };
 
   return (
-    <div className="mt-6">
-      <div className="flex justify-between items-center mb-4">
-        <label className="form-label text-[12px] font-semibold text-gray-800 mb-0">Raw Materials</label>
-        <button
-          type="button"
-          onClick={addRow}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
-          disabled={disabled}
-        >
-          <i className="ri-add-line text-xs" />
-          Add Raw Material
-        </button>
-      </div>
-      <div className="overflow-x-auto border border-gray-200 rounded">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="bg-gray-50/50">
-              <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border-b border-gray-200">Raw Material</th>
-              <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border-b border-gray-200">Quantity</th>
-              <th className="px-3 py-2.5 text-right text-[11px] font-bold text-[#495057] uppercase tracking-wider border-b border-gray-200 w-20">Action</th>
+    <BomSectionCard>
+      <BomSectionHeader
+        title="Packaging Materials"
+        description="Poly bags, labels, cartons, and other packaging per piece"
+        addLabel="Add Packaging"
+        onAdd={addRow}
+        disabled={disabled}
+      />
+      <BomTableShell>
+        <thead>
+          <tr className="bg-gray-50/80">
+            <th className={`${BOM_TABLE_HEAD} min-w-[220px]`}>Material</th>
+            <th className={`${BOM_TABLE_HEAD} w-36`}>Quantity</th>
+            <th className={`${BOM_TABLE_HEAD} w-16 text-right`}> </th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.length === 0 ? (
+            <tr>
+              <td colSpan={3} className="text-center py-10 px-4">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center">
+                    <i className="ri-gift-line text-emerald-500 text-lg" />
+                  </div>
+                  <p className="text-[12px] font-medium text-gray-600">No packaging lines yet</p>
+                  <p className="text-[11px] text-gray-400 max-w-xs">
+                    Add packaging materials such as poly bags, stickers, or carton inserts.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={addRow}
+                    className="mt-1 flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-100 rounded hover:bg-purple-100"
+                    disabled={disabled}
+                  >
+                    <i className="ri-add-line" /> Add first packaging
+                  </button>
+                </div>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {items.length === 0 ? (
-              <tr>
-                <td colSpan={3} className="text-center text-[11px] text-gray-500 py-6 px-4">
-                  No raw materials added. Click &quot;Add Raw Material&quot; to add a row.
-                </td>
-              </tr>
-            ) : (
-              items.map((row, index) => (
-                <tr key={index} className="border-b border-gray-100 hover:bg-gray-50/30">
-                  <td className="px-3 py-2">
-                    <button
-                      type="button"
+          ) : (
+            items.map((row, index) => {
+              const rowDisabled = disabled || !row.rawMaterialId;
+              return (
+                <tr key={index} className="border-b border-gray-100 hover:bg-gray-50/40">
+                  <td className="px-3 py-2.5">
+                    <BomSelectButton
+                      label={row.rawMaterialName}
+                      placeholder="Select packaging material…"
                       onClick={() => openModal(index)}
-                      className="w-full text-left px-3 py-2 text-[12px] bg-white border border-gray-200 rounded hover:bg-gray-50 hover:border-purple-300 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-between"
                       disabled={disabled}
-                    >
-                      <span className={row.rawMaterialName ? 'font-medium text-gray-800' : 'text-gray-400'}>
-                        {row.rawMaterialName || 'Select Raw Material'}
-                      </span>
-                      <i className="ri-arrow-down-s-line text-gray-400 text-sm" />
-                    </button>
+                    />
                   </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      className="w-full px-3 py-2 text-[12px] border border-gray-200 rounded focus:ring-0 focus:border-purple-300"
+                  <td className="px-3 py-2.5">
+                    <BomNumberInput
                       value={row.quantity}
-                      onChange={(e) => updateQuantity(index, Number(e.target.value))}
-                      disabled={disabled || !row.rawMaterialId}
+                      onChange={(v) => updateQuantity(index, v)}
+                      disabled={rowDisabled}
                       placeholder="0"
                     />
                   </td>
-                  <td className="px-3 py-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => removeRow(index)}
-                      className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 border border-red-100 rounded hover:bg-red-100 transition-colors disabled:opacity-50"
-                      disabled={disabled}
-                      title="Remove"
-                    >
-                      <i className="ri-delete-bin-line text-sm" />
-                    </button>
+                  <td className="px-3 py-2.5 text-right">
+                    <BomDeleteButton onClick={() => removeRow(index)} disabled={disabled} />
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              );
+            })
+          )}
+        </tbody>
+      </BomTableShell>
 
-      {/* Raw Material Selection Modal - same layout as yarn modal: table + search + pagination */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="raw-material-modal-title" role="dialog" aria-modal="true">
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto"
+          aria-labelledby="packaging-modal-title"
+          role="dialog"
+          aria-modal="true"
+        >
           <div className="flex min-h-full items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/50" onClick={closeModal} aria-hidden="true" />
-            <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="flex justify-between border-b border-gray-200 px-4 py-3">
-                <h3 className="text-sm font-semibold text-gray-900" id="raw-material-modal-title">
-                  Select Raw Material
+                <h3 className="text-sm font-semibold text-gray-900" id="packaging-modal-title">
+                  Select Packaging Material
                 </h3>
                 <button type="button" onClick={closeModal} className="p-1.5 text-gray-400 hover:text-gray-600 rounded">
                   <i className="ri-close-line text-xl" />
@@ -220,7 +224,7 @@ export function RawMaterialBomTable({ items, onChange, disabled }: RawMaterialBo
                   <input
                     type="text"
                     className="w-full pl-9 pr-3 py-2 text-[12px] border border-gray-200 rounded focus:ring-0 focus:border-purple-300"
-                    placeholder="Search raw materials by name..."
+                    placeholder="Search packaging materials…"
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
                   />
@@ -230,26 +234,40 @@ export function RawMaterialBomTable({ items, onChange, disabled }: RawMaterialBo
                 {loading ? (
                   <div className="flex flex-col items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mb-3 opacity-60" />
-                    <p className="text-[11px] text-gray-500">Loading raw materials...</p>
+                    <p className="text-[11px] text-gray-500">Loading packaging materials…</p>
                   </div>
                 ) : materials.length === 0 ? (
-                  <div className="py-12 text-center text-gray-500 text-[11px]">No raw materials found</div>
+                  <div className="py-12 text-center text-gray-500 text-[11px]">No packaging materials found</div>
                 ) : (
                   <table className="w-full border-collapse border border-gray-200">
                     <thead className="bg-gray-50/80">
                       <tr>
-                        <th className="px-3 py-2.5 text-left text-[11px] font-bold text-gray-600 uppercase border border-gray-200">Name</th>
-                        <th className="px-3 py-2.5 text-left text-[11px] font-bold text-gray-600 uppercase border border-gray-200">Group Name</th>
-                        <th className="px-3 py-2.5 text-left text-[11px] font-bold text-gray-600 uppercase border border-gray-200">Unit</th>
-                        <th className="px-3 py-2.5 text-right text-[11px] font-bold text-gray-600 uppercase border border-gray-200">Action</th>
+                        <th className="px-3 py-2.5 text-left text-[11px] font-bold text-gray-600 uppercase border border-gray-200">
+                          Name
+                        </th>
+                        <th className="px-3 py-2.5 text-left text-[11px] font-bold text-gray-600 uppercase border border-gray-200">
+                          Group
+                        </th>
+                        <th className="px-3 py-2.5 text-left text-[11px] font-bold text-gray-600 uppercase border border-gray-200">
+                          Unit
+                        </th>
+                        <th className="px-3 py-2.5 text-right text-[11px] font-bold text-gray-600 uppercase border border-gray-200">
+                          Action
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {materials.map((m) => (
                         <tr key={getMaterialId(m) || (m as RawMaterial).name} className="hover:bg-gray-50/50 border-b border-gray-100">
-                          <td className="px-3 py-2 text-[12px] font-medium text-gray-900 border border-gray-200">{(m as RawMaterial).name}</td>
-                          <td className="px-3 py-2 text-[12px] text-gray-600 border border-gray-200">{(m as RawMaterial).groupName || '-'}</td>
-                          <td className="px-3 py-2 text-[12px] text-gray-600 border border-gray-200">{(m as RawMaterial).unit || '-'}</td>
+                          <td className="px-3 py-2 text-[12px] font-medium text-gray-900 border border-gray-200">
+                            {(m as RawMaterial).name}
+                          </td>
+                          <td className="px-3 py-2 text-[12px] text-gray-600 border border-gray-200">
+                            {(m as RawMaterial).groupName || '—'}
+                          </td>
+                          <td className="px-3 py-2 text-[12px] text-gray-600 border border-gray-200">
+                            {(m as RawMaterial).unit || '—'}
+                          </td>
                           <td className="px-3 py-2 text-right border border-gray-200">
                             <button
                               type="button"
@@ -268,7 +286,10 @@ export function RawMaterialBomTable({ items, onChange, disabled }: RawMaterialBo
               </div>
               {totalResults > 0 && (
                 <div className="flex justify-between border-t border-gray-200 px-4 py-3 text-[11px] text-gray-600">
-                  <span>Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, totalResults)} of {totalResults}</span>
+                  <span>
+                    Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
+                    {Math.min(currentPage * ITEMS_PER_PAGE, totalResults)} of {totalResults}
+                  </span>
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -278,7 +299,9 @@ export function RawMaterialBomTable({ items, onChange, disabled }: RawMaterialBo
                     >
                       Prev
                     </button>
-                    <span>Page {currentPage} of {totalPages}</span>
+                    <span>
+                      Page {currentPage} of {totalPages}
+                    </span>
                     <button
                       type="button"
                       onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
@@ -294,6 +317,6 @@ export function RawMaterialBomTable({ items, onChange, disabled }: RawMaterialBo
           </div>
         </div>
       )}
-    </div>
+    </BomSectionCard>
   );
 }

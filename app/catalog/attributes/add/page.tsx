@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Pageheader from '@/shared/layout-components/page-header/pageheader';
 import Seo from '@/shared/layout-components/seo/seo';
@@ -23,10 +23,17 @@ interface ApiOptionValue {
   sortOrder: number;
 }
 
+interface CategoryOption {
+  id: string;
+  name: string;
+}
+
 interface AttributePayload {
   name: string;
   type: string;
   attributeType?: string; // 'Manufacturing' | 'Warehouse'
+  required?: boolean;
+  appliesToCategory?: string[];
   sortOrder: number;
   optionValues: ApiOptionValue[];
 }
@@ -60,13 +67,19 @@ async function createAttribute(payload: AttributePayload) {
   }
 }
 
+const NEEDS_OPTION_VALUES = (type: string) =>
+  ['select', 'radio', 'checkbox'].includes(type);
+
 const AddAttributePage = () => {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     type: 'select', // Default type
     attributeType: 'Manufacturing' as 'Manufacturing' | 'Warehouse',
+    required: false,
+    appliesToCategory: [] as string[],
     description: '',
     sortOrder: '',
     values: [
@@ -74,11 +87,36 @@ const AddAttributePage = () => {
     ] as OptionValue[]
   });
 
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/categories?page=1&limit=100000`);
+        if (!response.ok) return;
+        const data = await response.json();
+        setCategories(
+          (data.results || []).map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))
+        );
+      } catch {
+        // Non-critical
+      }
+    };
+    loadCategories();
+  }, []);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
+    }));
+  };
+
+  const toggleCategory = (categoryId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      appliesToCategory: prev.appliesToCategory.includes(categoryId)
+        ? prev.appliesToCategory.filter((id) => id !== categoryId)
+        : [...prev.appliesToCategory, categoryId],
     }));
   };
 
@@ -129,17 +167,18 @@ const AddAttributePage = () => {
         errors.push('Sort order must be a valid number');
       }
 
-      // Validate option values
-      formData.values.forEach((value, index) => {
-        if (!value.name.trim()) {
-          errors.push(`Option value #${index + 1}: Name is required`);
-        }
-        if (!value.sortOrder.trim()) {
-          errors.push(`Option value #${index + 1}: Sort order is required`);
-        } else if (isNaN(parseInt(value.sortOrder))) {
-          errors.push(`Option value #${index + 1}: Sort order must be a valid number`);
-        }
-      });
+      if (NEEDS_OPTION_VALUES(formData.type)) {
+        formData.values.forEach((value, index) => {
+          if (!value.name.trim()) {
+            errors.push(`Option value #${index + 1}: Name is required`);
+          }
+          if (!value.sortOrder.trim()) {
+            errors.push(`Option value #${index + 1}: Sort order is required`);
+          } else if (isNaN(parseInt(value.sortOrder))) {
+            errors.push(`Option value #${index + 1}: Sort order must be a valid number`);
+          }
+        });
+      }
 
       // If there are any validation errors, show them and return
       if (errors.length > 0) {
@@ -152,24 +191,28 @@ const AddAttributePage = () => {
       }
 
       // Upload option value images to S3 (optional per value)
-      const optionValues = await Promise.all(
-        formData.values.map(async (value) => {
-          const optionValue: ApiOptionValue = {
-            name: value.name.trim(),
-            sortOrder: parseInt(value.sortOrder),
-          };
-          const imageUrl = await uploadOptionalImage(value.image);
-          if (imageUrl) {
-            optionValue.image = imageUrl;
-          }
-          return optionValue;
-        })
-      );
+      const optionValues = NEEDS_OPTION_VALUES(formData.type)
+        ? await Promise.all(
+            formData.values.map(async (value) => {
+              const optionValue: ApiOptionValue = {
+                name: value.name.trim(),
+                sortOrder: parseInt(value.sortOrder),
+              };
+              const imageUrl = await uploadOptionalImage(value.image);
+              if (imageUrl) {
+                optionValue.image = imageUrl;
+              }
+              return optionValue;
+            })
+          )
+        : [];
 
       const payload: AttributePayload = {
         name: formData.name.trim(),
         type: formData.type,
         attributeType: formData.attributeType,
+        required: formData.required,
+        appliesToCategory: formData.appliesToCategory,
         sortOrder: parseInt(formData.sortOrder),
         optionValues,
       };
@@ -185,6 +228,8 @@ const AddAttributePage = () => {
         name: '',
         type: 'select',
         attributeType: 'Manufacturing',
+        required: false,
+        appliesToCategory: [],
         description: '',
         sortOrder: '',
         values: [
@@ -217,13 +262,13 @@ const AddAttributePage = () => {
     <div>
       <Toaster position="top-right" />
       <Seo title="Add Attribute" />
-      <Pageheader currentpage="Add Attribute" activepage="Attributes" mainpage="Add Attribute" />
+      <Pageheader currentpage="Add Attribute" activepage="Attributes Master" mainpage="Add Attribute" />
       
       <div className="grid grid-cols-12 gap-6">
         <div className="xl:col-span-12 col-span-12">
           <div className="box">
             <div className="box-header">
-              <h5 className="box-title">Option</h5>
+              <h5 className="box-title">Attribute</h5>
             </div>
             <div className="box-body">
               <form onSubmit={handleSubmit}>
@@ -232,7 +277,7 @@ const AddAttributePage = () => {
                   <div className="grid grid-cols-12 gap-4">
                     <div className="col-span-12 md:col-span-4">
                       <div className="form-group">
-                        <label htmlFor="name" className="form-label required">Option Name</label>
+                        <label htmlFor="name" className="form-label required">Attribute Name</label>
                         <div className="flex">
                           <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
                             <i className="ri-translate-2"></i>
@@ -242,7 +287,7 @@ const AddAttributePage = () => {
                             id="name"
                             name="name"
                             className="form-control !rounded-l-none"
-                            placeholder="Option Name"
+                            placeholder="Attribute Name"
                             value={formData.name}
                             onChange={handleInputChange}
                             required
@@ -266,6 +311,8 @@ const AddAttributePage = () => {
                           <option value="select">Select</option>
                           <option value="radio">Radio</option>
                           <option value="checkbox">Checkbox</option>
+                          <option value="text">Text</option>
+                          <option value="number">Number</option>
                         </select>
                       </div>
                     </div>
@@ -303,9 +350,49 @@ const AddAttributePage = () => {
                         />
                       </div>
                     </div>
+
+                    <div className="col-span-12 md:col-span-4">
+                      <div className="form-group">
+                        <label className="form-label flex items-center gap-2 cursor-pointer mt-8">
+                          <input
+                            type="checkbox"
+                            className="form-checkbox rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                            checked={formData.required}
+                            onChange={(e) => setFormData(prev => ({ ...prev, required: e.target.checked }))}
+                            disabled={isSubmitting}
+                          />
+                          Required
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="col-span-12">
+                      <div className="form-group">
+                        <label className="form-label">Applies To Categories</label>
+                        <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                          {categories.length === 0 ? (
+                            <p className="text-sm text-gray-400 col-span-full">No categories available</p>
+                          ) : (
+                            categories.map((cat) => (
+                              <label key={cat.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  className="form-checkbox rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                  checked={formData.appliesToCategory.includes(cat.id)}
+                                  onChange={() => toggleCategory(cat.id)}
+                                  disabled={isSubmitting}
+                                />
+                                {cat.name}
+                              </label>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Option Values */}
+                  {NEEDS_OPTION_VALUES(formData.type) && (
                   <div className="mt-6">
                     <h6 className="text-base font-semibold mb-4">Option Values</h6>
                     <div className="overflow-x-auto">
@@ -423,6 +510,7 @@ const AddAttributePage = () => {
                       </button>
                     </div>
                   </div>
+                  )}
 
                   <div className="flex justify-end space-x-4 mt-6">
                     <button
@@ -460,7 +548,7 @@ const AddAttributePage = () => {
 
 export default function AddAttributePageWrapper() {
   return (
-    <RequireCrudPermission path="Catalog.Attributes" action="create">
+    <RequireCrudPermission path="Catalog.Attributes Master" action="create">
       <AddAttributePage />
     </RequireCrudPermission>
   );

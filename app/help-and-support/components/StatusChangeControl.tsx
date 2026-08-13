@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import type { TicketDisposition, TicketStatus } from '@/shared/types/helpSupport';
-import { DISPOSITION_LABELS, STATUS_LABELS } from '../helpSupportConstants';
+import { DISPOSITION_LABELS, STATUS_LABELS, formatDispositionLabel } from '../helpSupportConstants';
 import HubFilterSelect from './HubFilterSelect';
 
 interface StatusChangeControlProps {
@@ -103,9 +103,9 @@ export default function StatusChangeControl({
               wrapperClassName="w-full"
             >
               <option value="">Select disposition</option>
-              {Object.entries(DISPOSITION_LABELS).map(([value, label]) => (
+              {Object.keys(DISPOSITION_LABELS).map((value) => (
                 <option key={value} value={value} disabled={value === currentDisposition}>
-                  {label}
+                  {formatDispositionLabel(value)}
                 </option>
               ))}
             </HubFilterSelect>

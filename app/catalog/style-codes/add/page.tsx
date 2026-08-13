@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast, Toaster } from 'react-hot-toast'
 import Seo from '@/shared/layout-components/seo/seo'
 import { styleCodeService } from '@/shared/services/styleCodeService'
+import { listProducts, ProductListItem } from '@/shared/services/productService'
 import { API_BASE_URL } from '@/shared/data/utilities/api'
 import { RawMaterialBomTable, RawMaterialBomItem } from '@/app/catalog/items/components/RawMaterialBomTable'
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission'
@@ -17,6 +18,9 @@ interface FormState {
   mrp: number | ''
   brand: string
   pack: string
+  bundleQty: number | ''
+  cartonQty: number | ''
+  linkedItem: string
   status: Status
 }
 
@@ -24,12 +28,16 @@ const AddStyleCodePage = () => {
   const router = useRouter()
   const [brandOptions, setBrandOptions] = useState<string[]>([])
   const [packOptions, setPackOptions] = useState<string[]>([])
+  const [productOptions, setProductOptions] = useState<ProductListItem[]>([])
   const [form, setForm] = useState<FormState>({
     styleCode: '',
     eanCode: '',
     mrp: '',
     brand: '',
     pack: '',
+    bundleQty: 60,
+    cartonQty: 120,
+    linkedItem: '',
     status: 'active',
   })
   const [bomItems, setBomItems] = useState<RawMaterialBomItem[]>([])
@@ -41,6 +49,8 @@ const AddStyleCodePage = () => {
     if (!form.styleCode.trim()) nextErrors.styleCode = 'Style code is required'
     if (!form.eanCode.trim()) nextErrors.eanCode = 'EAN is required'
     if (form.mrp === '' || Number(form.mrp) < 0) nextErrors.mrp = 'MRP must be 0 or more'
+    if (form.bundleQty === '' || Number(form.bundleQty) < 1) nextErrors.bundleQty = 'Bundle qty must be at least 1'
+    if (form.cartonQty === '' || Number(form.cartonQty) < 1) nextErrors.cartonQty = 'Carton qty must be at least 1'
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -71,7 +81,16 @@ const AddStyleCodePage = () => {
         console.error('Failed to load brand/pack options', error)
       }
     }
+    const fetchProducts = async () => {
+      try {
+        const resp = await listProducts({ page: 1, limit: 200 })
+        setProductOptions(resp.results || [])
+      } catch (error) {
+        console.error('Failed to load products', error)
+      }
+    }
     fetchBrandPack()
+    void fetchProducts()
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,6 +111,9 @@ const AddStyleCodePage = () => {
         mrp: Number(form.mrp),
         brand: form.brand.trim() || undefined,
         pack: form.pack.trim() || undefined,
+        bundleQty: Number(form.bundleQty),
+        cartonQty: Number(form.cartonQty),
+        linkedItem: form.linkedItem.trim() || null,
         status: form.status,
         ...(bom.length > 0 && { bom }),
       })
@@ -202,6 +224,45 @@ const AddStyleCodePage = () => {
                 </select>
               </div>
               <div>
+                <label className="form-label text-[12px]">Bundle Qty</label>
+                <input
+                  type="number"
+                  min={1}
+                  className={`form-control h-9 text-sm ${errors.bundleQty ? 'border-red-500' : ''}`}
+                  value={form.bundleQty}
+                  onChange={(e) => handleChange('bundleQty', e.target.value ? Number(e.target.value) : '')}
+                  placeholder="60"
+                />
+                {errors.bundleQty && <p className="text-xs text-red-500 mt-1">{errors.bundleQty}</p>}
+              </div>
+              <div>
+                <label className="form-label text-[12px]">Carton Qty</label>
+                <input
+                  type="number"
+                  min={1}
+                  className={`form-control h-9 text-sm ${errors.cartonQty ? 'border-red-500' : ''}`}
+                  value={form.cartonQty}
+                  onChange={(e) => handleChange('cartonQty', e.target.value ? Number(e.target.value) : '')}
+                  placeholder="120"
+                />
+                {errors.cartonQty && <p className="text-xs text-red-500 mt-1">{errors.cartonQty}</p>}
+              </div>
+              <div>
+                <label className="form-label text-[12px]">Linked Item</label>
+                <select
+                  className="form-select h-9 text-sm"
+                  value={form.linkedItem}
+                  onChange={(e) => handleChange('linkedItem', e.target.value)}
+                >
+                  <option value="">None</option>
+                  {productOptions.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name || p.factoryCode || p.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="form-label text-[12px]">Status</label>
                 <select
                   className="form-select h-9 text-sm"
@@ -244,7 +305,7 @@ const AddStyleCodePage = () => {
 
 export default function AddStyleCodePageWrapper() {
   return (
-    <RequireCrudPermission path="Catalog.Style Codes" action="create">
+    <RequireCrudPermission path="Catalog.Style codes" action="create">
       <AddStyleCodePage />
     </RequireCrudPermission>
   )

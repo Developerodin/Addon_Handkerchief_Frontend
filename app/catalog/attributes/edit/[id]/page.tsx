@@ -22,6 +22,8 @@ interface Attribute {
   name: string;
   type: string;
   attributeType?: string; // 'Manufacturing' | 'Warehouse'
+  required?: boolean;
+  appliesToCategory?: (string | { id?: string; _id?: string; name?: string })[];
   sortOrder: number;
   optionValues: AttributeValue[];
 }
@@ -35,15 +37,26 @@ type OptionValueForm = {
   _id?: string;
 };
 
+interface CategoryOption {
+  id: string;
+  name: string;
+}
+
+const NEEDS_OPTION_VALUES = (type: string) =>
+  ['select', 'radio', 'checkbox'].includes(type);
+
 const EditAttributePage = ({ params }: { params: { id: string } }) => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [attribute, setAttribute] = useState<Attribute | null>(null);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     type: 'select',
     attributeType: 'Manufacturing' as string,
+    required: false,
+    appliesToCategory: [] as string[],
     sortOrder: 0,
     optionValues: [] as OptionValueForm[]
   });
@@ -71,14 +84,20 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
         const data = await response.json();
         setAttribute(data);
         
-        // Initialize form data with existing values
         const validAttrTypes = ['Manufacturing', 'Warehouse'];
+        const appliesIds = (data.appliesToCategory || []).map(
+          (item: string | { id?: string; _id?: string }) =>
+            typeof item === 'string' ? item : (item?.id || item?._id || '')
+        ).filter(Boolean);
+
         setFormData({
           name: data.name,
           type: data.type,
           attributeType: validAttrTypes.includes(data.attributeType) ? data.attributeType : 'Manufacturing',
+          required: Boolean(data.required),
+          appliesToCategory: appliesIds,
           sortOrder: data.sortOrder,
-          optionValues: data.optionValues.map((value: AttributeValue) => ({
+          optionValues: (data.optionValues || []).map((value: AttributeValue) => ({
             name: value.name,
             image: null,
             imageUrl: value.image || null,
@@ -99,11 +118,36 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
     fetchAttribute();
   }, [params.id]);
 
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/categories?page=1&limit=100000`);
+        if (!response.ok) return;
+        const data = await response.json();
+        setCategories(
+          (data.results || []).map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))
+        );
+      } catch {
+        // Non-critical
+      }
+    };
+    loadCategories();
+  }, []);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
+    }));
+  };
+
+  const toggleCategory = (categoryId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      appliesToCategory: prev.appliesToCategory.includes(categoryId)
+        ? prev.appliesToCategory.filter((id) => id !== categoryId)
+        : [...prev.appliesToCategory, categoryId],
     }));
   };
 
@@ -145,22 +189,26 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
       setIsSaving(true);
       setError(null);
 
-      const optionValues = await Promise.all(
-        formData.optionValues.map(async (option) => {
-          const uploadedUrl = await uploadOptionalImage(option.image);
-          const image = uploadedUrl ?? option.imageUrl ?? undefined;
-          return {
-            name: option.name,
-            sortOrder: option.sortOrder,
-            ...(image ? { image } : {}),
-          };
-        })
-      );
+      const optionValues = NEEDS_OPTION_VALUES(formData.type)
+        ? await Promise.all(
+            formData.optionValues.map(async (option) => {
+              const uploadedUrl = await uploadOptionalImage(option.image);
+              const image = uploadedUrl ?? option.imageUrl ?? undefined;
+              return {
+                name: option.name,
+                sortOrder: option.sortOrder,
+                ...(image ? { image } : {}),
+              };
+            })
+          )
+        : [];
 
       const updateData = {
         name: formData.name,
         type: formData.type,
         attributeType: formData.attributeType || 'Manufacturing',
+        required: formData.required,
+        appliesToCategory: formData.appliesToCategory,
         sortOrder: formData.sortOrder,
         optionValues,
       };
@@ -280,6 +328,8 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
                     <option value="select">Select</option>
                     <option value="radio">Radio</option>
                     <option value="checkbox">Checkbox</option>
+                    <option value="text">Text</option>
+                    <option value="number">Number</option>
                   </select>
                 </div>
 
@@ -308,9 +358,45 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
                     disabled={isSaving}
                   />
                 </div>
+
+                <div>
+                  <label className="form-label flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="form-checkbox rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      checked={formData.required}
+                      onChange={(e) => setFormData(prev => ({ ...prev, required: e.target.checked }))}
+                      disabled={isSaving}
+                    />
+                    Required
+                  </label>
+                </div>
+
+                <div>
+                  <label className="form-label">Applies To Categories</label>
+                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {categories.length === 0 ? (
+                      <p className="text-sm text-gray-400 col-span-full">No categories available</p>
+                    ) : (
+                      categories.map((cat) => (
+                        <label key={cat.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="form-checkbox rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                            checked={formData.appliesToCategory.includes(cat.id)}
+                            onChange={() => toggleCategory(cat.id)}
+                            disabled={isSaving}
+                          />
+                          {cat.name}
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Option Values */}
+              {NEEDS_OPTION_VALUES(formData.type) && (
               <div>
                 <div className="flex flex-wrap items-center gap-3 mb-4">
                   <h3 className="text-lg font-medium shrink-0">Option Values</h3>
@@ -419,6 +505,7 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
                   ))}
                 </div>
               </div>
+              )}
 
               {/* Form Actions */}
               <div className="flex justify-end space-x-4 mt-6">
@@ -455,7 +542,7 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
 
 export default function EditAttributePageWrapper({ params }: { params: { id: string } }) {
   return (
-    <RequireCrudPermission path="Catalog.Attributes" action="update">
+    <RequireCrudPermission path="Catalog.Attributes Master" action="update">
       <EditAttributePage params={params} />
     </RequireCrudPermission>
   );

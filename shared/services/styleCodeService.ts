@@ -13,6 +13,10 @@ export interface StyleCode {
   mrp: number
   brand?: string
   pack?: string
+  bundleQty?: number
+  cartonQty?: number
+  /** Product ObjectId — may be string id or populated product */
+  linkedItem?: string | { id?: string; _id?: string; name?: string } | null
   status: 'active' | 'inactive'
   bom?: StyleCodeBomItem[]
   createdAt?: string
@@ -45,6 +49,8 @@ export interface BulkImportPayload {
     mrp: number
     brand?: string
     pack?: string
+    bundleQty?: number
+    cartonQty?: number
     status?: 'active' | 'inactive'
   }>
   batchSize?: number
@@ -129,7 +135,9 @@ class StyleCodeService {
     return this.request<StyleCode>(`/${styleCodeId}`)
   }
 
-  async create(payload: Omit<StyleCode, 'id' | 'createdAt' | 'updatedAt'> & { bom?: StyleCodeBomItem[] }): Promise<StyleCode> {
+  async create(
+    payload: Omit<StyleCode, 'id' | 'createdAt' | 'updatedAt'> & { bom?: StyleCodeBomItem[] }
+  ): Promise<StyleCode> {
     return this.request<StyleCode>('', {
       method: 'POST',
       body: JSON.stringify(payload),

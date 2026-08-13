@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Seo from '@/shared/layout-components/seo/seo';
 import { toast, Toaster } from 'react-hot-toast';
@@ -7,55 +7,87 @@ import Image from 'next/image';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
+import { filterDecimalInput } from '@/shared/utils/formInputFilters';
 
-interface RawMaterial {
+const PACKAGING_TYPES = [
+  'polybag',
+  'carton-120',
+  'bundle tag',
+  'sticker',
+  'insert card',
+  'embroidery carton',
+  'sewing thread',
+  'embroidery thread',
+  'other',
+] as const;
+
+interface FabricSupplier {
   id: string;
   name: string;
-  groupName: string;
+}
+
+interface PackagingMaterialForm {
+  id: string;
+  name: string;
   type: string;
-  description: string;
-  brand: string;
-  countSize: string;
-  material: string;
-  color: string;
-  shade: string;
+  sizeSpec: string;
   unit: string;
-  mrp: string;
+  supplier: string;
+  supplierName: string;
+  rate: string;
   hsnCode: string;
   gst: string;
-  articleNo: string;
+  minimumStock: string;
+  description: string;
+  status: 'active' | 'inactive';
   image: string | null;
 }
 
-function EditRawMaterial({ params }: { params: { id: string } }) {
+function EditPackagingMaterial({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [material, setMaterial] = useState<RawMaterial>({
+  const [isFetching, setIsFetching] = useState(true);
+  const [suppliers, setSuppliers] = useState<FabricSupplier[]>([]);
+  const [material, setMaterial] = useState<PackagingMaterialForm>({
     id: '',
     name: '',
-    groupName: '',
     type: '',
-    description: '',
-    brand: '',
-    countSize: '',
-    material: '',
-    color: '',
-    shade: '',
+    sizeSpec: '',
     unit: '',
-    mrp: '',
+    supplier: '',
+    supplierName: '',
+    rate: '',
     hsnCode: '',
     gst: '',
-    articleNo: '',
-    image: null
+    minimumStock: '',
+    description: '',
+    status: 'active',
+    image: null,
   });
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
 
-  // Fetch material data
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/fabric-suppliers?limit=500&status=active`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        setSuppliers(Array.isArray(data.results) ? data.results : []);
+      } catch {
+        // Non-critical
+      }
+    };
+    fetchSuppliers();
+  }, []);
+
   useEffect(() => {
     const fetchMaterial = async () => {
       try {
-        setIsLoading(true);
+        setIsFetching(true);
         const response = await fetch(`${API_BASE_URL}/raw-materials/${params.id}`, {
           headers: {
             'Accept': 'application/json',
@@ -65,42 +97,68 @@ function EditRawMaterial({ params }: { params: { id: string } }) {
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to fetch material');
+          throw new Error(errorData.message || 'Failed to fetch packaging material');
         }
 
         const data = await response.json();
+        const supplierId =
+          data.supplier && typeof data.supplier === 'object'
+            ? data.supplier.id
+            : data.supplier || '';
+
         setMaterial({
           id: data.id,
           name: data.name || '',
-          groupName: data.groupName || '',
           type: data.type || '',
-          description: data.description || '',
-          brand: data.brand || '',
-          countSize: data.countSize || '',
-          material: data.material || '',
-          color: data.color || '',
-          shade: data.shade || '',
+          sizeSpec: data.sizeSpec || data.countSize || '',
           unit: data.unit || '',
-          mrp: data.mrp || '',
+          supplier: supplierId,
+          supplierName: data.supplierName || (data.supplier?.name || ''),
+          rate: data.rate != null ? String(data.rate) : (data.mrp || ''),
           hsnCode: data.hsnCode || '',
           gst: data.gst || '',
-          articleNo: data.articleNo || '',
-          image: data.image || null
+          minimumStock: data.minimumStock != null ? String(data.minimumStock) : '',
+          description: data.description || '',
+          status: data.status === 'inactive' ? 'inactive' : 'active',
+          image: data.image || null,
         });
         if (data.image) {
           setImagePreview(data.image);
         }
       } catch (err) {
-        console.error('Error fetching material:', err);
-        toast.error(err instanceof Error ? err.message : 'Failed to fetch material');
+        console.error('Error fetching packaging material:', err);
+        toast.error(err instanceof Error ? err.message : 'Failed to fetch packaging material');
         router.push('/catalog/raw-material');
       } finally {
-        setIsLoading(false);
+        setIsFetching(false);
       }
     };
 
     fetchMaterial();
   }, [params.id, router]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setMaterial(prev => {
+      if (name === 'supplier') {
+        const selected = suppliers.find(s => s.id === value);
+        return {
+          ...prev,
+          supplier: value,
+          supplierName: selected?.name || prev.supplierName,
+        };
+      }
+      return { ...prev, [name]: value };
+    });
+  };
+
+  const handleDecimalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setMaterial(prev => ({
+      ...prev,
+      [name]: filterDecimalInput(value),
+    }));
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -116,11 +174,12 @@ function EditRawMaterial({ params }: { params: { id: string } }) {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     try {
       setIsLoading(true);
 
       const imageUrl = await uploadOptionalImage(selectedImage);
+      const selectedSupplier = suppliers.find(s => s.id === material.supplier);
 
       const response = await fetch(`${API_BASE_URL}/raw-materials/${params.id}`, {
         method: 'PATCH',
@@ -129,40 +188,38 @@ function EditRawMaterial({ params }: { params: { id: string } }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: material.name,
-          groupName: material.groupName,
+          name: material.name.trim(),
           type: material.type,
-          description: material.description,
-          brand: material.brand,
-          countSize: material.countSize,
-          material: material.material,
-          color: material.color,
-          shade: material.shade,
+          sizeSpec: material.sizeSpec.trim(),
           unit: material.unit,
-          mrp: material.mrp,
-          hsnCode: material.hsnCode,
-          gst: material.gst,
-          articleNo: material.articleNo,
+          supplier: material.supplier || null,
+          supplierName: material.supplierName.trim() || selectedSupplier?.name || '',
+          rate: material.rate === '' ? 0 : Number(material.rate),
+          hsnCode: material.hsnCode.trim(),
+          gst: material.gst.trim(),
+          minimumStock: material.minimumStock === '' ? 0 : Number(material.minimumStock),
+          description: material.description.trim(),
+          status: material.status,
           ...(imageUrl ? { image: imageUrl } : {}),
-        })
+        }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update material');
+        throw new Error(errorData.message || 'Failed to update packaging material');
       }
 
-      toast.success('Material updated successfully');
+      toast.success('Packaging material updated successfully');
       router.push('/catalog/raw-material');
     } catch (err) {
-      console.error('Error updating material:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to update material');
+      console.error('Error updating packaging material:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to update packaging material');
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (isLoading) {
+  if (isFetching) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -173,18 +230,17 @@ function EditRawMaterial({ params }: { params: { id: string } }) {
   return (
     <div className="main-content">
       <Toaster position="top-right" />
-      <Seo title="Edit Raw Material" />
-      
+      <Seo title="Edit Packaging material" />
+
       <div className="box">
         <div className="box-header">
-          <h1 className="box-title text-2xl font-semibold">Edit Raw Material</h1>
+          <h1 className="box-title text-2xl font-semibold">Edit Packaging material</h1>
         </div>
         <div className="box-body">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Image Upload */}
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700">Image</label>
+                <label className="block text-sm font-medium text-gray-700">Image (Optional)</label>
                 <div className="mt-1 flex items-center space-x-4">
                   {imagePreview && (
                     <div className="relative w-32 h-32">
@@ -197,9 +253,10 @@ function EditRawMaterial({ params }: { params: { id: string } }) {
                     </div>
                   )}
                   <label className="ti-btn ti-btn-primary cursor-pointer">
-                    <span>Change Image</span>
+                    <span>{imagePreview ? 'Change Image' : 'Upload Image'}</span>
                     <input
                       type="file"
+                      ref={fileInputRef}
                       className="hidden"
                       accept="image/*"
                       onChange={handleImageChange}
@@ -207,206 +264,179 @@ function EditRawMaterial({ params }: { params: { id: string } }) {
                   </label>
                 </div>
               </div>
-              {/* Group Name Dropdown */}
-              <div className="form-group">
-                <label className="form-label">Group Name</label>
-                <select
-                  name="groupName"
-                  value={material.groupName}
-                  onChange={e => setMaterial({ ...material, groupName: e.target.value })}
-                  className="form-control"
-                  required
-                >
-                  <option value="">Select Group</option>
-                  <option value="Embroidery">Embroidery</option>
-                  <option value="Packing Material">Packing Material</option>
-                  <option value="Yarn">Yarn</option>
-                  <option value="Finished Goods">Finished Goods</option>
-                  <option value="Stationary">Stationary</option>
-                  <option value="Household">Household</option>
-                  <option value="Machine Tools">Machine Tools</option>
-                  <option value="Maintenance">Maintenance</option>
-                </select>
-              </div>
-              {/* Type Dropdown */}
-              <div className="form-group">
-                <label className="form-label">Type</label>
-                <select
-                  name="type"
-                  value={material.type}
-                  onChange={e => setMaterial({ ...material, type: e.target.value })}
-                  className="form-control"
-                  required
-                >
-                  <option value="">Select Type</option>
-                  <option value="Threads">Threads</option>
-                  <option value="Tag">Tag</option>
-                  <option value="Polybags">Polybags</option>
-                  <option value="Box">Box</option>
-                  <option value="Stands">Stands</option>
-                  <option value="Socks">Socks</option>
-                  <option value="Stickers">Stickers</option>
-                </select>
-              </div>
 
-               {/* Article No */}
-               <div className="form-group">
-                <label className="form-label">Article No</label>
-                <input
-                  type="text"
-                  name="articleNo"
-                  value={material.articleNo}
-                  onChange={e => setMaterial({ ...material, articleNo: e.target.value })}
-                  className="form-control"
-                  required
-                />
-              </div>
-              
-              {/* Name */}
               <div className="form-group">
-                <label className="form-label">Name</label>
+                <label className="form-label">Name <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   name="name"
                   value={material.name}
-                  onChange={e => setMaterial({ ...material, name: e.target.value })}
+                  onChange={handleChange}
                   className="form-control"
                   required
                 />
               </div>
-              {/* Description */}
+
               <div className="form-group">
-                <label className="form-label">Description</label>
-                <textarea
-                  name="description"
-                  value={material.description}
-                  onChange={e => setMaterial({ ...material, description: e.target.value })}
+                <label className="form-label">Type <span className="text-red-500">*</span></label>
+                <select
+                  name="type"
+                  value={material.type}
+                  onChange={handleChange}
                   className="form-control"
-                  rows={2}
                   required
-                ></textarea>
+                >
+                  <option value="">Select Type</option>
+                  {PACKAGING_TYPES.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                  {material.type && !(PACKAGING_TYPES as readonly string[]).includes(material.type) && (
+                    <option value={material.type}>{material.type} (legacy)</option>
+                  )}
+                </select>
               </div>
-              {/* Brand */}
+
               <div className="form-group">
-                <label className="form-label">Brand</label>
+                <label className="form-label">Size / Spec</label>
                 <input
                   type="text"
-                  name="brand"
-                  value={material.brand}
-                  onChange={e => setMaterial({ ...material, brand: e.target.value })}
+                  name="sizeSpec"
+                  value={material.sizeSpec}
+                  onChange={handleChange}
                   className="form-control"
-                  required
+                  placeholder="e.g. 12x16, 120 pcs"
                 />
               </div>
-              {/* Count/Size */}
+
               <div className="form-group">
-                <label className="form-label">Count/Size</label>
-                <input
-                  type="text"
-                  name="countSize"
-                  value={material.countSize}
-                  onChange={e => setMaterial({ ...material, countSize: e.target.value })}
-                  className="form-control"
-                  required
-                />
-              </div>
-              {/* Material */}
-              <div className="form-group">
-                <label className="form-label">Material</label>
-                <input
-                  type="text"
-                  name="material"
-                  value={material.material}
-                  onChange={e => setMaterial({ ...material, material: e.target.value })}
-                  className="form-control"
-                  required
-                />
-              </div>
-              {/* Color */}
-              <div className="form-group">
-                <label className="form-label">Color</label>
-                <input
-                  type="text"
-                  name="color"
-                  value={material.color}
-                  onChange={e => setMaterial({ ...material, color: e.target.value })}
-                  className="form-control"
-                  required
-                />
-              </div>
-              {/* Shade */}
-              <div className="form-group">
-                <label className="form-label">Shade</label>
-                <input
-                  type="text"
-                  name="shade"
-                  value={material.shade}
-                  onChange={e => setMaterial({ ...material, shade: e.target.value })}
-                  className="form-control"
-                  required
-                />
-              </div>
-              {/* Unit Dropdown */}
-              <div className="form-group">
-                <label className="form-label">Unit</label>
+                <label className="form-label">Unit <span className="text-red-500">*</span></label>
                 <select
                   name="unit"
                   value={material.unit}
-                  onChange={e => setMaterial({ ...material, unit: e.target.value })}
+                  onChange={handleChange}
                   className="form-control"
                   required
                 >
                   <option value="">Select Unit</option>
-                  <option value="Meter">Meter</option>
                   <option value="Pcs">Pcs</option>
+                  <option value="Meter">Meter</option>
                   <option value="Kilograms">Kilograms</option>
                   <option value="Grams">Grams</option>
                   <option value="Liter">Liter</option>
-                  <option value="Pairs">Pairs</option>
                   <option value="Packet">Packet</option>
                   <option value="Packs">Packs</option>
+                  <option value="Roll">Roll</option>
+                  <option value="Cone">Cone</option>
+                  {material.unit && !['Pcs', 'Meter', 'Kilograms', 'Grams', 'Liter', 'Packet', 'Packs', 'Roll', 'Cone'].includes(material.unit) && (
+                    <option value={material.unit}>{material.unit}</option>
+                  )}
                 </select>
               </div>
-             
-              {/* MRP */}
+
               <div className="form-group">
-                <label className="form-label">MRP</label>
+                <label className="form-label">Supplier</label>
+                <select
+                  name="supplier"
+                  value={material.supplier}
+                  onChange={handleChange}
+                  className="form-control"
+                >
+                  <option value="">Select Supplier (optional)</option>
+                  {suppliers.map(supplier => (
+                    <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                  ))}
+                  {material.supplier && !suppliers.some(s => s.id === material.supplier) && (
+                    <option value={material.supplier}>
+                      {material.supplierName || 'Current supplier'}
+                    </option>
+                  )}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Supplier Name (fallback)</label>
                 <input
                   type="text"
-                  name="mrp"
-                  value={material.mrp}
-                  onChange={e => setMaterial({ ...material, mrp: e.target.value })}
+                  name="supplierName"
+                  value={material.supplierName}
+                  onChange={handleChange}
                   className="form-control"
-                  required
+                  placeholder="Free-text if not in list"
                 />
               </div>
-              {/* HSN Code */}
+
+              <div className="form-group">
+                <label className="form-label">Rate</label>
+                <input
+                  type="text"
+                  name="rate"
+                  value={material.rate}
+                  onChange={handleDecimalChange}
+                  className="form-control"
+                  inputMode="decimal"
+                />
+              </div>
+
               <div className="form-group">
                 <label className="form-label">HSN Code</label>
                 <input
                   type="text"
                   name="hsnCode"
                   value={material.hsnCode}
-                  onChange={e => setMaterial({ ...material, hsnCode: e.target.value })}
+                  onChange={handleChange}
                   className="form-control"
-                  required
                 />
               </div>
-              {/* GST % */}
+
               <div className="form-group">
-                <label className="form-label">GST %</label>
+                <label className="form-label">GST</label>
                 <input
                   type="text"
                   name="gst"
                   value={material.gst}
-                  onChange={e => setMaterial({ ...material, gst: e.target.value })}
+                  onChange={handleDecimalChange}
                   className="form-control"
-                  required
+                  inputMode="decimal"
                 />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Minimum Stock</label>
+                <input
+                  type="text"
+                  name="minimumStock"
+                  value={material.minimumStock}
+                  onChange={handleDecimalChange}
+                  className="form-control"
+                  inputMode="decimal"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Status</label>
+                <select
+                  name="status"
+                  value={material.status}
+                  onChange={handleChange}
+                  className="form-control"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+
+              <div className="form-group md:col-span-2">
+                <label className="form-label">Description</label>
+                <textarea
+                  name="description"
+                  value={material.description}
+                  onChange={handleChange}
+                  className="form-control"
+                  rows={3}
+                ></textarea>
               </div>
             </div>
 
-            {/* Form Actions */}
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
@@ -420,7 +450,7 @@ function EditRawMaterial({ params }: { params: { id: string } }) {
                 className="ti-btn ti-btn-primary"
                 disabled={isLoading}
               >
-                {isLoading ? 'Updating...' : 'Update Material'}
+                {isLoading ? 'Updating...' : 'Update Packaging material'}
               </button>
             </div>
           </form>
@@ -430,10 +460,10 @@ function EditRawMaterial({ params }: { params: { id: string } }) {
   );
 }
 
-export default function EditRawMaterialPageWrapper({ params }: { params: { id: string } }) {
+export default function EditPackagingMaterialPageWrapper({ params }: { params: { id: string } }) {
   return (
-    <RequireCrudPermission path="Catalog.Raw Material" action="update">
-      <EditRawMaterial params={params} />
+    <RequireCrudPermission path="Catalog.Packaging materials" action="update">
+      <EditPackagingMaterial params={params} />
     </RequireCrudPermission>
   );
 }

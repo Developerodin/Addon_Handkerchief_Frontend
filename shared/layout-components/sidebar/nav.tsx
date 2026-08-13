@@ -9,6 +9,13 @@ const MaterialIcon = <i className="bx bx-layer side-menu__icon"></i>;
 const ProcessIcon = <i className="bx bx-cog side-menu__icon"></i>;
 const AttributeIcon = <i className="bx bx-list-ul side-menu__icon"></i>;
 const StyleCodeIcon = <i className="bx bx-purchase-tag side-menu__icon"></i>;
+const SupplierIcon = <i className="bx bx-store side-menu__icon"></i>;
+const FabricIcon = <i className="bx bx-grid-alt side-menu__icon"></i>;
+const MachineIcon = <i className="bx bx-cog side-menu__icon"></i>;
+const WorkerIcon = <i className="bx bx-user side-menu__icon"></i>;
+const RackIcon = <i className="bx bx-layer side-menu__icon"></i>;
+const ContainerIcon = <i className="bx bx-box side-menu__icon"></i>;
+const LabelIcon = <i className="bx bx-printer side-menu__icon"></i>;
 const UsersIcon = (
   <i
     className="ri ri-user-line side-menu__icon"
@@ -50,31 +57,7 @@ const BaseMenuItems: any = [
         type: "link",
         active: false,
         selected: false,
-        title: "Categories",
-      },
-      {
-        icon: MaterialIcon,
-        path: "/catalog/raw-material",
-        type: "link",
-        active: false,
-        selected: false,
-        title: "Raw Material",
-      },
-      {
-        icon: ProcessIcon,
-        path: "/catalog/processes",
-        type: "link",
-        active: false,
-        selected: false,
-        title: "Processes",
-      },
-      {
-        icon: AttributeIcon,
-        path: "/catalog/attributes",
-        type: "link",
-        active: false,
-        selected: false,
-        title: "Attributes",
+        title: "Category",
       },
       {
         icon: StyleCodeIcon,
@@ -82,7 +65,87 @@ const BaseMenuItems: any = [
         type: "link",
         active: false,
         selected: false,
-        title: "Style Codes",
+        title: "Style codes",
+      },
+      {
+        icon: FabricIcon,
+        path: "/catalog/fabric",
+        type: "link",
+        active: false,
+        selected: false,
+        title: "Fabric master",
+      },
+      {
+        icon: SupplierIcon,
+        path: "/catalog/fabric-suppliers",
+        type: "link",
+        active: false,
+        selected: false,
+        title: "Fabric Suppliers",
+      },
+      {
+        icon: MaterialIcon,
+        path: "/catalog/raw-material",
+        type: "link",
+        active: false,
+        selected: false,
+        title: "Packaging materials",
+      },
+      {
+        icon: ProcessIcon,
+        path: "/catalog/processes",
+        type: "link",
+        active: false,
+        selected: false,
+        title: "Process Master",
+      },
+      {
+        icon: AttributeIcon,
+        path: "/catalog/attributes",
+        type: "link",
+        active: false,
+        selected: false,
+        title: "Attributes Master",
+      },
+      {
+        icon: MachineIcon,
+        path: "/catalog/machines",
+        type: "link",
+        active: false,
+        selected: false,
+        title: "Machines & Configuration",
+      },
+      {
+        icon: WorkerIcon,
+        path: "/catalog/workers",
+        type: "link",
+        active: false,
+        selected: false,
+        title: "Workers / Operators",
+      },
+      {
+        icon: RackIcon,
+        path: "/catalog/storage-racks",
+        type: "link",
+        active: false,
+        selected: false,
+        title: "Storage Racks",
+      },
+      {
+        icon: ContainerIcon,
+        path: "/catalog/containers",
+        type: "link",
+        active: false,
+        selected: false,
+        title: "Containers",
+      },
+      {
+        icon: LabelIcon,
+        path: "/catalog/label-templates",
+        type: "link",
+        active: false,
+        selected: false,
+        title: "Label Templates & Device Registry",
       },
     ],
   },

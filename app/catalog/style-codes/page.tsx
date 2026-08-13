@@ -146,6 +146,8 @@ const StyleCodesPage = () => {
         mrp: 199,
         brand: 'Brand A',
         pack: '2-pack',
+        'Bundle Qty': 60,
+        'Carton Qty': 120,
         status: 'active',
       },
       {
@@ -154,6 +156,8 @@ const StyleCodesPage = () => {
         mrp: 249,
         brand: 'Brand B',
         pack: '3-pack',
+        'Bundle Qty': 60,
+        'Carton Qty': 120,
         status: 'inactive',
       },
     ]
@@ -199,6 +203,8 @@ const StyleCodesPage = () => {
         mrp: row.mrp ?? 0,
         brand: row.brand ?? '',
         pack: row.pack ?? '',
+        'Bundle Qty': row.bundleQty ?? 60,
+        'Carton Qty': row.cartonQty ?? 120,
         status: row.status ?? 'active',
       }))
       const ws = XLSX.utils.json_to_sheet(exportRows)
@@ -224,14 +230,26 @@ const StyleCodesPage = () => {
 
   const parseStyleCodesFromRows = (rowsJson: Record<string, any>[]) =>
     rowsJson
-      .map((row) => ({
-        styleCode: String(row.styleCode || row.StyleCode || row['Style Code'] || '').trim(),
-        eanCode: String(row.eanCode || row.EAN || row['eanCode'] || '').trim(),
-        mrp: Number(row.mrp ?? row.MRP ?? 0),
-        brand: String(row.brand || row.Brand || '').trim() || undefined,
-        pack: String(row.pack || row.Pack || '').trim() || undefined,
-        status: parseStatus(row.status || row.Status),
-      }))
+      .map((row) => {
+        const bundleRaw = row.bundleQty ?? row['Bundle Qty'] ?? row.BundleQty
+        const cartonRaw = row.cartonQty ?? row['Carton Qty'] ?? row.CartonQty
+        const bundleQty = bundleRaw === '' || bundleRaw === undefined || bundleRaw === null
+          ? 60
+          : Number(bundleRaw)
+        const cartonQty = cartonRaw === '' || cartonRaw === undefined || cartonRaw === null
+          ? 120
+          : Number(cartonRaw)
+        return {
+          styleCode: String(row.styleCode || row.StyleCode || row['Style Code'] || '').trim(),
+          eanCode: String(row.eanCode || row.EAN || row['eanCode'] || '').trim(),
+          mrp: Number(row.mrp ?? row.MRP ?? 0),
+          brand: String(row.brand || row.Brand || '').trim() || undefined,
+          pack: String(row.pack || row.Pack || '').trim() || undefined,
+          bundleQty: !Number.isNaN(bundleQty) && bundleQty >= 1 ? bundleQty : 60,
+          cartonQty: !Number.isNaN(cartonQty) && cartonQty >= 1 ? cartonQty : 120,
+          status: parseStatus(row.status || row.Status),
+        }
+      })
       .filter((r) => r.styleCode && r.eanCode && !Number.isNaN(r.mrp))
 
   const readExcelFirstSheetRows = async (file: File): Promise<Record<string, any>[]> => {
@@ -413,6 +431,13 @@ const StyleCodesPage = () => {
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/catalog/style-code-combos"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-[11px] font-bold rounded border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                <i className="ri-stack-line text-xs" />
+                Combos
+              </Link>
               <div className="relative">
                 <input
                   type="text"
@@ -588,6 +613,8 @@ const StyleCodesPage = () => {
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">MRP</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Brand</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Pack</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Bundle</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Carton</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Status</th>
                   {(canUpdate || canDelete) && (
                   <th className="px-1.5 py-3 text-right pr-[10px] text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
@@ -602,6 +629,8 @@ const StyleCodesPage = () => {
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-700 border border-gray-200">{formatMoney(row.mrp)}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{row.brand || '-'}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{row.pack || '-'}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-700 border border-gray-200">{row.bundleQty ?? 60}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-700 border border-gray-200">{row.cartonQty ?? 120}</td>
                     <td className="px-1.5 py-2.5 border border-gray-200">
                       <span
                         className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold rounded uppercase ${

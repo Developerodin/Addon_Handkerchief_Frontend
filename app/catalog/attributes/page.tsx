@@ -17,11 +17,19 @@ interface AttributeValue {
   sortOrder: number;
 }
 
+interface CategoryRef {
+  id?: string;
+  _id?: string;
+  name?: string;
+}
+
 interface Attribute {
   id: number;
   name: string;
   type: string;
-  attributeType?: string; // 'Manufacturing' | 'Warehouse', default 'Manufacturing'
+  attributeType?: string;
+  required?: boolean;
+  appliesToCategory?: (string | CategoryRef)[];
   sortOrder: number;
   optionValues: AttributeValue[];
 }
@@ -34,13 +42,27 @@ interface ApiResponse {
   totalResults: number;
 }
 
-interface ExcelAttribute {
-  'Attribute Name': string;
-  'Type': string;
-  'Attribute Type'?: string;
-  'Values': string;
-  'Sort Order': number;
+interface CategoryOption {
+  id: string;
+  name: string;
 }
+
+const yesNo = (value?: boolean) => (value ? 'Yes' : 'No');
+const parseYesNo = (value: unknown) => {
+  const s = String(value ?? '').trim().toLowerCase();
+  return s === 'yes' || s === 'true' || s === '1';
+};
+
+const getCategoryNames = (appliesTo?: (string | CategoryRef)[]) => {
+  if (!appliesTo?.length) return '';
+  return appliesTo
+    .map((item) => {
+      if (typeof item === 'string') return item;
+      return item?.name || item?.id || item?._id || '';
+    })
+    .filter(Boolean)
+    .join(', ');
+};
 
 const AttributesPage = () => {
   const { canCreate, canUpdate, canDelete, canImport, guardDelete } = useCatalogCrud('attributes');
@@ -60,8 +82,8 @@ const AttributesPage = () => {
   const [totalResults, setTotalResults] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [importProgress, setImportProgress] = useState<number | null>(null);
+  const [allCategories, setAllCategories] = useState<CategoryOption[]>([]);
 
-  // Fetch attributes from API
   const fetchAttributes = async (page = 1, limit = itemsPerPage, search = '') => {
     try {
       setIsLoading(true);
@@ -93,6 +115,22 @@ const AttributesPage = () => {
     setCurrentPage(1);
   }, [searchQuery]);
 
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/categories?page=1&limit=100000`);
+        if (!response.ok) return;
+        const data = await response.json();
+        setAllCategories(
+          (data.results || []).map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))
+        );
+      } catch {
+        // Non-critical for list display
+      }
+    };
+    loadCategories();
+  }, []);
+
   const handleSelectAll = () => {
     if (selectAll) {
       setSelectedAttributes([]);
@@ -110,9 +148,21 @@ const AttributesPage = () => {
     }
   };
 
+  const resolveCategoryNamesForExport = (appliesTo?: (string | CategoryRef)[]) => {
+    if (!appliesTo?.length) return '';
+    return appliesTo
+      .map((item) => {
+        if (typeof item === 'object' && item?.name) return item.name;
+        const id = typeof item === 'string' ? item : (item?.id || item?._id || '');
+        const found = allCategories.find((c) => c.id === id);
+        return found?.name || '';
+      })
+      .filter(Boolean)
+      .join(', ');
+  };
+
   const handleExport = async () => {
     try {
-      // Fetch all attributes for export
       const response = await fetch(`${API_BASE_URL}/product-attributes?page=1&limit=10000`);
       if (!response.ok) throw new Error('Failed to fetch all attributes for export');
       const data: ApiResponse = await response.json();
@@ -125,22 +175,20 @@ const AttributesPage = () => {
         'Attribute Name': attr.name,
         'Type': attr.type,
         'Attribute Type': attr.attributeType ?? 'Manufacturing',
-        'Values': attr.optionValues.map(v => v.name).join(', '),
+        'Required': yesNo(attr.required),
+        'Applies To Categories': resolveCategoryNamesForExport(attr.appliesToCategory),
+        'Values': (attr.optionValues || []).map(v => v.name).join(', '),
         'Sort Order': attr.sortOrder
       }));
       const ws = XLSX.utils.json_to_sheet(exportData);
-      const colWidths = [
-        { wch: 10 },
-        { wch: 20 },
-        { wch: 15 },
-        { wch: 14 },
-        { wch: 40 },
-        { wch: 10 },
+      ws['!cols'] = [
+        { wch: 10 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 10 },
+        { wch: 28 }, { wch: 40 }, { wch: 10 },
       ];
-      ws['!cols'] = colWidths;
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Attributes');
       XLSX.writeFile(wb, 'attributes.xlsx');
+      toast.success('Attributes exported successfully');
     } catch (err) {
       toast.error('Failed to export attributes');
     }
@@ -148,25 +196,22 @@ const AttributesPage = () => {
 
   const handleExportTemplate = () => {
     try {
-      const sampleData = [
-        {
-          'Attribute Name': 'Color',
-          'Type': 'select',
-          'Attribute Type': 'Manufacturing',
-          'Values': 'Red, Blue, Green, Black',
-          'Sort Order': 1,
-        },
-        {
-          'Attribute Name': 'Size',
-          'Type': 'radio',
-          'Attribute Type': 'Warehouse',
-          'Values': 'Small, Medium, Large',
-          'Sort Order': 2,
-        },
+      const sampleAttrs = [
+        'Size', 'GSM', 'Fabric Type', 'Colour', 'Pattern', 'Border Type',
+        'Hemming Type', 'Embroidery', 'Gender', 'Occasion', 'Season', 'Pack Size',
       ];
+      const sampleData = sampleAttrs.map((name, index) => ({
+        'Attribute Name': name,
+        'Type': name === 'GSM' ? 'number' : 'select',
+        'Attribute Type': 'Manufacturing',
+        'Required': index < 4 ? 'Yes' : 'No',
+        'Applies To Categories': 'Handkerchief',
+        'Values': name === 'GSM' ? '' : `${name} Option 1, ${name} Option 2`,
+        'Sort Order': index + 1,
+      }));
       const ws = XLSX.utils.json_to_sheet(sampleData);
       ws['!cols'] = [
-        { wch: 20 }, { wch: 12 }, { wch: 16 }, { wch: 40 }, { wch: 10 },
+        { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 24 }, { wch: 40 }, { wch: 10 },
       ];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Attribute Template');
@@ -197,9 +242,7 @@ const AttributesPage = () => {
         throw new Error(errorData.message || 'Failed to delete attribute');
       }
 
-      // Always refetch from backend after delete
       await fetchAttributes();
-
       toast.success('Attribute deleted successfully');
     } catch (err) {
       console.error('Error deleting attribute:', err);
@@ -234,43 +277,84 @@ const AttributesPage = () => {
         const workbook = XLSX.read(data, { type: 'binary' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const jsonData: (ExcelAttribute & { ID?: number })[] = XLSX.utils.sheet_to_json(worksheet);
+        const jsonData: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet);
+
+        // Refresh categories for name→id resolution
+        let categories = allCategories;
+        try {
+          const catRes = await fetch(`${API_BASE_URL}/categories?page=1&limit=100000`);
+          if (catRes.ok) {
+            const catData = await catRes.json();
+            categories = (catData.results || []).map((c: { id: string; name: string }) => ({
+              id: c.id,
+              name: c.name,
+            }));
+            setAllCategories(categories);
+          }
+        } catch {
+          // use existing
+        }
+
+        // Fetch all attributes for upsert
+        let allAttrs: Attribute[] = [];
+        try {
+          const allRes = await fetch(`${API_BASE_URL}/product-attributes?page=1&limit=100000`);
+          if (allRes.ok) {
+            const allData = await allRes.json();
+            allAttrs = allData.results || [];
+          }
+        } catch {
+          allAttrs = attributes;
+        }
 
         let processed = 0;
         for (const row of jsonData) {
           try {
-            console.log('Processing row:', row);
-            // Ensure type is valid
-            const validTypes = ['select', 'radio', 'checkbox'];
-            const type = row['Type']?.toLowerCase() || 'select';
+            const validTypes = ['select', 'radio', 'checkbox', 'text', 'textarea', 'number'];
+            const type = String(row['Type'] || 'select').toLowerCase();
             if (!validTypes.includes(type)) {
               throw new Error(`Invalid type: ${row['Type']} for attribute: ${row['Attribute Name']}`);
             }
-            const attrType = (row['Attribute Type'] ?? 'Manufacturing').trim();
+            const attrType = String(row['Attribute Type'] ?? 'Manufacturing').trim();
             const validAttrTypes = ['Manufacturing', 'Warehouse'];
             const attributeType = validAttrTypes.includes(attrType) ? attrType : 'Manufacturing';
+            const categoryNames = String(row['Applies To Categories'] || '')
+              .split(',')
+              .map((n) => n.trim())
+              .filter(Boolean);
+            const appliesToCategory = categoryNames
+              .map((name) => categories.find((c) => c.name.trim().toLowerCase() === name.toLowerCase())?.id)
+              .filter((id): id is string => Boolean(id));
+
+            const valuesStr = String(row['Values'] || '');
+            const optionValues = valuesStr
+              .split(',')
+              .map((value) => value.trim())
+              .filter(Boolean)
+              .map((name, index) => ({
+                name,
+                sortOrder: index,
+                image: 'null'
+              }));
+
             const attributeData = {
-              name: row['Attribute Name'],
-              type: type,
+              name: String(row['Attribute Name'] || ''),
+              type,
               attributeType,
+              required: parseYesNo(row['Required']),
+              appliesToCategory,
               sortOrder: Number(row['Sort Order']) || 0,
-              optionValues: (row['Values'] || '')
-                .split(',')
-                .map(value => value.trim())
-                .filter(value => value)
-                .map((name, index) => ({
-                  name,
-                  sortOrder: index,
-                  image: 'null'
-                }))
+              optionValues,
             };
-            // Upsert logic: try by ID, then by name
-            let response, responseData;
-            if (row.ID) {
-              // Try to update by ID
-              const existingById = attributes.find(attr => attr.id === row.ID);
+
+            if (!attributeData.name) throw new Error('Missing attribute name');
+
+            let response;
+            const rowId = row['ID'];
+            if (rowId) {
+              const existingById = allAttrs.find(attr => String(attr.id) === String(rowId));
               if (existingById) {
-                response = await fetch(`${API_BASE_URL}/product-attributes/${row.ID}`, {
+                response = await fetch(`${API_BASE_URL}/product-attributes/${rowId}`, {
                   method: 'PATCH',
                   headers: {
                     'Accept': 'application/json',
@@ -278,15 +362,18 @@ const AttributesPage = () => {
                   },
                   body: JSON.stringify(attributeData)
                 });
-                responseData = await response.json();
                 if (!response.ok) {
+                  const responseData = await response.json();
                   throw new Error(responseData.message || `Failed to update attribute: ${attributeData.name}`);
                 }
+                processed++;
+                setImportProgress(Math.round((processed / jsonData.length) * 100));
                 continue;
               }
             }
-            // Fallback: update by name
-            const existingByName = attributes.find(attr => attr.name.trim().toLowerCase() === attributeData.name.trim().toLowerCase());
+            const existingByName = allAttrs.find(
+              attr => attr.name.trim().toLowerCase() === attributeData.name.trim().toLowerCase()
+            );
             if (existingByName) {
               response = await fetch(`${API_BASE_URL}/product-attributes/${existingByName.id}`, {
                 method: 'PATCH',
@@ -296,12 +383,11 @@ const AttributesPage = () => {
                 },
                 body: JSON.stringify(attributeData)
               });
-              responseData = await response.json();
               if (!response.ok) {
+                const responseData = await response.json();
                 throw new Error(responseData.message || `Failed to update attribute: ${attributeData.name}`);
               }
             } else {
-              // Create new attribute
               response = await fetch(`${API_BASE_URL}/product-attributes`, {
                 method: 'POST',
                 headers: {
@@ -310,7 +396,10 @@ const AttributesPage = () => {
                 },
                 body: JSON.stringify(attributeData)
               });
-              responseData = await response.json();
+              if (!response.ok) {
+                const responseData = await response.json();
+                throw new Error(responseData.message || `Failed to create attribute: ${attributeData.name}`);
+              }
             }
           } catch (err) {
             console.error('Error importing attribute:', err);
@@ -318,13 +407,12 @@ const AttributesPage = () => {
           processed++;
           setImportProgress(Math.round((processed / jsonData.length) * 100));
         }
-        // Refresh the attributes list
         await fetchAttributes();
         setImportProgress(null);
         toast.success('Import completed');
       };
 
-      reader.onerror = (error) => {
+      reader.onerror = () => {
         setImportProgress(null);
         throw new Error('Failed to read file');
       };
@@ -341,7 +429,6 @@ const AttributesPage = () => {
     }
   };
 
-  // Bulk delete handler
   const handleBulkDelete = async () => {
     if (!guardDelete()) return;
     if (!window.confirm('Are you sure you want to delete all selected attributes? This action cannot be undone.')) return;
@@ -356,7 +443,6 @@ const AttributesPage = () => {
           },
         });
       }
-      // Always refetch from backend after bulk delete
       await fetchAttributes();
       setSelectedAttributes([]);
       setSelectAll(false);
@@ -368,7 +454,6 @@ const AttributesPage = () => {
     }
   };
 
-  // Add a helper function to generate condensed pagination
   function getPagination(currentPage: number, totalPages: number) {
     const pages = [];
     if (totalPages <= 7) {
@@ -388,56 +473,32 @@ const AttributesPage = () => {
   return (
     <div className="main-content !p-[10px]">
       <Toaster position="top-right" />
-      <Seo title="Attributes"/>
+      <Seo title="Attributes Master"/>
 
       <div className="bg-white shadow-sm border border-gray-100 mx-0 catalog-list-card">
         <div className="p-[10px] catalog-list-toolbar">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-2">
               <div className="w-[3px] h-5 bg-purple-600 rounded-full"></div>
-              <h1 className="text-sm font-bold text-gray-800">Attributes</h1>
+              <h1 className="text-sm font-bold text-gray-800">Attributes Master</h1>
               <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm">
                 {totalResults}
               </span>
               <HelpIcon
-                title="Product Attributes Management"
+                title="Attributes Master"
                 content={
                   <div>
-                    <p className="mb-4">This page allows you to manage product attributes that define the characteristics and properties of your products.</p>
+                    <p className="mb-4">Configure handkerchief product attribute dimensions and their allowed values.</p>
                     <h4 className="font-semibold mb-2">What you can do:</h4>
                     <ul className="list-disc list-inside mb-4 space-y-1">
-                      <li><strong>View Attributes:</strong> See all product attributes with their types and values</li>
-                      <li><strong>Add New Attribute:</strong> Create new product attributes with custom types and values</li>
-                      <li><strong>Edit Attribute:</strong> Modify existing attribute details, types, and option values</li>
-                      <li><strong>Delete Attribute:</strong> Remove attributes that are no longer needed</li>
-                      <li><strong>Bulk Operations:</strong> Select multiple attributes for bulk deletion</li>
-                      <li><strong>Import/Export:</strong> Import attributes from Excel files or export existing data</li>
-                      <li><strong>Search & Filter:</strong> Find specific attributes using the search functionality</li>
-                      <li><strong>Pagination:</strong> Navigate through large lists of attributes efficiently</li>
+                      <li><strong>View / Add / Edit:</strong> Manage attributes such as Size, GSM, Colour, Pattern</li>
+                      <li><strong>Required:</strong> Mark attributes as required on products</li>
+                      <li><strong>Applies To Categories:</strong> Limit attributes to specific categories</li>
+                      <li><strong>Import/Export:</strong> Bulk load from Excel using the handkerchief template</li>
                     </ul>
-                    <h4 className="font-semibold mb-2">Attribute Information:</h4>
-                    <ul className="list-disc list-inside mb-4 space-y-1">
-                      <li><strong>Name:</strong> The name of the product attribute (e.g., Color, Size, Material)</li>
-                      <li><strong>Type:</strong> The type of attribute (e.g., select, radio, checkbox, text)</li>
-                      <li><strong>Option Values:</strong> Available options for the attribute (e.g., Red, Blue, Green for Color)</li>
-                      <li><strong>Sort Order:</strong> The order in which attributes should be displayed</li>
-                      <li><strong>Images:</strong> Associated images for attribute values (if applicable)</li>
-                    </ul>
-                    <h4 className="font-semibold mb-2">Common Attribute Types:</h4>
-                    <ul className="list-disc list-inside mb-4 space-y-1">
-                      <li><strong>Select:</strong> Dropdown selection with predefined options</li>
-                      <li><strong>Radio:</strong> Single choice from multiple options</li>
-                      <li><strong>Checkbox:</strong> Multiple choice selection</li>
-                      <li><strong>Text:</strong> Free text input</li>
-                      <li><strong>Number:</strong> Numeric input</li>
-                    </ul>
-                    <h4 className="font-semibold mb-2">Tips:</h4>
+                    <h4 className="font-semibold mb-2">Types:</h4>
                     <ul className="list-disc list-inside space-y-1">
-                      <li>Use the import feature to bulk upload attributes from Excel files</li>
-                      <li>Organize attributes by type for better product organization</li>
-                      <li>Use descriptive names for attributes to make them easily identifiable</li>
-                      <li>Set appropriate sort orders to control display sequence</li>
-                      <li>Add images to attribute values for better visual representation</li>
+                      <li>select, radio, checkbox, text, number</li>
                     </ul>
                   </div>
                 }
@@ -529,6 +590,8 @@ const AttributesPage = () => {
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Attribute Name</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Type</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Attribute Type</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Required</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Applies To</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Values</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Sort Order</th>
                   {(canUpdate || canDelete) && (
@@ -548,6 +611,14 @@ const AttributesPage = () => {
                     </td>
                     <td className="px-1.5 py-2.5 border border-gray-200">
                       <span className="inline-flex px-1.5 py-0.5 text-[9px] font-bold rounded tracking-tight bg-gray-100 text-gray-700">{attribute.attributeType ?? 'Manufacturing'}</span>
+                    </td>
+                    <td className="px-1.5 py-2.5 border border-gray-200">
+                      <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-bold rounded uppercase tracking-tight ${attribute.required ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
+                        {yesNo(attribute.required)}
+                      </span>
+                    </td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">
+                      {getCategoryNames(attribute.appliesToCategory) || '—'}
                     </td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">
                       <div className="flex flex-wrap gap-1">
@@ -598,4 +669,4 @@ const AttributesPage = () => {
   );
 };
 
-export default AttributesPage; 
+export default AttributesPage;

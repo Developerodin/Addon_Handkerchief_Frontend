@@ -10,7 +10,7 @@ import { toast, Toaster } from 'react-hot-toast';
 import HelpIcon from '@/shared/components/HelpIcon';
 import { useSelector } from 'react-redux';
 import { isDesignUser, isProductionUser, isFinalUser, shouldShowAttribute, shouldShowAttributeForFinal } from '@/shared/utils/userUtils';
-import yarnCatalogService, { YarnCatalog } from '@/shared/services/yarnCatalogService';
+import fabricCatalogService, { FabricCatalog } from '@/shared/services/fabricCatalogService';
 import { styleCodeService } from '@/shared/services/styleCodeService';
 import productService, { ProductBulkRow } from '@/shared/services/productService';
 import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud';
@@ -41,6 +41,7 @@ interface Product {
   updatedAt?: string;
   attributes?: Record<string, string>;
   bom?: ProductBOM[];
+  rawMaterials?: Array<{ rawMaterialId?: string; quantity?: number; unitCost?: number }>;
   processes?: ProductProcess[];
   styleCodes?: StyleCode[];
 }
@@ -55,9 +56,12 @@ interface ProductsResponse {
 
 interface ProductBOM {
   _id?: string;
-  yarnCatalogId: string;
-  yarnName: string;
+  fabricCatalogId?: string;
+  fabricName?: string;
+  yarnCatalogId?: string;
+  yarnName?: string;
   quantity: number;
+  unitCost?: number;
 }
 
 interface ProductProcess {
@@ -737,23 +741,23 @@ const ProductListPage = () => {
       clearInterval(progressTimer);
       setExportProgress(15);
       
-      // Continue animation while fetching yarn catalogs
+      // Continue animation while fetching fabric catalogs
       const progressTimer2 = animateProgress(15, 25, 300);
       
-      // Fetch all yarn catalogs to create reverse mapping
-      let allYarnCatalogs: YarnCatalog[] = [];
+      // Fetch all fabric catalogs to create reverse mapping
+      let allFabricCatalogs: FabricCatalog[] = [];
       let currentPage = 1;
       let hasMore = true;
       const totalPagesEstimate = 10; // Estimate for progress calculation
       
       while (hasMore) {
-        const response = await yarnCatalogService.getYarnCatalogs({
+        const response = await fabricCatalogService.getFabricCatalogs({
           page: currentPage,
           limit: 1000,
           status: 'active'
         });
         
-        allYarnCatalogs = [...allYarnCatalogs, ...(response.results || [])];
+        allFabricCatalogs = [...allFabricCatalogs, ...(response.results || [])];
         
         // Update progress during pagination
         const progressPercent = 25 + Math.min((currentPage / totalPagesEstimate) * 30, 30);
@@ -768,10 +772,10 @@ const ProductListPage = () => {
       clearInterval(progressTimer2);
       setExportProgress(55);
       
-      // Create reverse mapping from yarn catalog ID to yarn name
-      const yarnNameMapping: Record<string, string> = {};
-      allYarnCatalogs.forEach((yarn: YarnCatalog) => {
-        yarnNameMapping[yarn.id] = yarn.yarnName;
+      // Create reverse mapping from fabric catalog ID to fabric name
+      const fabricNameMapping: Record<string, string> = {};
+      allFabricCatalogs.forEach((fabric: FabricCatalog) => {
+        fabricNameMapping[fabric.id] = fabric.name;
       });
       setExportProgress(60);
       
@@ -783,13 +787,29 @@ const ProductListPage = () => {
           // Update progress during data processing
           setExportProgress(60 + Math.floor((index / selectedProductsData.length) * 15));
         }
-        return (product.bom || []).map(bom => ({
+        return (product.bom || []).map(bom => {
+          const fabricId = bom.fabricCatalogId || bom.yarnCatalogId || '';
+          return {
+            'Product ID': product.id,
+            'Product Name': product.name,
+            'Fabric Name': bom.fabricName || bom.yarnName || fabricNameMapping[fabricId] || fabricId,
+            'Fabric ID': fabricId,
+            'Quantity': bom.quantity,
+            'Unit Cost': bom.unitCost ?? '',
+          };
+        });
+      });
+
+      // Packaging sheet if rawMaterials present
+      const packagingData = selectedProductsData.flatMap((product) =>
+        (product.rawMaterials || []).map((rm) => ({
           'Product ID': product.id,
           'Product Name': product.name,
-          'Yarn Name': bom.yarnName || yarnNameMapping[bom.yarnCatalogId] || bom.yarnCatalogId,
-          'Quantity': bom.quantity
-        }));
-      });
+          'Raw Material ID': typeof rm.rawMaterialId === 'object' ? ((rm.rawMaterialId as any)?.id || '') : (rm.rawMaterialId || ''),
+          'Quantity': rm.quantity,
+          'Unit Cost': rm.unitCost ?? '',
+        }))
+      );
       setExportProgress(80);
       
       if (bomData.length > 0) {
@@ -804,6 +824,10 @@ const ProductListPage = () => {
         }));
         const ws = XLSX.utils.json_to_sheet(productData);
         XLSX.utils.book_append_sheet(wb, ws, 'BOM');
+      }
+      if (packagingData.length > 0) {
+        const wsPkg = XLSX.utils.json_to_sheet(packagingData);
+        XLSX.utils.book_append_sheet(wb, wsPkg, 'Packaging');
       }
       setExportProgress(90);
 
@@ -1157,20 +1181,26 @@ const ProductListPage = () => {
         {
           'Product ID': '680c7a2bc30d1e00643b84e8',
           'Product Name': 'Example Product 1',
-          'Yarn Name': 'Cotton Yarn 20/1',
-          'Quantity': 2.5
+          'Fabric Name': 'Cotton Poplin White',
+          'Fabric ID': '',
+          'Quantity': 0.25,
+          'Unit Cost': 45
         },
         {
           'Product ID': '680c7a2bc30d1e00643b84e8',
           'Product Name': 'Example Product 1',
-          'Yarn Name': 'Elastic Yarn 30/2',
-          'Quantity': 1.0
+          'Fabric Name': 'Linen Blend Ivory',
+          'Fabric ID': '',
+          'Quantity': 0.1,
+          'Unit Cost': 60
         },
         {
           'Product ID': '68246cc23d04e20065d3d60a',
           'Product Name': 'Example Product 2',
-          'Yarn Name': 'Cotton Yarn 20/1',
-          'Quantity': 3.0
+          'Fabric Name': 'Cotton Poplin White',
+          'Fabric ID': '',
+          'Quantity': 0.3,
+          'Unit Cost': 45
         }
       ];
       
@@ -1184,7 +1214,7 @@ const ProductListPage = () => {
           '': ''
         },
         {
-          'Instructions': '1. This template is for updating product BOM only (not creating products).',
+          'Instructions': '1. This template is for updating product fabric BOM only (not creating products).',
           '': ''
         },
         {
@@ -1196,19 +1226,19 @@ const ProductListPage = () => {
           '': ''
         },
         {
-          'Instructions': '4. Yarn Name must be the exact name of a yarn catalog from your system (not ID).',
+          'Instructions': '4. Fabric Name must match a fabric catalog name (or provide Fabric ID).',
           '': ''
         },
         {
-          'Instructions': '5. Quantity must be a positive number (in grams).',
+          'Instructions': '5. Quantity is metres per piece (positive number).',
           '': ''
         },
         {
-          'Instructions': '6. Each row represents one yarn-quantity pair for a product.',
+          'Instructions': '6. Each row represents one fabric-quantity pair for a product.',
           '': ''
         },
         {
-          'Instructions': '7. Multiple yarns for the same product should be on separate rows.',
+          'Instructions': '7. Multiple fabrics for the same product should be on separate rows.',
           '': ''
         }
       ];
@@ -1853,11 +1883,12 @@ const ProductListPage = () => {
 
           // Filter out rows without required fields
           const validBOM = bomData.filter((row: any) => {
-            return row['Product ID'] && row['Yarn Name'] && row['Quantity'] !== undefined;
+            const fabricName = row['Fabric Name'] || row['Yarn Name'];
+            return row['Product ID'] && fabricName && row['Quantity'] !== undefined;
           });
 
           if (validBOM.length === 0) {
-            toast.error('No valid BOM entries found in the Excel file. Please ensure Product ID, Yarn Name, and Quantity are provided.');
+            toast.error('No valid BOM entries found in the Excel file. Please ensure Product ID, Fabric Name (or Yarn Name), and Quantity are provided.');
             setImportProgress(null);
             toast.dismiss(loadingToast);
             return;
@@ -1865,19 +1896,19 @@ const ProductListPage = () => {
 
           setImportProgress(25);
 
-          // Fetch all yarn catalogs to create mapping
-          let allYarnCatalogs: YarnCatalog[] = [];
+          // Fetch all fabric catalogs to create mapping
+          let allFabricCatalogs: FabricCatalog[] = [];
           let currentPage = 1;
           let hasMore = true;
           
           while (hasMore) {
-            const response = await yarnCatalogService.getYarnCatalogs({
+            const response = await fabricCatalogService.getFabricCatalogs({
               page: currentPage,
               limit: 1000,
               status: 'active'
             });
             
-            allYarnCatalogs = [...allYarnCatalogs, ...(response.results || [])];
+            allFabricCatalogs = [...allFabricCatalogs, ...(response.results || [])];
             
             if (currentPage >= response.totalPages) {
               hasMore = false;
@@ -1886,30 +1917,34 @@ const ProductListPage = () => {
             }
           }
           
-          // Create mapping from yarn name to yarn catalog ID
-          const yarnMapping: Record<string, string> = {};
-          allYarnCatalogs.forEach((yarn: YarnCatalog) => {
-            yarnMapping[yarn.yarnName.toLowerCase()] = yarn.id;
+          // Create mapping from fabric name to fabric catalog ID
+          const fabricMapping: Record<string, string> = {};
+          allFabricCatalogs.forEach((fabric: FabricCatalog) => {
+            fabricMapping[fabric.name.toLowerCase()] = fabric.id;
+            if (fabric.id) fabricMapping[fabric.id.toLowerCase()] = fabric.id;
           });
 
-          console.log('Yarn mapping created:', yarnMapping);
+          console.log('Fabric mapping created:', fabricMapping);
 
           setImportProgress(50);
 
-          // Group BOM by product ID and map yarn names to IDs
-          const productBOM: Record<string, Array<{yarnCatalogId: string, yarnName: string, quantity: number}>> = {};
+          // Group BOM by product ID and map fabric names to IDs
+          const productBOM: Record<string, Array<{fabricCatalogId: string, fabricName: string, quantity: number, unitCost?: number}>> = {};
           const mappingErrors: string[] = [];
 
           validBOM.forEach((row: any) => {
             const productId = row['Product ID'].toString().trim();
-            const yarnName = row['Yarn Name'].toString().trim();
+            const fabricName = (row['Fabric Name'] || row['Yarn Name'] || '').toString().trim();
+            const fabricIdCol = row['Fabric ID'] ? row['Fabric ID'].toString().trim() : '';
             const quantity = parseFloat(row['Quantity']);
+            const unitCost = row['Unit Cost'] !== undefined && row['Unit Cost'] !== '' ? parseFloat(row['Unit Cost']) : undefined;
             
-            // Map yarn name to yarn catalog ID
-            const yarnCatalogId = yarnMapping[yarnName.toLowerCase()];
+            const fabricCatalogId = fabricIdCol
+              || fabricMapping[fabricName.toLowerCase()]
+              || fabricMapping[fabricIdCol.toLowerCase()];
             
-            if (!yarnCatalogId) {
-              mappingErrors.push(`Yarn name "${yarnName}" not found in the system`);
+            if (!fabricCatalogId) {
+              mappingErrors.push(`Fabric name "${fabricName}" not found in the system`);
               return;
             }
             
@@ -1917,9 +1952,10 @@ const ProductListPage = () => {
               productBOM[productId] = [];
             }
             productBOM[productId].push({
-              yarnCatalogId: yarnCatalogId,
-              yarnName: yarnName,
-              quantity: quantity
+              fabricCatalogId,
+              fabricName,
+              quantity,
+              ...(unitCost != null && !Number.isNaN(unitCost) ? { unitCost } : {}),
             });
           });
 
@@ -1927,9 +1963,9 @@ const ProductListPage = () => {
           if (mappingErrors.length > 0) {
             const errorMessages = mappingErrors.slice(0, 5).join('\n');
             if (mappingErrors.length > 5) {
-              toast.error(`Some yarns not found:\n${errorMessages}\n...and ${mappingErrors.length - 5} more errors`);
+              toast.error(`Some fabrics not found:\n${errorMessages}\n...and ${mappingErrors.length - 5} more errors`);
             } else {
-              toast.error(`Some yarns not found:\n${errorMessages}`);
+              toast.error(`Some fabrics not found:\n${errorMessages}`);
             }
             setImportProgress(null);
             toast.dismiss(loadingToast);

@@ -7,20 +7,24 @@ interface CatalogRowActionsProps {
   segment: CatalogSegment;
   editHref: string;
   onDelete: () => void;
+  onReplicate?: () => void;
   deleteDisabled?: boolean;
   deleteLoading?: boolean;
+  replicateLoading?: boolean;
 }
 
 export default function CatalogRowActions({
   segment,
   editHref,
   onDelete,
+  onReplicate,
   deleteDisabled,
   deleteLoading,
+  replicateLoading,
 }: CatalogRowActionsProps) {
-  const { canUpdate, canDelete } = useCatalogCrud(segment);
+  const { canCreate, canUpdate, canDelete } = useCatalogCrud(segment);
 
-  if (!canUpdate && !canDelete) return null;
+  if (!canUpdate && !canDelete && !(canCreate && onReplicate)) return null;
 
   return (
     <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
@@ -32,6 +36,17 @@ export default function CatalogRowActions({
         >
           <i className="ri-pencil-line text-xs" />
         </Link>
+      )}
+      {canCreate && onReplicate && (
+        <button
+          type="button"
+          className="w-7 h-7 flex items-center justify-center bg-blue-50 text-blue-500 border border-blue-100 rounded hover:bg-blue-100 transition-colors disabled:opacity-50"
+          onClick={onReplicate}
+          title="Replicate"
+          disabled={replicateLoading}
+        >
+          <i className="ri-file-copy-line text-xs" />
+        </button>
       )}
       {canDelete && (
         <button

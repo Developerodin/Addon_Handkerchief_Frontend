@@ -21,16 +21,33 @@ export const FULL_CRUD: CrudPermissions = {
   delete: true,
 };
 
+/** Catalog permission keys (must match backend navigationHelper CATALOG_MODULES). */
 export const CATALOG_MODULES = [
   'Items',
-  'Categories',
-  'Raw Material',
-  'Processes',
-  'Attributes',
-  'Style Codes',
+  'Category',
+  'Style codes',
+  'Fabric master',
+  'Fabric Suppliers',
+  'Packaging materials',
+  'Process Master',
+  'Attributes Master',
+  'Machines & Configuration',
+  'Workers / Operators',
+  'Storage Racks',
+  'Containers Master',
+  'Label Templates & Device Registry',
 ] as const;
 
 export type CatalogModule = (typeof CATALOG_MODULES)[number];
+
+/** Map legacy Catalog keys from older user navigation documents. */
+export const CATALOG_KEY_ALIASES: Record<string, CatalogModule> = {
+  Categories: 'Category',
+  'Style Codes': 'Style codes',
+  'Raw Material': 'Packaging materials',
+  Processes: 'Process Master',
+  Attributes: 'Attributes Master',
+};
 
 export interface NavigationPermissions {
   Dashboard: CrudPermissions;
@@ -106,14 +123,23 @@ export const applyCrudChange = (
 };
 
 export const mergeNavigationWithDefaults = (
-  partial?: Partial<NavigationPermissions>
+  partial?: Partial<NavigationPermissions> & { Catalog?: Record<string, unknown> }
 ): NavigationPermissions => {
   if (!partial) return JSON.parse(JSON.stringify(DEFAULT_NAVIGATION));
 
   const catalog = buildCatalogDefaults();
-  if (partial.Catalog) {
-    for (const key of CATALOG_MODULES) {
-      catalog[key] = applyCrudDependencies(normalizeCrud(partial.Catalog[key]));
+  const incomingCatalog = (partial.Catalog || {}) as Record<string, unknown>;
+
+  for (const key of CATALOG_MODULES) {
+    catalog[key] = applyCrudDependencies(normalizeCrud(incomingCatalog[key]));
+  }
+
+  // Migrate legacy keys if the new key was empty
+  for (const [legacy, next] of Object.entries(CATALOG_KEY_ALIASES)) {
+    const hasNew =
+      catalog[next].create || catalog[next].read || catalog[next].update || catalog[next].delete;
+    if (!hasNew && incomingCatalog[legacy] != null) {
+      catalog[next] = applyCrudDependencies(normalizeCrud(incomingCatalog[legacy]));
     }
   }
 
@@ -145,9 +171,20 @@ export const getCrudAtPath = (
 /** Map catalog route segment to permission key */
 export const CATALOG_PATH_TO_MODULE: Record<string, CatalogModule> = {
   items: 'Items',
-  categories: 'Categories',
-  'raw-material': 'Raw Material',
-  processes: 'Processes',
-  attributes: 'Attributes',
-  'style-codes': 'Style Codes',
+  categories: 'Category',
+  'style-codes': 'Style codes',
+  'style-code-combos': 'Style codes',
+  fabric: 'Fabric master',
+  'fabric-master': 'Fabric master',
+  'fabric-suppliers': 'Fabric Suppliers',
+  'packaging-materials': 'Packaging materials',
+  'raw-material': 'Packaging materials',
+  processes: 'Process Master',
+  attributes: 'Attributes Master',
+  machines: 'Machines & Configuration',
+  workers: 'Workers / Operators',
+  'storage-racks': 'Storage Racks',
+  containers: 'Containers Master',
+  'label-templates': 'Label Templates & Device Registry',
+  'device-registry': 'Label Templates & Device Registry',
 };

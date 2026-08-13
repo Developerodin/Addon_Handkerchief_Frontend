@@ -21,22 +21,27 @@ interface ProcessStep {
 interface Process {
   id: string;
   name: string;
+  code?: string;
   type: string;
   description: string;
+  department?: string;
+  floor?: string;
+  standardTime?: number;
+  machineType?: string;
+  standardRate?: number;
+  qcCheckpoint?: boolean;
+  reworkEligible?: boolean;
   sortOrder: number;
   status: 'active' | 'inactive';
   image?: string;
   steps: ProcessStep[];
 }
 
-interface ExcelRow {
-  'Process Name': string;
-  'Description'?: string;
-  'Type': string;
-  'Sort Order'?: string | number;
-  'Status'?: string;
-  'Steps (Title | Description | Duration)'?: string; // Format: "Step1 Title|Step1 Desc|30, Step2 Title|Step2 Desc|45"
-}
+const yesNo = (value?: boolean) => (value ? 'Yes' : 'No');
+const parseYesNo = (value: unknown) => {
+  const s = String(value ?? '').trim().toLowerCase();
+  return s === 'yes' || s === 'true' || s === '1';
+};
 
 const ProcessesPage = () => {
   const { canCreate, canUpdate, canDelete, canImport, guardDelete } = useCatalogCrud('processes');
@@ -55,7 +60,6 @@ const ProcessesPage = () => {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [importProgress, setImportProgress] = useState<number | null>(null);
 
-  // Fetch processes from API
   const fetchProcesses = async (page = 1, limit = itemsPerPage, search = '') => {
     try {
       setIsLoading(true);
@@ -123,9 +127,7 @@ const ProcessesPage = () => {
           throw new Error(errorData.message || 'Failed to delete process');
         }
 
-        // Always refetch from backend after delete
         await fetchProcesses();
-        // Remove from selected processes if it was selected
         setSelectedProcesses(prev => prev.filter(selectedId => selectedId !== id));
         toast.success('Process deleted successfully', { id: loadingToast });
       } catch (err) {
@@ -167,9 +169,7 @@ const ProcessesPage = () => {
         });
         const results = await Promise.all(deletePromises);
         const successfulDeletes = results.filter((id): id is string => id !== null);
-        // Always refetch from backend after bulk delete
         await fetchProcesses();
-        // Clear selected processes
         setSelectedProcesses([]);
         setSelectAll(false);
         if (hasError) {
@@ -186,32 +186,43 @@ const ProcessesPage = () => {
     }
   };
 
+  const mapProcessToExcelRow = (process: Process) => ({
+    'ID': process.id,
+    'Process Name': process.name,
+    'Code': process.code || '',
+    'Description': process.description || '',
+    'Type': process.type,
+    'Department': process.department || '',
+    'Floor': process.floor || '',
+    'Standard Time': process.standardTime ?? 0,
+    'Machine Type': process.machineType || '',
+    'Standard Rate': process.standardRate ?? 0,
+    'QC Checkpoint': yesNo(process.qcCheckpoint),
+    'Rework Eligible': yesNo(process.reworkEligible),
+    'Sort Order': process.sortOrder,
+    'Status': process.status,
+    'Steps (Title | Description | Duration)': (process.steps || [])
+      .map(step => `${step.stepTitle}|${step.stepDescription}|${step.duration}`)
+      .join(', ')
+  });
+
   const handleExport = async () => {
     try {
       let exportSource: Process[] = [];
       if (selectedProcesses.length > 0) {
         exportSource = processes.filter(proc => selectedProcesses.includes(proc.id));
       } else {
-        // Fetch all processes from backend
         const response = await fetch(`${API_BASE_URL}/processes?page=1&limit=100000`);
         if (!response.ok) throw new Error('Failed to fetch all processes for export');
         const data = await response.json();
         exportSource = data.results || [];
       }
-      const exportData = exportSource.map(process => ({
-        'ID': process.id,
-        'Process Name': process.name,
-        'Description': process.description || '',
-        'Type': process.type,
-        'Sort Order': process.sortOrder,
-        'Status': process.status,
-        'Steps (Title | Description | Duration)': process.steps
-          .map(step => `${step.stepTitle}|${step.stepDescription}|${step.duration}`)
-          .join(', ')
-      }));
+      const exportData = exportSource.map(mapProcessToExcelRow);
       const ws = XLSX.utils.json_to_sheet(exportData);
       ws['!cols'] = [
-        { wch: 20 }, { wch: 20 }, { wch: 30 }, { wch: 15 }, { wch: 10 }, { wch: 10 }, { wch: 50 }
+        { wch: 20 }, { wch: 18 }, { wch: 12 }, { wch: 28 }, { wch: 14 }, { wch: 12 },
+        { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
+        { wch: 10 }, { wch: 10 }, { wch: 50 },
       ];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Processes');
@@ -226,44 +237,145 @@ const ProcessesPage = () => {
 
   const handleExportTemplate = () => {
     try {
-      // Create sample data
       const sampleData = [
         {
-          'Process Name': 'Assembly Process',
-          'Description': 'Main assembly line process',
-          'Type': 'Assembly',
+          'Process Name': 'Cutting',
+          'Code': 'CUT',
+          'Description': 'Fabric cutting for handkerchief panels',
+          'Type': 'Manufacturing',
+          'Department': 'cutting',
+          'Floor': '1',
+          'Standard Time': 8,
+          'Machine Type': 'cutting',
+          'Standard Rate': 0,
+          'QC Checkpoint': 'No',
+          'Rework Eligible': 'Yes',
           'Sort Order': 1,
           'Status': 'active',
-          'Steps (Title | Description | Duration)': 'Prepare Parts|Gather all components|15, Assembly|Put components together|45, Quality Check|Verify assembly|20'
+          'Steps (Title | Description | Duration)': 'Lay fabric|Spread and align fabric|3, Cut panels|Cut handkerchief panels|5',
         },
         {
-          'Process Name': 'Quality Control',
-          'Description': 'Quality inspection process',
-          'Type': 'Quality Control',
+          'Process Name': 'Selvage',
+          'Code': 'SEL',
+          'Description': 'Selvage edge preparation',
+          'Type': 'Manufacturing',
+          'Department': 'hemming',
+          'Floor': '1',
+          'Standard Time': 5,
+          'Machine Type': 'none',
+          'Standard Rate': 0,
+          'QC Checkpoint': 'No',
+          'Rework Eligible': 'Yes',
           'Sort Order': 2,
           'Status': 'active',
-          'Steps (Title | Description | Duration)': 'Visual Inspection|Check for visible defects|10, Measurement|Verify dimensions|15, Testing|Perform quality tests|30'
-        }
+          'Steps (Title | Description | Duration)': 'Trim selvage|Prepare selvage edge|5',
+        },
+        {
+          'Process Name': 'Half-moon',
+          'Code': 'HM',
+          'Description': 'Half-moon cutting operation',
+          'Type': 'Manufacturing',
+          'Department': 'cutting',
+          'Floor': '1',
+          'Standard Time': 6,
+          'Machine Type': 'half-moon',
+          'Standard Rate': 0,
+          'QC Checkpoint': 'No',
+          'Rework Eligible': 'Yes',
+          'Sort Order': 3,
+          'Status': 'active',
+          'Steps (Title | Description | Duration)': 'Half-moon cut|Cut half-moon shape|6',
+        },
+        {
+          'Process Name': 'Hemming',
+          'Code': 'HEM',
+          'Description': 'Edge hemming of handkerchief',
+          'Type': 'Manufacturing',
+          'Department': 'hemming',
+          'Floor': '1',
+          'Standard Time': 12,
+          'Machine Type': 'vertical-hemming',
+          'Standard Rate': 0,
+          'QC Checkpoint': 'No',
+          'Rework Eligible': 'Yes',
+          'Sort Order': 4,
+          'Status': 'active',
+          'Steps (Title | Description | Duration)': 'Hem edges|Stitch hem on all sides|12',
+        },
+        {
+          'Process Name': 'Checking',
+          'Code': 'CHK',
+          'Description': 'Quality checking of finished piece',
+          'Type': 'Quality Control',
+          'Department': 'checking',
+          'Floor': '2',
+          'Standard Time': 4,
+          'Machine Type': 'none',
+          'Standard Rate': 0,
+          'QC Checkpoint': 'Yes',
+          'Rework Eligible': 'Yes',
+          'Sort Order': 5,
+          'Status': 'active',
+          'Steps (Title | Description | Duration)': 'Inspect|Visual and measurement check|4',
+        },
+        {
+          'Process Name': 'Ironing',
+          'Code': 'IRN',
+          'Description': 'Press and finish handkerchief',
+          'Type': 'Manufacturing',
+          'Department': 'ironing',
+          'Floor': '2',
+          'Standard Time': 5,
+          'Machine Type': 'ironing',
+          'Standard Rate': 0,
+          'QC Checkpoint': 'No',
+          'Rework Eligible': 'Yes',
+          'Sort Order': 6,
+          'Status': 'active',
+          'Steps (Title | Description | Duration)': 'Press|Iron and fold finish|5',
+        },
+        {
+          'Process Name': 'Packing',
+          'Code': 'PKG',
+          'Description': 'Pack finished handkerchiefs',
+          'Type': 'Packaging',
+          'Department': 'packing',
+          'Floor': '2',
+          'Standard Time': 3,
+          'Machine Type': 'none',
+          'Standard Rate': 0,
+          'QC Checkpoint': 'No',
+          'Rework Eligible': 'No',
+          'Sort Order': 7,
+          'Status': 'active',
+          'Steps (Title | Description | Duration)': 'Pack|Pack into poly bags/cartons|3',
+        },
+        {
+          'Process Name': 'Embroidery',
+          'Code': 'EMB',
+          'Description': 'Embroidery stitching on handkerchief',
+          'Type': 'Manufacturing',
+          'Department': 'embroidery',
+          'Floor': '1',
+          'Standard Time': 20,
+          'Machine Type': 'embroidery',
+          'Standard Rate': 0,
+          'QC Checkpoint': 'Yes',
+          'Rework Eligible': 'Yes',
+          'Sort Order': 8,
+          'Status': 'active',
+          'Steps (Title | Description | Duration)': 'Embroider|Run embroidery design|20',
+        },
       ];
 
-      // Create worksheet with sample data
       const ws = XLSX.utils.json_to_sheet(sampleData);
-
-      // Add column widths
-      const colWidths = [
-        { wch: 20 }, // Process Name
-        { wch: 30 }, // Description
-        { wch: 15 }, // Type
-        { wch: 10 }, // Sort Order
-        { wch: 10 }, // Status
-        { wch: 50 }, // Steps
+      ws['!cols'] = [
+        { wch: 16 }, { wch: 10 }, { wch: 32 }, { wch: 14 }, { wch: 12 }, { wch: 8 },
+        { wch: 12 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
+        { wch: 10 }, { wch: 50 },
       ];
-      ws['!cols'] = colWidths;
-
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Process Template');
-
-      // Save template file
       XLSX.writeFile(wb, 'process_import_template.xlsx');
       toast.success('Template downloaded successfully');
     } catch (error) {
@@ -288,42 +400,47 @@ const ProcessesPage = () => {
           const jsonData = XLSX.utils.sheet_to_json(worksheet);
           let successCount = 0;
           let errorCount = 0;
-          // Fetch all processes for upsert by name
           const allResponse = await fetch(`${API_BASE_URL}/processes?page=1&limit=100000`);
           const allData = allResponse.ok ? await allResponse.json() : { results: [] };
           const allProcesses: Process[] = allData.results || [];
           for (let i = 0; i < jsonData.length; i++) {
-            const row = jsonData[i] as any;
+            const row = jsonData[i] as Record<string, unknown>;
             try {
-              const stepsString = row['Steps (Title | Description | Duration)'] || '';
-              const steps = (stepsString as string).split(',').map((stepStr: string) => {
+              const stepsString = String(row['Steps (Title | Description | Duration)'] || '');
+              const steps = stepsString.split(',').map((stepStr: string) => {
                 const [stepTitle = '', stepDescription = '', duration = '0'] = stepStr.trim().split('|');
                 return {
                   stepTitle: stepTitle.trim(),
                   stepDescription: stepDescription.trim(),
                   duration: parseInt(duration.trim()) || 0
                 };
-              }).filter((step: any) => step.stepTitle);
+              }).filter((step) => step.stepTitle);
               const processData = {
-                name: row['Process Name'],
-                description: row['Description'] || '',
-                type: row['Type'],
-                sortOrder: parseInt(row['Sort Order']?.toString() || '0'),
-                status: (row['Status']?.toString()?.toLowerCase() === 'active') ? 'active' : 'inactive',
-                steps: steps.length > 0 ? steps : []
+                name: String(row['Process Name'] || ''),
+                code: String(row['Code'] || ''),
+                description: String(row['Description'] || ''),
+                type: String(row['Type'] || ''),
+                department: String(row['Department'] || '').trim().toLowerCase(),
+                floor: String(row['Floor'] || ''),
+                standardTime: Number(row['Standard Time']) || 0,
+                machineType: String(row['Machine Type'] || '').trim().toLowerCase(),
+                standardRate: Number(row['Standard Rate']) || 0,
+                qcCheckpoint: parseYesNo(row['QC Checkpoint']),
+                reworkEligible: parseYesNo(row['Rework Eligible']),
+                sortOrder: parseInt(String(row['Sort Order'] ?? '0')) || 0,
+                status: (String(row['Status'] || '').toLowerCase() === 'active') ? 'active' : 'inactive',
+                steps: steps.length > 0 ? steps : [{ stepTitle: 'Step 1', stepDescription: 'Default step', duration: 0 }],
               };
               if (!processData.name || !processData.type) {
                 errorCount++;
                 continue;
               }
-              let processId = row['ID'];
+              let processId = row['ID'] as string | undefined;
               if (!processId) {
-                // Try to find by name (case-insensitive)
                 const found = allProcesses.find(p => p.name.trim().toLowerCase() === processData.name.trim().toLowerCase());
                 if (found) processId = found.id;
               }
               if (processId) {
-                // Update existing
                 const patchResponse = await fetch(`${API_BASE_URL}/processes/${processId}`, {
                   method: 'PATCH',
                   headers: {
@@ -335,7 +452,6 @@ const ProcessesPage = () => {
                 if (!patchResponse.ok) throw new Error();
                 successCount++;
               } else {
-                // Create new
                 const postResponse = await fetch(`${API_BASE_URL}/processes`, {
                   method: 'POST',
                   headers: {
@@ -370,7 +486,6 @@ const ProcessesPage = () => {
     }
   };
 
-  // Add a helper function to generate condensed pagination
   function getPagination(currentPage: number, totalPages: number) {
     const pages = [];
     if (totalPages <= 7) {
@@ -390,48 +505,34 @@ const ProcessesPage = () => {
   return (
     <div className="main-content !p-[10px]">
       <Toaster position="top-right" />
-      <Seo title="Processes"/>
+      <Seo title="Process Master"/>
 
       <div className="bg-white shadow-sm border border-gray-100 mx-0 catalog-list-card">
         <div className="p-[10px] catalog-list-toolbar">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-2">
               <div className="w-[3px] h-5 bg-purple-600 rounded-full"></div>
-              <h1 className="text-sm font-bold text-gray-800">Processes</h1>
+              <h1 className="text-sm font-bold text-gray-800">Process Master</h1>
               <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm">
                 {totalResults}
               </span>
               <HelpIcon
-                title="Processes Management"
+                title="Process Master"
                 content={
                   <div>
-                    <p className="mb-4">This page allows you to manage manufacturing processes used in your production workflow.</p>
+                    <p className="mb-4">Manage handkerchief manufacturing processes used in product production routes.</p>
                     <h4 className="font-semibold mb-2">What you can do:</h4>
                     <ul className="list-disc list-inside mb-4 space-y-1">
-                      <li><strong>View Processes:</strong> See all manufacturing processes with their details, types, and status</li>
-                      <li><strong>Add New Process:</strong> Create new manufacturing processes with custom steps and descriptions</li>
-                      <li><strong>Edit Process:</strong> Modify existing process details, steps, and configurations</li>
-                      <li><strong>Delete Process:</strong> Remove processes that are no longer needed</li>
-                      <li><strong>Bulk Operations:</strong> Select multiple processes for bulk deletion</li>
-                      <li><strong>Import/Export:</strong> Import processes from Excel files or export existing data</li>
-                      <li><strong>Search & Filter:</strong> Find specific processes using the search functionality</li>
-                      <li><strong>Pagination:</strong> Navigate through large lists of processes efficiently</li>
+                      <li><strong>View Processes:</strong> See all processes with code, department, type, and status</li>
+                      <li><strong>Add / Edit:</strong> Maintain process details including time, machine type, QC and rework flags</li>
+                      <li><strong>Import/Export:</strong> Bulk load processes from Excel using the handkerchief template</li>
                     </ul>
-                    <h4 className="font-semibold mb-2">Process Information:</h4>
-                    <ul className="list-disc list-inside mb-4 space-y-1">
-                      <li><strong>Name:</strong> The name of the manufacturing process</li>
-                      <li><strong>Type:</strong> Category or classification of the process</li>
-                      <li><strong>Description:</strong> Detailed explanation of what the process involves</li>
-                      <li><strong>Steps:</strong> Individual steps within the process with durations</li>
-                      <li><strong>Status:</strong> Whether the process is active or inactive</li>
-                      <li><strong>Sort Order:</strong> The order in which processes should be displayed</li>
-                    </ul>
-                    <h4 className="font-semibold mb-2">Tips:</h4>
+                    <h4 className="font-semibold mb-2">Key fields:</h4>
                     <ul className="list-disc list-inside space-y-1">
-                      <li>Use the import feature to bulk upload processes from Excel files</li>
-                      <li>Download the template to see the correct format for importing</li>
-                      <li>Processes can be organized by type for better management</li>
-                      <li>Inactive processes won&apos;t appear in production workflows</li>
+                      <li><strong>Code / Department / Floor:</strong> Identify and locate the process</li>
+                      <li><strong>Standard Time / Rate:</strong> Minutes and costing rate</li>
+                      <li><strong>Machine Type:</strong> cutting, half-moon, hemming, embroidery, ironing, etc.</li>
+                      <li><strong>QC Checkpoint / Rework Eligible:</strong> Quality and rework behaviour</li>
                     </ul>
                   </div>
                 }
@@ -521,6 +622,8 @@ const ProcessesPage = () => {
                     <input type="checkbox" checked={selectAll} onChange={handleSelectAll} className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" />
                   </th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Process Name</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Code</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Department</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Type</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Steps</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Sort Order</th>
@@ -545,6 +648,14 @@ const ProcessesPage = () => {
                         )}
                         <span>{process.name}</span>
                       </div>
+                    </td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{process.code || '—'}</td>
+                    <td className="px-1.5 py-2.5 border border-gray-200">
+                      {process.department ? (
+                        <span className="inline-flex px-1.5 py-0.5 text-[9px] font-bold rounded uppercase tracking-tight bg-gray-100 text-gray-700">{process.department}</span>
+                      ) : (
+                        <span className="text-[12px] text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="px-1.5 py-2.5 border border-gray-200">
                       <span className="inline-flex px-1.5 py-0.5 text-[9px] font-bold rounded uppercase tracking-tight bg-purple-100 text-purple-800">{process.type}</span>
@@ -594,4 +705,4 @@ const ProcessesPage = () => {
   );
 };
 
-export default ProcessesPage; 
+export default ProcessesPage;

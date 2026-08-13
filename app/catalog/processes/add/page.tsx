@@ -19,20 +19,59 @@ interface ProcessStep {
 
 interface ProcessFormData {
   name: string;
+  code: string;
   description: string;
   type: string;
+  department: string;
+  floor: string;
+  standardTime: number;
+  machineType: string;
+  standardRate: number;
+  qcCheckpoint: boolean;
+  reworkEligible: boolean;
   sortOrder: number;
   image: File | null;
   status: 'active' | 'inactive';
   steps: ProcessStep[];
 }
 
+const DEPARTMENT_OPTIONS = [
+  { value: '', label: 'Select Department' },
+  { value: 'store', label: 'Store' },
+  { value: 'cutting', label: 'Cutting' },
+  { value: 'hemming', label: 'Hemming' },
+  { value: 'checking', label: 'Checking' },
+  { value: 'ironing', label: 'Ironing' },
+  { value: 'packing', label: 'Packing' },
+  { value: 'dispatch', label: 'Dispatch' },
+  { value: 'embroidery', label: 'Embroidery' },
+];
+
+const MACHINE_TYPE_OPTIONS = [
+  { value: '', label: 'Select Machine Type' },
+  { value: 'cutting', label: 'Cutting' },
+  { value: 'half-moon', label: 'Half-moon' },
+  { value: 'vertical-hemming', label: 'Vertical Hemming' },
+  { value: 'horizontal-hemming', label: 'Horizontal Hemming' },
+  { value: 'embroidery', label: 'Embroidery' },
+  { value: 'ironing', label: 'Ironing' },
+  { value: 'none', label: 'None' },
+];
+
 const AddProcessPage = () => {
   const router = useRouter();
   const [formData, setFormData] = useState<ProcessFormData>({
     name: '',
+    code: '',
     description: '',
     type: '',
+    department: '',
+    floor: '',
+    standardTime: 0,
+    machineType: '',
+    standardRate: 0,
+    qcCheckpoint: false,
+    reworkEligible: false,
     sortOrder: 0,
     image: null,
     status: 'active',
@@ -44,11 +83,19 @@ const AddProcessPage = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    if (name === 'sortOrder') {
+    if (name === 'sortOrder' || name === 'standardTime') {
       const filtered = filterDigitsOnly(value);
       setFormData(prev => ({
         ...prev,
-        sortOrder: filtered === '' ? 0 : parseInt(filtered, 10),
+        [name]: filtered === '' ? 0 : parseInt(filtered, 10),
+      }));
+      return;
+    }
+    if (name === 'standardRate') {
+      const cleaned = value.replace(/[^\d.]/g, '');
+      setFormData(prev => ({
+        ...prev,
+        standardRate: cleaned === '' ? 0 : parseFloat(cleaned) || 0,
       }));
       return;
     }
@@ -113,8 +160,16 @@ const AddProcessPage = () => {
 
       const processData = {
         name: formData.name,
+        code: formData.code,
         type: formData.type,
-        description: formData.description,
+        description: formData.description || ' ',
+        department: formData.department,
+        floor: formData.floor,
+        standardTime: formData.standardTime,
+        machineType: formData.machineType,
+        standardRate: formData.standardRate,
+        qcCheckpoint: formData.qcCheckpoint,
+        reworkEligible: formData.reworkEligible,
         sortOrder: formData.sortOrder,
         status: formData.status,
         steps: formData.steps,
@@ -149,7 +204,7 @@ const AddProcessPage = () => {
     <div>
       <Toaster position="top-right" />
       <Seo title="Add Process" />
-      <Pageheader currentpage="Add Process" activepage="Processes" mainpage="Add Process" />
+      <Pageheader currentpage="Add Process" activepage="Process Master" mainpage="Add Process" />
       
       <div className="grid grid-cols-12 gap-6">
         <div className="xl:col-span-12 col-span-12">
@@ -160,7 +215,6 @@ const AddProcessPage = () => {
             <div className="box-body">
               <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 gap-6">
-                  {/* Basic Information */}
                   <div className="grid grid-cols-12 gap-4">
                     <div className="col-span-12 md:col-span-6">
                       <div className="form-group">
@@ -174,6 +228,22 @@ const AddProcessPage = () => {
                           value={formData.name}
                           onChange={handleInputChange}
                           required
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-6">
+                      <div className="form-group">
+                        <label htmlFor="code" className="form-label">Code</label>
+                        <input
+                          type="text"
+                          id="code"
+                          name="code"
+                          className="form-control"
+                          placeholder="e.g. CUT, HEM"
+                          value={formData.code}
+                          onChange={handleInputChange}
                           disabled={isSubmitting}
                         />
                       </div>
@@ -200,6 +270,24 @@ const AddProcessPage = () => {
                       </div>
                     </div>
 
+                    <div className="col-span-12 md:col-span-6">
+                      <div className="form-group">
+                        <label htmlFor="department" className="form-label">Department</label>
+                        <select
+                          id="department"
+                          name="department"
+                          className="form-select"
+                          value={formData.department}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                        >
+                          {DEPARTMENT_OPTIONS.map((opt) => (
+                            <option key={opt.value || 'empty'} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
                     <div className="col-span-12">
                       <div className="form-group">
                         <label htmlFor="description" className="form-label">Description</label>
@@ -216,7 +304,75 @@ const AddProcessPage = () => {
                       </div>
                     </div>
 
-                    <div className="col-span-12 md:col-span-6">
+                    <div className="col-span-12 md:col-span-4">
+                      <div className="form-group">
+                        <label htmlFor="floor" className="form-label">Floor</label>
+                        <input
+                          type="text"
+                          id="floor"
+                          name="floor"
+                          className="form-control"
+                          placeholder="e.g. 1, 2"
+                          value={formData.floor}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-4">
+                      <div className="form-group">
+                        <label htmlFor="standardTime" className="form-label">Standard Time (min)</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          id="standardTime"
+                          name="standardTime"
+                          className="form-control"
+                          placeholder="Minutes"
+                          value={formData.standardTime === 0 ? '' : String(formData.standardTime)}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-4">
+                      <div className="form-group">
+                        <label htmlFor="machineType" className="form-label">Machine Type</label>
+                        <select
+                          id="machineType"
+                          name="machineType"
+                          className="form-select"
+                          value={formData.machineType}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                        >
+                          {MACHINE_TYPE_OPTIONS.map((opt) => (
+                            <option key={opt.value || 'empty'} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-4">
+                      <div className="form-group">
+                        <label htmlFor="standardRate" className="form-label">Standard Rate</label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          id="standardRate"
+                          name="standardRate"
+                          className="form-control"
+                          placeholder="Rate"
+                          value={formData.standardRate === 0 ? '' : String(formData.standardRate)}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-4">
                       <div className="form-group">
                         <label htmlFor="sortOrder" className="form-label">Sort Order</label>
                         <input
@@ -233,7 +389,7 @@ const AddProcessPage = () => {
                       </div>
                     </div>
 
-                    <div className="col-span-12 md:col-span-6">
+                    <div className="col-span-12 md:col-span-4">
                       <div className="form-group">
                         <label htmlFor="status" className="form-label">Status</label>
                         <select
@@ -247,6 +403,36 @@ const AddProcessPage = () => {
                           <option value="active">Active</option>
                           <option value="inactive">Inactive</option>
                         </select>
+                      </div>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-6">
+                      <div className="form-group">
+                        <label className="form-label flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="form-checkbox rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                            checked={formData.qcCheckpoint}
+                            onChange={(e) => setFormData(prev => ({ ...prev, qcCheckpoint: e.target.checked }))}
+                            disabled={isSubmitting}
+                          />
+                          QC Checkpoint
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-6">
+                      <div className="form-group">
+                        <label className="form-label flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="form-checkbox rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                            checked={formData.reworkEligible}
+                            onChange={(e) => setFormData(prev => ({ ...prev, reworkEligible: e.target.checked }))}
+                            disabled={isSubmitting}
+                          />
+                          Rework Eligible
+                        </label>
                       </div>
                     </div>
 
@@ -294,7 +480,6 @@ const AddProcessPage = () => {
                     </div>
                   </div>
 
-                  {/* Process Steps */}
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <h6 className="text-base font-semibold">Process Steps</h6>
@@ -403,7 +588,7 @@ const AddProcessPage = () => {
 
 export default function AddProcessPageWrapper() {
   return (
-    <RequireCrudPermission path="Catalog.Processes" action="create">
+    <RequireCrudPermission path="Catalog.Process Master" action="create">
       <AddProcessPage />
     </RequireCrudPermission>
   );

@@ -53,6 +53,7 @@ const CategoriesPage = () => {
   const [categoryNameMap, setCategoryNameMap] = useState<Record<string, string>>({});
   const [importProgress, setImportProgress] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isReplicating, setIsReplicating] = useState(false);
 
   // Fetch categories from API (with pagination and search)
   const fetchCategories = async (page = 1, limit = itemsPerPage, search = '') => {
@@ -153,6 +154,43 @@ const CategoriesPage = () => {
     }
   };
 
+  const handleReplicate = async (category: Category) => {
+    if (!canCreate) return;
+    setIsReplicating(true);
+    const loadingToast = toast.loading('Replicating category...');
+    try {
+      const parentId =
+        typeof category.parent === 'object' && category.parent
+          ? category.parent.id
+          : (category.parent || null);
+      const response = await fetch(`${API_BASE_URL}/categories`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: `${category.name} (Copy)`,
+          description: category.description || '',
+          parent: parentId,
+          sortOrder: category.sortOrder,
+          status: category.status,
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to replicate category');
+      }
+      toast.success('Category replicated successfully', { id: loadingToast });
+      await fetchCategories(currentPage, itemsPerPage, searchQuery);
+    } catch (err) {
+      console.error('Error replicating category:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to replicate category', { id: loadingToast });
+    } finally {
+      setIsReplicating(false);
+    }
+  };
+
   const handleDeleteSelected = async () => {
     if (!guardDelete()) return;
     if (selectedCategories.length === 0) return;
@@ -210,17 +248,24 @@ const CategoriesPage = () => {
     try {
       const sampleData = [
         {
-          'Category Name': 'Electronics',
-          'Description': 'Electronic products and accessories',
+          'Category Name': 'Handkerchief',
+          'Description': 'All handkerchief products',
           'Parent Category': 'None',
           'Sort Order': 1,
           'Status': 'active',
         },
         {
-          'Category Name': 'Mobile Phones',
-          'Description': 'Smartphones and mobile devices',
-          'Parent Category': 'Electronics',
+          'Category Name': 'Embroidery',
+          'Description': 'Embroidered handkerchief styles',
+          'Parent Category': 'Handkerchief',
           'Sort Order': 1,
+          'Status': 'active',
+        },
+        {
+          'Category Name': 'Plain',
+          'Description': 'Plain handkerchief styles',
+          'Parent Category': 'Handkerchief',
+          'Sort Order': 2,
           'Status': 'active',
         },
       ];
@@ -400,49 +445,24 @@ const CategoriesPage = () => {
                     <div>
                       <h4 className="font-semibold text-lg mb-2">What is this page?</h4>
                       <p className="text-gray-700">
-                        This is the Categories Management page where you can organize and manage your product categories, create hierarchical structures, and maintain a well-organized product catalog.
+                        Manage handkerchief product categories (e.g. Handkerchief, Embroidery, Plain) and organize them in a hierarchy for the catalog.
                       </p>
                     </div>
                     <div>
                       <h4 className="font-semibold text-lg mb-2">What can you do here?</h4>
                       <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li><strong>View Categories:</strong> Browse all product categories with pagination and search functionality</li>
-                        <li><strong>Add New Category:</strong> Click "Add New Category" to create a new category</li>
-                        <li><strong>Edit Categories:</strong> Click the edit icon next to any category to modify its details</li>
-                        <li><strong>Delete Categories:</strong> Remove individual categories or bulk delete selected ones</li>
-                        <li><strong>Search & Filter:</strong> Use the search bar to find specific categories</li>
-                        <li><strong>Export Data:</strong> Export all categories to Excel format</li>
-                        <li><strong>Import Data:</strong> Import categories from Excel files</li>
-                        <li><strong>Bulk Operations:</strong> Select multiple categories for bulk deletion</li>
-                      </ul>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-lg mb-2">Category Structure:</h4>
-                      <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li><strong>Hierarchical Organization:</strong> Create parent-child relationships between categories</li>
-                        <li><strong>Sort Order:</strong> Control the display order of categories</li>
-                        <li><strong>Status Management:</strong> Set categories as active or inactive</li>
-                        <li><strong>Description:</strong> Add detailed descriptions for better organization</li>
-                      </ul>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-lg mb-2">Data Fields:</h4>
-                      <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li><strong>Category Name:</strong> The name of the category (required)</li>
-                        <li><strong>Description:</strong> Optional description of the category</li>
-                        <li><strong>Parent Category:</strong> Parent category for hierarchical structure</li>
-                        <li><strong>Sort Order:</strong> Numeric value to control display order</li>
-                        <li><strong>Status:</strong> Active or inactive status</li>
+                        <li><strong>View Categories:</strong> Browse all product categories with pagination and search</li>
+                        <li><strong>Add / Edit / Replicate:</strong> Create, modify, or copy categories</li>
+                        <li><strong>Delete Categories:</strong> Remove individual or selected categories</li>
+                        <li><strong>Import/Export:</strong> Bulk load from Excel using the handkerchief template</li>
                       </ul>
                     </div>
                     <div>
                       <h4 className="font-semibold text-lg mb-2">Tips:</h4>
                       <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li>Use descriptive category names for better organization</li>
-                        <li>Create a logical hierarchy with parent-child relationships</li>
-                        <li>Use sort order to control how categories appear in lists</li>
-                        <li>Keep categories active only if they're currently in use</li>
-                        <li>Export categories before making bulk changes</li>
+                        <li>Use parent-child relationships for styles under Handkerchief</li>
+                        <li>Use Replicate to quickly copy a category as &quot;Name (Copy)&quot;</li>
+                        <li>Export before making bulk changes</li>
                       </ul>
                     </div>
                   </div>
@@ -555,7 +575,7 @@ const CategoriesPage = () => {
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Parent Category</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Sort Order</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Status</th>
-                  {(canUpdate || canDelete) && (
+                  {(canUpdate || canDelete || canCreate) && (
                   <th className="px-1.5 py-3 text-right pr-[10px] text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
                   )}
                 </tr>
@@ -586,12 +606,14 @@ const CategoriesPage = () => {
                         {category.status}
                       </span>
                     </td>
-                    {(canUpdate || canDelete) && (
+                    {(canUpdate || canDelete || canCreate) && (
                     <td className="px-1.5 py-2.5 text-right pr-[10px] border border-gray-200">
                       <CatalogRowActions
                         segment="categories"
                         editHref={`/catalog/categories/edit/${category.id}`}
                         onDelete={() => handleDelete(category.id)}
+                        onReplicate={() => handleReplicate(category)}
+                        replicateLoading={isReplicating}
                       />
                     </td>
                     )}

@@ -37,9 +37,14 @@ export const useNavigationMenu = (menuItems: MenuItem[]): MenuItem[] => {
         if (item.menutitle) return true;
         if (item.type === 'link' && item.path) return hasPermission(item.path);
         if (item.type === 'sub' && item.children) {
-          const visibleChildren = item.children.filter(
-            (child) => child.path && hasSubPermission(item.path || '/catalog', child.title)
-          );
+          const visibleChildren = item.children.filter((child) => {
+            if (!child.path) return false;
+            // Path-based check so sidebar titles can differ from Catalog permission keys
+            if (item.path === '/catalog' || child.path.startsWith('/catalog/')) {
+              return hasPermission(child.path);
+            }
+            return hasSubPermission(item.path || '', child.title);
+          });
           return visibleChildren.length > 0;
         }
         return false;
@@ -49,9 +54,13 @@ export const useNavigationMenu = (menuItems: MenuItem[]): MenuItem[] => {
         if (item.type === 'sub' && item.children) {
           return cloneMenuItem({
             ...item,
-            children: item.children.filter(
-              (child) => child.path && hasSubPermission(item.path || '/catalog', child.title)
-            ),
+            children: item.children.filter((child) => {
+              if (!child.path) return false;
+              if (item.path === '/catalog' || child.path.startsWith('/catalog/')) {
+                return hasPermission(child.path);
+              }
+              return hasSubPermission(item.path || '', child.title);
+            }),
           });
         }
         return cloneMenuItem(item);

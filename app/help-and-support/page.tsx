@@ -63,7 +63,7 @@ export default function HelpAndSupportPage() {
             ))}
           </div>
 
-          {activeTab === 'files' && <FilesTab isManagement={isManagement} />}
+          {activeTab === 'files' && <FilesTab />}
           {activeTab === 'tasks' && <TasksTab isManagement={isManagement} isSuperAdmin={isSuperAdmin} />}
           {activeTab === 'tickets' && (
             <TicketsTab isManagement={isManagement} userRole={user?.role} userEmail={user?.email} />

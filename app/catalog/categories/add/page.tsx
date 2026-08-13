@@ -305,7 +305,7 @@ const AddCategoryPage = () => {
 
 export default function AddCategoryPageWrapper() {
   return (
-    <RequireCrudPermission path="Catalog.Categories" action="create">
+    <RequireCrudPermission path="Catalog.Category" action="create">
       <AddCategoryPage />
     </RequireCrudPermission>
   );

@@ -10,50 +10,58 @@ import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud';
 import CatalogRowActions from '@/shared/components/catalog/CatalogRowActions';
 import CatalogPageSizeSelect from '@/shared/components/catalog/CatalogPageSizeSelect';
 
-interface RawMaterial {
+interface FabricSupplier {
   id: string;
   name: string;
-  groupName: string;
+}
+
+interface PackagingMaterial {
+  id: string;
+  name: string;
   type: string;
-  description: string;
-  brand: string;
-  countSize: string;
-  material: string;
-  color: string;
-  shade: string;
+  sizeSpec?: string;
   unit: string;
-  mrp: string;
-  hsnCode: string;
-  gst: string;
-  articleNo: string;
+  supplier?: string | FabricSupplier | null;
+  supplierName?: string;
+  rate?: number;
+  hsnCode?: string;
+  gst?: string;
+  minimumStock?: number;
+  description?: string;
+  status?: 'active' | 'inactive';
+  image?: string | null;
 }
 
 interface ExcelRow {
   'ID'?: string;
   'Name'?: string;
-  'Group Name'?: string;
   'Type'?: string;
-  'Description'?: string;
-  'Brand'?: string;
-  'Count/Size'?: string;
-  'Material'?: string;
-  'Color'?: string;
-  'Shade'?: string;
+  'Size Spec'?: string;
   'Unit'?: string;
-  'MRP'?: string;
+  'Supplier Name'?: string;
+  'Rate'?: string | number;
   'HSN Code'?: string;
-  'GST %'?: string;
-  'Article No.'?: string;
-  [key: string]: string | undefined;
+  'GST'?: string;
+  'Minimum Stock'?: string | number;
+  'Description'?: string;
+  'Status'?: string;
+  [key: string]: string | number | undefined;
 }
 
-const RawMaterialPage = () => {
+const getSupplierDisplay = (material: PackagingMaterial): string => {
+  if (material.supplier && typeof material.supplier === 'object' && material.supplier.name) {
+    return material.supplier.name;
+  }
+  return material.supplierName || '—';
+};
+
+const PackagingMaterialsPage = () => {
   const { canCreate, canUpdate, canDelete, canImport, guardDelete } = useCatalogCrud('raw-material');
   const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [materials, setMaterials] = useState<RawMaterial[]>([]);
+  const [materials, setMaterials] = useState<PackagingMaterial[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -62,19 +70,17 @@ const RawMaterialPage = () => {
   const [importProgress, setImportProgress] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const REQUIRED_FIELDS = ['name', 'unit'];
+  const REQUIRED_FIELDS = ['name', 'type', 'unit'];
 
-  // Fetch raw materials from API (with pagination and search)
   const fetchMaterials = async (page = 1, limit = itemsPerPage, search = '') => {
     try {
       setIsLoading(true);
       setError(null);
       const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
       const response = await fetch(`${API_BASE_URL}/raw-materials?page=${page}&limit=${limit}${searchParam}`);
-      console.log("response",response);
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch raw materials');
+        throw new Error(errorData.message || 'Failed to fetch packaging materials');
       }
       const data = await response.json();
       const materialsArray = Array.isArray(data.results) ? data.results : [];
@@ -82,10 +88,10 @@ const RawMaterialPage = () => {
       setTotalResults(data.totalResults || 0);
       setTotalPages(data.totalPages || 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch raw materials');
+      setError(err instanceof Error ? err.message : 'Failed to fetch packaging materials');
       setMaterials([]);
       setTotalPages(1);
-      toast.error('Failed to load raw materials');
+      toast.error('Failed to load packaging materials');
     } finally {
       setIsLoading(false);
     }
@@ -118,41 +124,38 @@ const RawMaterialPage = () => {
 
   const handleExport = async () => {
     try {
-      // Always fetch all raw materials for export
       const response = await fetch(`${API_BASE_URL}/raw-materials?page=1&limit=100000`);
-      console.log("response",response);
-      if (!response.ok) throw new Error('Failed to fetch all raw materials for export');
+      if (!response.ok) throw new Error('Failed to fetch all packaging materials for export');
       const data = await response.json();
       const exportSource = Array.isArray(data.results) ? data.results : [];
-      const exportData = exportSource.map((mat: RawMaterial) => ({
+      const exportData = exportSource.map((mat: PackagingMaterial) => ({
         'ID': mat.id,
         'Name': mat.name,
-        'Group Name': mat.groupName,
         'Type': mat.type,
-        'Description': mat.description,
-        'Brand': mat.brand,
-        'Count/Size': mat.countSize,
-        'Material': mat.material,
-        'Color': mat.color,
-        'Shade': mat.shade,
+        'Size Spec': mat.sizeSpec || '',
         'Unit': mat.unit,
-        'MRP': mat.mrp,
-        'HSN Code': mat.hsnCode,
-        'GST %': mat.gst,
-        'Article No.': mat.articleNo
+        'Supplier Name': getSupplierDisplay(mat) === '—' ? '' : getSupplierDisplay(mat),
+        'Rate': mat.rate ?? '',
+        'HSN Code': mat.hsnCode || '',
+        'GST': mat.gst || '',
+        'Minimum Stock': mat.minimumStock ?? '',
+        'Description': mat.description || '',
+        'Status': mat.status || 'active',
       }));
       const ws = XLSX.utils.json_to_sheet(exportData);
       ws['!cols'] = [
-        { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 30 }, { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 15 }, { wch: 10 }
+        { wch: 24 }, { wch: 22 }, { wch: 18 }, { wch: 14 }, { wch: 10 },
+        { wch: 20 }, { wch: 10 }, { wch: 12 }, { wch: 8 }, { wch: 14 },
+        { wch: 30 }, { wch: 10 },
       ];
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Raw Materials');
-      const fileName = `raw-materials_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.utils.book_append_sheet(wb, ws, 'Packaging Materials');
+      const fileName = `packaging-materials_${new Date().toISOString().split('T')[0]}.xlsx`;
       XLSX.writeFile(wb, fileName);
-      toast.success('Raw materials exported successfully');
+      toast.success('Packaging materials exported successfully');
     } catch (error) {
-      console.error('Error exporting raw materials:', error);
-      toast.error('Failed to export raw materials');
+      console.error('Error exporting packaging materials:', error);
+      toast.error('Failed to export packaging materials');
     }
   };
 
@@ -160,47 +163,40 @@ const RawMaterialPage = () => {
     try {
       const sampleData = [
         {
-          'Name': 'Cotton Yarn 40s',
-          'Group Name': 'Yarn',
-          'Type': 'Threads',
-          'Description': 'Premium cotton yarn for knitting',
-          'Brand': 'Sample Brand',
-          'Count/Size': '40',
-          'Material': 'Cotton',
-          'Color': 'White',
-          'Shade': 'Natural',
-          'Unit': 'Kilograms',
-          'MRP': '500',
-          'HSN Code': '52051200',
-          'GST %': '12',
-          'Article No.': 'ART-001',
+          'Name': 'Polybag Medium',
+          'Type': 'polybag',
+          'Size Spec': '12x16',
+          'Unit': 'Pcs',
+          'Supplier Name': 'PackWell',
+          'Rate': 2.5,
+          'HSN Code': '39232990',
+          'GST': '18',
+          'Minimum Stock': 500,
+          'Description': 'Medium size polybag for packaging',
+          'Status': 'active',
         },
         {
-          'Name': 'Polybag Medium',
-          'Group Name': 'Packing Material',
-          'Type': 'Polybags',
-          'Description': 'Medium size polybag for packaging',
-          'Brand': 'PackWell',
-          'Count/Size': '100',
-          'Material': 'Plastic',
-          'Color': 'Transparent',
-          'Shade': 'Clear',
+          'Name': 'Carton 120',
+          'Type': 'carton-120',
+          'Size Spec': '120 pcs',
           'Unit': 'Pcs',
-          'MRP': '2.50',
-          'HSN Code': '39232990',
-          'GST %': '18',
-          'Article No.': 'ART-002',
+          'Supplier Name': '',
+          'Rate': 45,
+          'HSN Code': '48191000',
+          'GST': '12',
+          'Minimum Stock': 100,
+          'Description': 'Standard 120-piece carton',
+          'Status': 'active',
         },
       ];
       const ws = XLSX.utils.json_to_sheet(sampleData);
       ws['!cols'] = [
-        { wch: 20 }, { wch: 18 }, { wch: 12 }, { wch: 30 }, { wch: 15 },
-        { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
-        { wch: 10 }, { wch: 12 }, { wch: 8 }, { wch: 12 },
+        { wch: 20 }, { wch: 16 }, { wch: 12 }, { wch: 10 }, { wch: 18 },
+        { wch: 10 }, { wch: 12 }, { wch: 8 }, { wch: 14 }, { wch: 30 }, { wch: 10 },
       ];
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Raw Material Template');
-      XLSX.writeFile(wb, 'raw_material_import_template.xlsx');
+      XLSX.utils.book_append_sheet(wb, ws, 'Packaging Materials');
+      XLSX.writeFile(wb, 'packaging_materials_import_template.xlsx');
       toast.success('Template downloaded successfully');
     } catch (error) {
       console.error('Error creating template:', error);
@@ -211,7 +207,7 @@ const RawMaterialPage = () => {
   const handleDeleteSelected = async () => {
     if (!guardDelete()) return;
     if (selectedMaterials.length === 0) return;
-    
+
     if (window.confirm(`Are you sure you want to delete ${selectedMaterials.length} selected material(s)?`)) {
       try {
         for (const id of selectedMaterials) {
@@ -231,7 +227,7 @@ const RawMaterialPage = () => {
 
         toast.success('Selected materials deleted successfully');
         setSelectedMaterials([]);
-        fetchMaterials(); // Refresh the list
+        fetchMaterials(currentPage, itemsPerPage, searchQuery);
       } catch (err) {
         console.error('Error deleting materials:', err);
         toast.error(err instanceof Error ? err.message : 'Failed to delete materials');
@@ -241,7 +237,7 @@ const RawMaterialPage = () => {
 
   const handleDelete = async (id: string) => {
     if (!guardDelete()) return;
-    if (window.confirm('Are you sure you want to delete this material?')) {
+    if (window.confirm('Are you sure you want to delete this packaging material?')) {
       try {
         const response = await fetch(`${API_BASE_URL}/raw-materials/${id}`, {
           method: 'DELETE',
@@ -253,14 +249,14 @@ const RawMaterialPage = () => {
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to delete material');
+          throw new Error(errorData.message || 'Failed to delete packaging material');
         }
 
-        toast.success('Material deleted successfully');
-        fetchMaterials(); // Refresh the list
+        toast.success('Packaging material deleted successfully');
+        fetchMaterials(currentPage, itemsPerPage, searchQuery);
       } catch (err) {
         console.error('Error deleting material:', err);
-        toast.error(err instanceof Error ? err.message : 'Failed to delete material');
+        toast.error(err instanceof Error ? err.message : 'Failed to delete packaging material');
       }
     }
   };
@@ -269,7 +265,7 @@ const RawMaterialPage = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     setImportProgress(0);
-    const loadingToast = toast.loading('Importing materials...');
+    const loadingToast = toast.loading('Importing packaging materials...');
     try {
       const reader = new FileReader();
       reader.onload = async (event) => {
@@ -283,39 +279,59 @@ const RawMaterialPage = () => {
           let errorCount = 0;
           let skippedCount = 0;
           let firstErrorMsg = '';
+
+          const [allResponse, suppliersResponse] = await Promise.all([
+            fetch(`${API_BASE_URL}/raw-materials?page=1&limit=100000`),
+            fetch(`${API_BASE_URL}/fabric-suppliers?limit=500&status=active`),
+          ]);
+          const allData = allResponse.ok ? await allResponse.json() : { results: [] };
+          const allMaterials: PackagingMaterial[] = allData.results || [];
+          const suppliersData = suppliersResponse.ok ? await suppliersResponse.json() : { results: [] };
+          const suppliers: FabricSupplier[] = suppliersData.results || [];
+
           for (let i = 0; i < jsonData.length; i++) {
             const row = jsonData[i];
-            // Map all fields as strings
-            const material = {
+            const supplierName = String(row['Supplier Name'] || '').trim();
+            const matchedSupplier = supplierName
+              ? suppliers.find(s => s.name.trim().toLowerCase() === supplierName.toLowerCase())
+              : undefined;
+
+            const rateRaw = row['Rate'];
+            const minStockRaw = row['Minimum Stock'];
+            const statusRaw = String(row['Status'] || 'active').trim().toLowerCase();
+
+            const material: Record<string, unknown> = {
               name: String(row['Name'] || '').trim(),
-              groupName: String(row['Group Name'] || '').trim(),
               type: String(row['Type'] || '').trim(),
-              description: String(row['Description'] || '').trim(),
-              brand: String(row['Brand'] || '').trim(),
-              countSize: String(row['Count/Size'] || '').trim(),
-              material: String(row['Material'] || '').trim(),
-              color: String(row['Color'] || '').trim(),
-              shade: String(row['Shade'] || '').trim(),
+              sizeSpec: String(row['Size Spec'] || '').trim(),
               unit: String(row['Unit'] || '').trim(),
-              mrp: String(row['MRP'] || '').trim(),
+              supplier: matchedSupplier?.id || null,
+              supplierName: supplierName,
+              rate: rateRaw === '' || rateRaw == null ? 0 : Number(rateRaw),
               hsnCode: String(row['HSN Code'] || '').trim(),
-              gst: String(row['GST %'] || '').trim(),
-              articleNo: String(row['Article No.'] || '').trim(),
-              image: 'null'
+              gst: String(row['GST'] || '').trim(),
+              minimumStock: minStockRaw === '' || minStockRaw == null ? 0 : Number(minStockRaw),
+              description: String(row['Description'] || '').trim(),
+              status: statusRaw === 'inactive' ? 'inactive' : 'active',
             };
-            console.log('Importing material:', material);
-            // Validate all required fields
-            const missingFields = REQUIRED_FIELDS.filter(f => !material[f as keyof typeof material]);
+
+            const missingFields = REQUIRED_FIELDS.filter(f => !material[f]);
             if (missingFields.length > 0) {
               skippedCount++;
               if (!firstErrorMsg) firstErrorMsg = `Row ${i + 2}: Missing required fields: ${missingFields.join(', ')}`;
               continue;
             }
-            let materialId = row['ID'];
-            // If ID is present, update; if not, always create new (do not upsert by name)
+
+            let materialId = row['ID'] ? String(row['ID']).trim() : '';
+            if (!materialId) {
+              const found = allMaterials.find(
+                m => m.name.trim().toLowerCase() === String(material.name).toLowerCase()
+              );
+              if (found) materialId = found.id;
+            }
+
             try {
               if (materialId) {
-                // Update existing
                 const patchResponse = await fetch(`${API_BASE_URL}/raw-materials/${materialId}`, {
                   method: 'PATCH',
                   headers: {
@@ -325,14 +341,11 @@ const RawMaterialPage = () => {
                   body: JSON.stringify(material),
                 });
                 const patchResult = await patchResponse.clone().json().catch(() => ({}));
-                console.log('PATCH response:', patchResponse.status, patchResult);
                 if (!patchResponse.ok) {
-                  const errData = patchResult;
-                  throw new Error(errData.message || 'Failed to update');
+                  throw new Error(patchResult.message || 'Failed to update');
                 }
                 successCount++;
               } else {
-                // Create new
                 const postResponse = await fetch(`${API_BASE_URL}/raw-materials`, {
                   method: 'POST',
                   headers: {
@@ -342,17 +355,15 @@ const RawMaterialPage = () => {
                   body: JSON.stringify(material),
                 });
                 const postResult = await postResponse.clone().json().catch(() => ({}));
-                console.log('POST response:', postResponse.status, postResult);
                 if (!postResponse.ok) {
-                  const errData = postResult;
-                  throw new Error(errData.message || 'Failed to create');
+                  throw new Error(postResult.message || 'Failed to create');
                 }
                 successCount++;
               }
-            } catch (error: any) {
+            } catch (error: unknown) {
               errorCount++;
-              console.error('Import error:', error);
-              if (!firstErrorMsg) firstErrorMsg = `Row ${i + 2}: ${error.message || 'Unknown error'}`;
+              const message = error instanceof Error ? error.message : 'Unknown error';
+              if (!firstErrorMsg) firstErrorMsg = `Row ${i + 2}: ${message}`;
             }
             setImportProgress(Math.round(((i + 1) / jsonData.length) * 100));
           }
@@ -362,26 +373,21 @@ const RawMaterialPage = () => {
           if (successCount > 0) toast.success(`Successfully imported/updated ${successCount} materials`);
           if (errorCount > 0) toast.error(`Failed to import/update ${errorCount} materials. ${firstErrorMsg}`);
           if (skippedCount > 0) toast.error(`Skipped ${skippedCount} row(s) due to missing required fields. ${firstErrorMsg}`);
-          fetchMaterials();
-        } catch (err: any) {
+          fetchMaterials(currentPage, itemsPerPage, searchQuery);
+        } catch (err: unknown) {
           setImportProgress(null);
-          toast.error('Failed to process import file: ' + (err.message || ''), { id: loadingToast });
+          const message = err instanceof Error ? err.message : '';
+          toast.error('Failed to process import file: ' + message, { id: loadingToast });
         }
       };
       reader.readAsArrayBuffer(file);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setImportProgress(null);
-      toast.error('Failed to import materials: ' + (err.message || ''), { id: loadingToast });
+      const message = err instanceof Error ? err.message : '';
+      toast.error('Failed to import materials: ' + message, { id: loadingToast });
     }
   };
 
-  // Filter materials based on search query
-  const filteredMaterials = materials.filter(material =>
-    (material.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-    (material.color?.toLowerCase() || '').includes(searchQuery.toLowerCase())
-  );
-
-  // Condensed pagination helper
   function getPagination(currentPage: number, totalPages: number) {
     const pages = [];
     if (totalPages <= 7) {
@@ -401,56 +407,37 @@ const RawMaterialPage = () => {
   return (
     <div className="main-content !p-[10px]">
       <Toaster position="top-right" />
-      <Seo title="Raw Material"/>
+      <Seo title="Packaging materials"/>
 
       <div className="bg-white shadow-sm border border-gray-100 mx-0 catalog-list-card">
         <div className="p-[10px] catalog-list-toolbar">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-2">
               <div className="w-[3px] h-5 bg-purple-600 rounded-full"></div>
-              <h1 className="text-sm font-bold text-gray-800">Raw Material</h1>
+              <h1 className="text-sm font-bold text-gray-800">Packaging materials</h1>
               <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm">
                 {totalResults}
               </span>
               <HelpIcon
-                title="Raw Material Management"
+                title="Packaging materials"
                 content={
                   <div>
                     <p className="mb-4">
-                      This page allows you to manage raw materials used in your manufacturing processes.
+                      Catalog packing materials consumed at order packing — polybags, cartons, tags, stickers, threads, and more.
                     </p>
                     <h4 className="font-semibold mb-2">What you can do:</h4>
                     <ul className="list-disc list-inside mb-4 space-y-1">
-                      <li><strong>View Materials:</strong> See all raw materials with their specifications and details</li>
-                      <li><strong>Add New Material:</strong> Create new raw material entries with complete specifications</li>
-                      <li><strong>Edit Material:</strong> Modify existing material details, pricing, and specifications</li>
-                      <li><strong>Delete Material:</strong> Remove materials that are no longer needed</li>
-                      <li><strong>Bulk Operations:</strong> Select multiple materials for bulk deletion</li>
-                      <li><strong>Import/Export:</strong> Import materials from Excel files or export existing data</li>
-                      <li><strong>Search & Filter:</strong> Find specific materials using the search functionality</li>
-                      <li><strong>Pagination:</strong> Navigate through large lists of materials efficiently</li>
+                      <li><strong>View:</strong> Browse packaging materials with type, size/spec, supplier, and stock levels</li>
+                      <li><strong>Add / Edit:</strong> Maintain name, type, unit, rate, HSN, GST, and minimum stock</li>
+                      <li><strong>Import / Export:</strong> Bulk load or download Excel with the packaging columns</li>
+                      <li><strong>Search:</strong> Find materials by name, type, size, supplier, or HSN</li>
                     </ul>
-                    <h4 className="font-semibold mb-2">Material Information:</h4>
-                    <ul className="list-disc list-inside mb-4 space-y-1">
-                      <li><strong>Name:</strong> The name of the raw material</li>
-                      <li><strong>Group Name:</strong> Category or group classification</li>
-                      <li><strong>Type:</strong> Type of material (fabric, thread, etc.)</li>
-                      <li><strong>Brand:</strong> Brand or manufacturer of the material</li>
-                      <li><strong>Count/Size:</strong> Material specifications like count or size</li>
-                      <li><strong>Material:</strong> Base material composition</li>
-                      <li><strong>Color & Shade:</strong> Color and shade specifications</li>
-                      <li><strong>Unit:</strong> Unit of measurement (meters, pieces, etc.)</li>
-                      <li><strong>MRP:</strong> Maximum Retail Price</li>
-                      <li><strong>HSN Code:</strong> Harmonized System of Nomenclature code</li>
-                      <li><strong>GST %:</strong> Goods and Services Tax percentage</li>
-                      <li><strong>Article No:</strong> Unique article number for identification</li>
-                    </ul>
-                    <h4 className="font-semibold mb-2">Tips:</h4>
+                    <h4 className="font-semibold mb-2">Fields:</h4>
                     <ul className="list-disc list-inside space-y-1">
-                      <li>Use the import feature to bulk upload materials from Excel files</li>
-                      <li>Ensure all required fields (Name, Unit) are filled when adding materials</li>
-                      <li>Organize materials by groups for better inventory management</li>
-                      <li>Keep HSN codes and GST rates updated for accurate tax calculations</li>
+                      <li><strong>Name, Type, Unit:</strong> Required</li>
+                      <li><strong>Size/Spec:</strong> Dimensions or pack count</li>
+                      <li><strong>Supplier:</strong> Optional linked supplier or free-text name</li>
+                      <li><strong>Rate, HSN, GST, Min Stock:</strong> Costing and reorder tracking</li>
                     </ul>
                   </div>
                 }
@@ -558,10 +545,16 @@ const RawMaterialPage = () => {
                   <th className="pl-[10px] pr-1 py-3 text-left w-10 border border-gray-200">
                     <input type="checkbox" checked={selectAll} onChange={handleSelectAll} className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" />
                   </th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Group Name</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Name</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Color</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Type</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Size/Spec</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Unit</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Supplier</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Rate</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">HSN</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">GST</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Min Stock</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Status</th>
                   {(canUpdate || canDelete) && (
                   <th className="px-1.5 py-3 text-right pr-[10px] text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
                   )}
@@ -573,10 +566,20 @@ const RawMaterialPage = () => {
                     <td className="pl-[10px] pr-1 py-2.5 border border-gray-200">
                       <input type="checkbox" checked={selectedMaterials.includes(material.id)} onChange={() => handleMaterialSelect(material.id)} className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" />
                     </td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-semibold text-gray-600 border border-gray-200">{material.groupName}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-bold text-gray-900 border border-gray-200">{material.name}</td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{material.color}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{material.type}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{material.sizeSpec || '—'}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{material.unit}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{getSupplierDisplay(material)}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{material.rate ?? '—'}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{material.hsnCode || '—'}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{material.gst || '—'}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{material.minimumStock ?? '—'}</td>
+                    <td className="px-1.5 py-2.5 border border-gray-200">
+                      <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-bold rounded uppercase tracking-tight ${(material.status || 'active') === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {material.status || 'active'}
+                      </span>
+                    </td>
                     {(canUpdate || canDelete) && (
                     <td className="px-1.5 py-2.5 text-right pr-[10px] border border-gray-200">
                       <CatalogRowActions
@@ -620,4 +623,4 @@ const RawMaterialPage = () => {
   );
 };
 
-export default RawMaterialPage; 
+export default PackagingMaterialsPage;

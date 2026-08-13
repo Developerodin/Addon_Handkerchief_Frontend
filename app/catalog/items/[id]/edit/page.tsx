@@ -4,14 +4,17 @@ import { useParams, useRouter } from 'next/navigation';
 import axios from 'axios';
 import Seo from '@/shared/layout-components/seo/seo';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
-import yarnCatalogService, { YarnCatalog } from '@/shared/services/yarnCatalogService';
 import { styleCodeService, StyleCode } from '@/shared/services/styleCodeService';
 import { StyleCodeSelectModal } from '@/app/catalog/style-codes/components/StyleCodeSelectModal';
 import { ProcessSequenceEditor } from '@/app/catalog/items/components/ProcessSequenceEditor';
+import { ProductBomTab } from '@/app/catalog/items/components/ProductBomTab';
 import ProductImageUploadField from '@/app/catalog/items/components/ProductImageUploadField';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { useSelector } from 'react-redux';
 import { isDesignUser, isProductionUser, isFinalUser, shouldShowAttribute, shouldShowAttributeForFinal } from '@/shared/utils/userUtils';
+
+const normalizeProductionType = (value?: string): 'normal' | 'embroidery' =>
+  value === 'embroidery' ? 'embroidery' : 'normal';
 
 interface StyleCodeItem {
   styleCodeId?: string;
@@ -27,9 +30,12 @@ interface Product {
   name: string;
   softwareCode: string;
   internalCode: string;
+  articleName?: string;
   knittingCode?: string;
   vendorCode: string;
   factoryCode: string;
+  hsnCode?: string;
+  gst?: string;
   productionType?: string;
   styleCodes?: StyleCodeItem[];
   styleCode?: string; // Keep for backward compatibility
@@ -41,15 +47,17 @@ interface Product {
   };
   attributes: Record<string, string>;
   bom: Array<{
-    yarnCatalogId: string;
-    yarnName: string;
+    fabricCatalogId: string;
+    fabricName: string;
     quantity: number;
+    unitCost?: number;
   }>;
-  rawMaterials?: Array<{ rawMaterialId: string; rawMaterialName?: string; quantity: number }>;
+  rawMaterials?: Array<{ rawMaterialId: string; rawMaterialName?: string; quantity: number; unitCost?: number }>;
   processes: Array<{
     processId: string;
   }>;
   image?: string;
+  unitCost?: number;
 }
 
 interface Category {
@@ -84,6 +92,7 @@ interface ProcessType {
   name: string;
   type?: string;
   description?: string;
+  sortOrder?: number;
 }
 
 const API_ENDPOINTS = {
@@ -104,26 +113,9 @@ const EditProductPage = () => {
 
   const [isLoading, setIsLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [yarnCatalogs, setYarnCatalogs] = useState<YarnCatalog[]>([]);
   const [attributeCategories, setAttributeCategories] = useState<AttributeCategory[]>([]);
   const [processes, setProcesses] = useState<ProcessType[]>([]);
   const [activeTab, setActiveTab] = useState('general');
-
-  // Yarn catalog pagination states
-  const [currentYarnPage, setCurrentYarnPage] = useState(1);
-  const [totalYarnPages, setTotalYarnPages] = useState(1);
-  const [totalYarnResults, setTotalYarnResults] = useState(0);
-  const yarnsPerPage = 50;
-
-  // Modal states for yarn catalog selection
-  const [isYarnModalOpen, setIsYarnModalOpen] = useState(false);
-  const [selectedBomIndex, setSelectedBomIndex] = useState<number | null>(null);
-  const [modalYarnSearchQuery, setModalYarnSearchQuery] = useState('');
-  const [modalCurrentYarnPage, setModalCurrentYarnPage] = useState(1);
-  const [modalYarnCatalogs, setModalYarnCatalogs] = useState<YarnCatalog[]>([]);
-  const [modalTotalYarnPages, setModalTotalYarnPages] = useState(1);
-  const [modalTotalYarnResults, setModalTotalYarnResults] = useState(0);
-  const [isModalLoading, setIsModalLoading] = useState(false);
 
   // Style code select modal
   const [styleCodeModalOpen, setStyleCodeModalOpen] = useState(false);
@@ -134,17 +126,21 @@ const EditProductPage = () => {
     name: '',
     softwareCode: '',
     internalCode: '',
+    articleName: '',
     knittingCode: '',
     vendorCode: '',
     factoryCode: '',
-    productionType: 'internal',
+    hsnCode: '',
+    gst: '',
+    productionType: 'normal',
     styleCodes: [{ styleCodeId: '', styleCode: '', eanCode: '', mrp: 0, brand: '', pack: '' }],
     description: '',
     category: { id: '', name: '' },
     attributes: {},
     bom: [],
     rawMaterials: [],
-    processes: []
+    processes: [],
+    unitCost: 0,
   });
 
   const [styleCodeOptions, setStyleCodeOptions] = useState<StyleCodeItem[]>([]);
@@ -275,7 +271,7 @@ const EditProductPage = () => {
 
         // (styleCodeOptions already set above)
         
-        product.productionType = product.productionType || 'internal';
+        product.productionType = normalizeProductionType(product.productionType);
 
         // Defensive: ensure attributes, bom, processes are arrays/objects
         product.attributes = product.attributes || {};
@@ -300,16 +296,37 @@ const EditProductPage = () => {
 
         // Process the bom and processes arrays
         product.bom = Array.isArray(product.bom)
-          ? product.bom.map((item: any) => ({
-              yarnCatalogId: typeof item.yarnCatalogId === 'object' && item.yarnCatalogId !== null
-                ? item.yarnCatalogId.id || item.yarnCatalogId._id
-                : item.yarnCatalogId || item.materialId || '',
-              yarnName: item.yarnName || item.materialName || '',
-              quantity: item.quantity || 0
-            }))
+          ? product.bom.map((item: any) => {
+              const fabricRef = item.fabricCatalogId ?? item.yarnCatalogId ?? item.materialId;
+              const fabricCatalogId =
+                typeof fabricRef === 'object' && fabricRef !== null
+                  ? fabricRef.id || fabricRef._id
+                  : fabricRef || '';
+              return {
+                fabricCatalogId: String(fabricCatalogId || ''),
+                fabricName: item.fabricName || item.yarnName || item.materialName || (typeof fabricRef === 'object' ? fabricRef.name : '') || '',
+                quantity: item.quantity || 0,
+                unitCost: Number(item.unitCost) || 0,
+              };
+            })
           : [];
-        // Debug: log normalized BOM
         console.log('Normalized BOM:', product.bom);
+
+        const normalizeRawMaterials = Array.isArray(product.rawMaterials)
+          ? product.rawMaterials.map((item: any) => {
+              const rmRef = item.rawMaterialId ?? item.rawMaterial;
+              const rawMaterialId =
+                typeof rmRef === 'object' && rmRef !== null
+                  ? rmRef.id || rmRef._id
+                  : rmRef || '';
+              return {
+                rawMaterialId: String(rawMaterialId || ''),
+                rawMaterialName: item.rawMaterialName || (typeof rmRef === 'object' ? rmRef.name : '') || '',
+                quantity: Number(item.quantity) || 0,
+                unitCost: Number(item.unitCost) || 0,
+              };
+            })
+          : [];
         
         // Normalize processes to always have processId as string
         product.processes = Array.isArray(product.processes)
@@ -320,12 +337,16 @@ const EditProductPage = () => {
 
         console.log('Normalized processes:', product.processes);
         
-        // Set the product data with normalized attributes (rawMaterials section removed from form)
         setFormData({
           ...product,
+          articleName: product.articleName || '',
+          hsnCode: product.hsnCode || '',
+          gst: product.gst || '',
+          productionType: normalizeProductionType(product.productionType),
           attributes: normalizedAttributes,
           processes: product.processes,
-          rawMaterials: []
+          rawMaterials: normalizeRawMaterials,
+          unitCost: Number(product.unitCost) || 0,
         });
         console.log('Product data loaded:', product);
         console.log('Product attributes:', product.attributes);
@@ -385,67 +406,6 @@ const EditProductPage = () => {
 
     fetchData();
   }, [productId]);
-
-  // Fetch yarn catalogs
-  useEffect(() => {
-    const fetchYarnCatalogs = async () => {
-      try {
-        const response = await yarnCatalogService.getYarnCatalogs({
-          page: currentYarnPage,
-          limit: yarnsPerPage,
-          status: 'active'
-        });
-        setYarnCatalogs(response.results || []);
-        setTotalYarnPages(response.totalPages || 1);
-        setTotalYarnResults(response.totalResults || 0);
-      } catch (error) {
-        console.error('Error fetching yarn catalogs:', error);
-        setYarnCatalogs([]);
-      }
-    };
-
-    const isInitialLoad = currentYarnPage === 1;
-    const delay = isInitialLoad ? 0 : 500;
-    
-    const timeoutId = setTimeout(() => {
-      fetchYarnCatalogs();
-    }, delay);
-
-    return () => clearTimeout(timeoutId);
-  }, [currentYarnPage]);
-
-  // Fetch yarn catalogs for modal
-  useEffect(() => {
-    if (!isYarnModalOpen) return;
-
-    const fetchModalYarnCatalogs = async () => {
-      setIsModalLoading(true);
-      try {
-        const response = await yarnCatalogService.getYarnCatalogs({
-          page: modalCurrentYarnPage,
-          limit: yarnsPerPage,
-          yarnName: modalYarnSearchQuery.trim() || undefined,
-          status: 'active'
-        });
-        setModalYarnCatalogs(response.results || []);
-        setModalTotalYarnPages(response.totalPages || 1);
-        setModalTotalYarnResults(response.totalResults || 0);
-      } catch (error) {
-        console.error('Error fetching yarn catalogs for modal:', error);
-        setModalYarnCatalogs([]);
-      } finally {
-        setIsModalLoading(false);
-      }
-    };
-
-    // Debounce search
-    const delay = modalYarnSearchQuery.trim() ? 500 : 0;
-    const timeoutId = setTimeout(() => {
-      fetchModalYarnCatalogs();
-    }, delay);
-
-    return () => clearTimeout(timeoutId);
-  }, [isYarnModalOpen, modalYarnSearchQuery, modalCurrentYarnPage]);
 
   // Normalize product attributes from value-ID to value-name once when categories are loaded (API expects name → value string)
   const attributesNormalizedRef = useRef(false);
@@ -508,28 +468,6 @@ const EditProductPage = () => {
         ...prev,
         attributes: updatedAttributes
       };
-    });
-  };
-
-  const handleBomItemChange = (index: number, field: 'yarnCatalogId' | 'quantity', value: string | number) => {
-    setFormData(prev => {
-      const newBom = [...prev.bom];
-      if (field === 'yarnCatalogId') {
-        // Search in both yarnCatalogs and modalYarnCatalogs
-        const selectedYarn = yarnCatalogs.find(y => y.id === value) || 
-                            modalYarnCatalogs.find(y => y.id === value);
-        newBom[index] = {
-          ...newBom[index],
-          yarnCatalogId: value.toString(),
-          yarnName: selectedYarn?.yarnName || ''
-        };
-      } else {
-        newBom[index] = {
-          ...newBom[index],
-          quantity: typeof value === 'string' ? parseFloat(value) : value
-        };
-      }
-      return { ...prev, bom: newBom };
     });
   };
 
@@ -618,56 +556,18 @@ const EditProductPage = () => {
     setStyleCodeModalIndex(null);
   };
 
-  const addBomItem = () => {
+  const applyProcessTemplate = (mode: 'normal' | 'embroidery') => {
+    const sorted = [...processes].sort((a: any, b: any) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0));
+    const filtered = sorted.filter((p: any) => {
+      const isEmbroidery = (p.name || '').toLowerCase().includes('embroidery');
+      return mode === 'embroidery' ? true : !isEmbroidery;
+    });
     setFormData(prev => ({
       ...prev,
-      bom: [...prev.bom, { yarnCatalogId: '', yarnName: '', quantity: 0 }]
+      processes: filtered.length > 0
+        ? filtered.map((p: any) => ({ processId: p.id }))
+        : [{ processId: '' }],
     }));
-  };
-
-  const removeBomItem = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      bom: prev.bom.filter((_, i) => i !== index)
-    }));
-  };
-
-  // Open yarn selection modal
-  const handleOpenYarnModal = (index: number) => {
-    setSelectedBomIndex(index);
-    setIsYarnModalOpen(true);
-    setModalYarnSearchQuery('');
-    setModalCurrentYarnPage(1);
-  };
-
-  // Close yarn selection modal
-  const handleCloseYarnModal = () => {
-    setIsYarnModalOpen(false);
-    setSelectedBomIndex(null);
-    setModalYarnSearchQuery('');
-    setModalCurrentYarnPage(1);
-  };
-
-  // Select yarn from modal
-  const handleSelectYarn = (yarn: YarnCatalog) => {
-    if (selectedBomIndex !== null) {
-      setFormData(prev => {
-        const newBom = [...prev.bom];
-        newBom[selectedBomIndex] = {
-          ...newBom[selectedBomIndex],
-          yarnCatalogId: yarn.id,
-          yarnName: yarn.yarnName
-        };
-        return { ...prev, bom: newBom };
-      });
-      handleCloseYarnModal();
-    }
-  };
-
-  // Handle modal search
-  const handleModalYarnSearch = (query: string) => {
-    setModalYarnSearchQuery(query);
-    setModalCurrentYarnPage(1); // Reset to first page when search changes
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -680,39 +580,32 @@ const EditProductPage = () => {
 
     // Validate required fields based on user type
     if (isProduction) {
-      // Production user: Factory Code required only when not outsourced
-      if (formData.productionType !== 'outsourced' && (!formData.factoryCode || formData.factoryCode.trim() === '')) {
+      if (!formData.factoryCode || formData.factoryCode.trim() === '') {
         alert('Please fill in all required fields');
         return;
       }
     } else if (isFinal) {
       // Final user: no required-field validation on frontend
     } else if (isDesign) {
-      const outsourced = formData.productionType === 'outsourced';
-      const needCodes = !outsourced;
       if (!formData.name || formData.name.trim() === '' || !formData.category) {
         alert('Please fill in all required fields');
         return;
       }
-      if (needCodes && (
+      if (
           !formData.internalCode || formData.internalCode.trim() === '' ||
-          !formData.knittingCode || formData.knittingCode.trim() === '' ||
-          !formData.vendorCode || formData.vendorCode.trim() === '')) {
+          !formData.vendorCode || formData.vendorCode.trim() === '') {
         alert('Please fill in all required fields');
         return;
       }
     } else {
-      const outsourced = formData.productionType === 'outsourced';
-      const needCodeFields = !outsourced;
       if (!formData.name || formData.name.trim() === '' || !formData.category ||
-          (needCodeFields && (!formData.factoryCode || formData.factoryCode.trim() === ''))) {
+          (!formData.factoryCode || formData.factoryCode.trim() === '')) {
         alert('Please fill in all required fields.');
         return;
       }
-      if (needCodeFields && (
+      if (
           !formData.internalCode || formData.internalCode.trim() === '' ||
-          !formData.knittingCode || formData.knittingCode.trim() === '' ||
-          !formData.vendorCode || formData.vendorCode.trim() === '')) {
+          !formData.vendorCode || formData.vendorCode.trim() === '') {
         alert('Please fill in all required fields.');
         return;
       }
@@ -741,7 +634,7 @@ const EditProductPage = () => {
       
       // Prepare the base product data
       const productData: any = {};
-    productData.productionType = formData.productionType || 'internal';
+    productData.productionType = normalizeProductionType(formData.productionType);
 
       // Style codes: send only IDs (entries with valid styleCodeId)
       const styleCodeIds = (formData.styleCodes || [])
@@ -760,20 +653,24 @@ const EditProductPage = () => {
         productData.styleCodes = styleCodeIds;
         productData.description = formData.description.trim();
       } else if (isDesign) {
-        // Design user: Basic fields (optional when outsourced)
         productData.name = formData.name.trim();
         productData.softwareCode = formData.softwareCode?.trim() ?? '';
         productData.internalCode = formData.internalCode?.trim() ?? '';
+        productData.articleName = formData.articleName?.trim() ?? '';
         productData.knittingCode = formData.knittingCode?.trim() ?? '';
         productData.vendorCode = formData.vendorCode?.trim() ?? '';
+        productData.hsnCode = formData.hsnCode?.trim() ?? '';
+        productData.gst = formData.gst?.trim() ?? '';
         productData.category = formData.category?.id || '';
       } else {
-        // Other users: All fields (Software/Internal/Knitting/Vendor optional when outsourced)
         productData.name = formData.name.trim();
         productData.softwareCode = formData.softwareCode?.trim() ?? '';
         productData.internalCode = formData.internalCode?.trim() ?? '';
+        productData.articleName = formData.articleName?.trim() ?? '';
         productData.knittingCode = (formData.knittingCode || '').trim();
         productData.vendorCode = formData.vendorCode?.trim() ?? '';
+        productData.hsnCode = formData.hsnCode?.trim() ?? '';
+        productData.gst = formData.gst?.trim() ?? '';
         productData.category = formData.category?.id || '';
         productData.factoryCode = formData.factoryCode.trim();
         productData.styleCodes = styleCodeIds;
@@ -836,11 +733,19 @@ const EditProductPage = () => {
 
       // BOM, rawMaterials and Processes for production users and non-design/non-final/non-production users
       if (isProduction || (!isDesign && !isFinal && !isProduction)) {
-        productData.bom = formData.bom.filter(item => item.yarnCatalogId && item.quantity > 0).map(item => ({
-          yarnCatalogId: item.yarnCatalogId,
-          yarnName: item.yarnName,
-          quantity: Number(item.quantity)
+        productData.bom = formData.bom.filter(item => item.fabricCatalogId && item.quantity > 0).map(item => ({
+          fabricCatalogId: item.fabricCatalogId,
+          fabricName: item.fabricName,
+          quantity: Number(item.quantity),
+          unitCost: Number(item.unitCost) || 0,
         }));
+        productData.rawMaterials = (formData.rawMaterials || [])
+          .filter(item => item.rawMaterialId && (item.quantity ?? 0) >= 0)
+          .map(item => ({
+            rawMaterialId: item.rawMaterialId,
+            quantity: Number(item.quantity) || 0,
+            unitCost: Number(item.unitCost) || 0,
+          }));
         productData.processes = formData.processes.filter(proc => proc.processId).map(proc => ({
           processId: proc.processId
         }));
@@ -921,23 +826,23 @@ const EditProductPage = () => {
                           <select
                             name="productionType"
                             className="form-control"
-                            value={formData.productionType ?? 'internal'}
+                            value={normalizeProductionType(formData.productionType)}
                             onChange={(e) => handleInputChange({ target: { name: 'productionType', value: e.target.value } } as any)}
                             required
                           >
-                            <option value="internal">Internal</option>
-                            <option value="outsourced">Outsourced</option>
+                            <option value="normal">Normal</option>
+                            <option value="embroidery">Embroidery</option>
                           </select>
                         </div>
                         <div>
-                          <label className="form-label">Factory Code{formData.productionType !== 'outsourced' ? ' *' : ''}</label>
+                          <label className="form-label">Factory Code *</label>
                           <input
                             type="text"
                             name="factoryCode"
                             className="form-control"
                             value={formData.factoryCode}
                             onChange={handleInputChange}
-                            required={formData.productionType !== 'outsourced'}
+                            required
                           />
                         </div>
                       </>
@@ -949,23 +854,23 @@ const EditProductPage = () => {
                           <select
                             name="productionType"
                             className="form-control"
-                            value={formData.productionType ?? 'internal'}
+                            value={normalizeProductionType(formData.productionType)}
                             onChange={(e) => handleInputChange({ target: { name: 'productionType', value: e.target.value } } as any)}
                             required
                           >
-                            <option value="internal">Internal</option>
-                            <option value="outsourced">Outsourced</option>
+                            <option value="normal">Normal</option>
+                            <option value="embroidery">Embroidery</option>
                           </select>
                         </div>
                         <div>
-                          <label className="form-label">Factory Code{formData.productionType !== 'outsourced' ? ' *' : ''}</label>
+                          <label className="form-label">Factory Code *</label>
                           <input
                             type="text"
                             name="factoryCode"
                             className="form-control"
                             value={formData.factoryCode}
                             onChange={handleInputChange}
-                            required={formData.productionType !== 'outsourced'}
+                            required
                           />
                         </div>
                         <div className="md:col-span-2">
@@ -1096,47 +1001,78 @@ const EditProductPage = () => {
                               </select>
                             </div>
                             <div>
-                              <label className="form-label">Software Code{formData.productionType !== 'outsourced' ? ' *' : ''}</label>
+                              <label className="form-label">Software Code *</label>
                               <input
                                 type="text"
                                 name="softwareCode"
                                 className="form-control"
                                 value={formData.softwareCode}
                                 onChange={handleInputChange}
-                                required={formData.productionType !== 'outsourced'}
+                                required
                               />
                             </div>
                             <div>
-                              <label className="form-label">Internal Code / Design Code{formData.productionType !== 'outsourced' ? ' *' : ''}</label>
+                              <label className="form-label">Internal Code / Design Code *</label>
                               <input
                                 type="text"
                                 name="internalCode"
                                 className="form-control"
                                 value={formData.internalCode}
                                 onChange={handleInputChange}
-                                required={formData.productionType !== 'outsourced'}
+                                required
                               />
                             </div>
                             <div>
-                              <label className="form-label">Knitting Code{formData.productionType !== 'outsourced' ? ' *' : ''}</label>
+                              <label className="form-label">Knitting Code (optional)</label>
                               <input
                                 type="text"
                                 name="knittingCode"
                                 className="form-control"
                                 value={formData.knittingCode || ''}
                                 onChange={handleInputChange}
-                                required={formData.productionType !== 'outsourced'}
-                              />
+                                                              />
                             </div>
                             <div>
-                              <label className="form-label">Vendor Code{formData.productionType !== 'outsourced' ? ' *' : ''}</label>
+                              <label className="form-label">Article Name</label>
+                              <input
+                                type="text"
+                                name="articleName"
+                                className="form-control"
+                                value={formData.articleName || ''}
+                                onChange={handleInputChange}
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="form-label">HSN Code</label>
+                                <input
+                                  type="text"
+                                  name="hsnCode"
+                                  className="form-control"
+                                  value={formData.hsnCode || ''}
+                                  onChange={handleInputChange}
+                                />
+                              </div>
+                              <div>
+                                <label className="form-label">GST</label>
+                                <input
+                                  type="text"
+                                  name="gst"
+                                  className="form-control"
+                                  value={formData.gst || ''}
+                                  onChange={handleInputChange}
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="form-label">Vendor Code *</label>
                               <input
                                 type="text"
                                 name="vendorCode"
                                 className="form-control"
                                 value={formData.vendorCode}
                                 onChange={handleInputChange}
-                                required={formData.productionType !== 'outsourced'}
+                                required
                               />
                             </div>
                             <div>
@@ -1144,23 +1080,23 @@ const EditProductPage = () => {
                               <select
                                 name="productionType"
                                 className="form-control"
-                                value={formData.productionType ?? 'internal'}
+                                value={normalizeProductionType(formData.productionType)}
                                 onChange={(e) => handleInputChange({ target: { name: 'productionType', value: e.target.value } } as any)}
                                 required
                               >
-                                <option value="internal">Internal</option>
-                                <option value="outsourced">Outsourced</option>
+                                <option value="normal">Normal</option>
+                            <option value="embroidery">Embroidery</option>
                               </select>
                             </div>
                             <div>
-                              <label className="form-label">Factory Code{formData.productionType !== 'outsourced' ? ' *' : ''}</label>
+                              <label className="form-label">Factory Code *</label>
                               <input
                                 type="text"
                                 name="factoryCode"
                                 className="form-control"
                                 value={formData.factoryCode}
                                 onChange={handleInputChange}
-                                required={formData.productionType !== 'outsourced'}
+                                required
                               />
                             </div>
                             <div className="md:col-span-2">
@@ -1298,47 +1234,78 @@ const EditProductPage = () => {
                               </select>
                             </div>
                             <div>
-                              <label className="form-label">Software Code{formData.productionType !== 'outsourced' ? ' *' : ''}</label>
+                              <label className="form-label">Software Code *</label>
                               <input
                                 type="text"
                                 name="softwareCode"
                                 className="form-control"
                                 value={formData.softwareCode}
                                 onChange={handleInputChange}
-                                required={formData.productionType !== 'outsourced'}
+                                required
                               />
                             </div>
                             <div>
-                              <label className="form-label">Internal Code / Design Code{formData.productionType !== 'outsourced' ? ' *' : ''}</label>
+                              <label className="form-label">Internal Code / Design Code *</label>
                               <input
                                 type="text"
                                 name="internalCode"
                                 className="form-control"
                                 value={formData.internalCode}
                                 onChange={handleInputChange}
-                                required={formData.productionType !== 'outsourced'}
+                                required
                               />
                             </div>
                             <div>
-                              <label className="form-label">Knitting Code{formData.productionType !== 'outsourced' ? ' *' : ''}</label>
+                              <label className="form-label">Knitting Code (optional)</label>
                               <input
                                 type="text"
                                 name="knittingCode"
                                 className="form-control"
                                 value={formData.knittingCode || ''}
                                 onChange={handleInputChange}
-                                required={formData.productionType !== 'outsourced'}
-                              />
+                                                              />
                             </div>
                             <div>
-                              <label className="form-label">Vendor Code{formData.productionType !== 'outsourced' ? ' *' : ''}</label>
+                              <label className="form-label">Article Name</label>
+                              <input
+                                type="text"
+                                name="articleName"
+                                className="form-control"
+                                value={formData.articleName || ''}
+                                onChange={handleInputChange}
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="form-label">HSN Code</label>
+                                <input
+                                  type="text"
+                                  name="hsnCode"
+                                  className="form-control"
+                                  value={formData.hsnCode || ''}
+                                  onChange={handleInputChange}
+                                />
+                              </div>
+                              <div>
+                                <label className="form-label">GST</label>
+                                <input
+                                  type="text"
+                                  name="gst"
+                                  className="form-control"
+                                  value={formData.gst || ''}
+                                  onChange={handleInputChange}
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="form-label">Vendor Code *</label>
                               <input
                                 type="text"
                                 name="vendorCode"
                                 className="form-control"
                                 value={formData.vendorCode}
                                 onChange={handleInputChange}
-                                required={formData.productionType !== 'outsourced'}
+                                required
                               />
                             </div>
                             <div>
@@ -1346,23 +1313,23 @@ const EditProductPage = () => {
                               <select
                                 name="productionType"
                                 className="form-control"
-                                value={formData.productionType ?? 'internal'}
+                                value={normalizeProductionType(formData.productionType)}
                                 onChange={(e) => handleInputChange({ target: { name: 'productionType', value: e.target.value } } as any)}
                                 required
                               >
-                                <option value="internal">Internal</option>
-                                <option value="outsourced">Outsourced</option>
+                                <option value="normal">Normal</option>
+                            <option value="embroidery">Embroidery</option>
                               </select>
                             </div>
                             <div>
-                              <label className="form-label">Factory Code{formData.productionType !== 'outsourced' ? ' *' : ''}</label>
+                              <label className="form-label">Factory Code *</label>
                               <input
                                 type="text"
                                 name="factoryCode"
                                 className="form-control"
                                 value={formData.factoryCode}
                                 onChange={handleInputChange}
-                                required={formData.productionType !== 'outsourced'}
+                                required
                               />
                             </div>
                             <div className="md:col-span-2">
@@ -1468,207 +1435,41 @@ const EditProductPage = () => {
 
                 {/* BOM Tab */}
                 {!isDesign && !isFinal && activeTab === 'bom' && (
-                  <div>
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-lg font-medium">Bill of Materials</h3>
-                      <button
-                        type="button"
-                        onClick={addBomItem}
-                        className="ti-btn ti-btn-primary"
-                        disabled={isLoading}
-                      >
-                        <i className="ri-add-line me-2"></i> Add Yarn
-                      </button>
-                    </div>
-                    <div className="table-responsive">
-                      <table className="table whitespace-nowrap table-bordered min-w-full">
-                        <thead>
-                          <tr className="border-b border-gray-200">
-                            <th className="text-start">Yarn Name</th>
-                            <th className="text-start">Quantity in Grams</th>
-                            <th className="text-start">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {formData.bom.map((item, index) => (
-                            <tr key={index} className="border-b border-gray-200">
-                              <td>
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenYarnModal(index)}
-                                  className="form-control text-left bg-white cursor-pointer hover:bg-gray-50"
-                                  disabled={isLoading}
-                                >
-                                  {item.yarnName || 'Select Yarn Catalog'}
-                                  <i className="ri-arrow-down-s-line float-right mt-1"></i>
-                                </button>
-                              </td>
-                              <td>
-                                <input
-                                  type="number"
-                                  step="any"
-                                  min="0"
-                                  className="form-control"
-                                  value={item.quantity}
-                                  onChange={(e) => handleBomItemChange(index, 'quantity', Number(e.target.value))}
-                                  disabled={isLoading || !item.yarnCatalogId}
-                                  placeholder="Enter quantity"
-                                />
-                              </td>
-                              <td>
-                                <button
-                                  type="button"
-                                  onClick={() => removeBomItem(index)}
-                                  className="ti-btn ti-btn-danger ti-btn-sm"
-                                  disabled={isLoading}
-                                >
-                                  <i className="ri-delete-bin-line"></i>
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Yarn Catalog Selection Modal */}
-                    {isYarnModalOpen && (
-                      <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-                        <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                          {/* Background overlay */}
-                          <div 
-                            className="fixed inset-0 bg-transparent bg-opacity-75 transition-opacity"
-                            onClick={handleCloseYarnModal}
-                          ></div>
-
-                          {/* Modal panel */}
-                          <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-                            <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                              <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-lg font-medium text-gray-900" id="modal-title">
-                                  Select Yarn Catalog
-                                </h3>
-                                <button
-                                  type="button"
-                                  onClick={handleCloseYarnModal}
-                                  className="text-gray-400 hover:text-gray-500"
-                                >
-                                  <i className="ri-close-line text-2xl"></i>
-                                </button>
-                              </div>
-
-                              {/* Search box */}
-                              <div className="mb-4">
-                                <input
-                                  type="text"
-                                  className="form-control"
-                                  placeholder="Search yarn catalog by name..."
-                                  value={modalYarnSearchQuery}
-                                  onChange={(e) => handleModalYarnSearch(e.target.value)}
-                                />
-                              </div>
-
-                              {/* Yarn catalogs list */}
-                              <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg">
-                                {isModalLoading ? (
-                                  <div className="p-8 text-center">
-                                    <i className="ri-loader-4-line animate-spin text-2xl text-gray-400"></i>
-                                    <p className="mt-2 text-gray-500">Loading yarn catalogs...</p>
-                                  </div>
-                                ) : modalYarnCatalogs.length === 0 ? (
-                                  <div className="p-8 text-center">
-                                    <p className="text-gray-500">No yarn catalogs found</p>
-                                  </div>
-                                ) : (
-                                  <table className="table min-w-full">
-                                    <thead className="bg-gray-50 sticky top-0">
-                                      <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Yarn Name</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                      {modalYarnCatalogs.map((yarn) => (
-                                        <tr key={yarn.id} className="hover:bg-gray-50">
-                                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                            {yarn.yarnName}
-                                          </td>
-                                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                                            {yarn.yarnType?.name || '-'}
-                                          </td>
-                                          <td className="px-4 py-3 whitespace-nowrap text-sm">
-                                            <button
-                                              type="button"
-                                              onClick={() => handleSelectYarn(yarn)}
-                                              className="ti-btn ti-btn-primary"
-                                            >
-                                              Select
-                                            </button>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                )}
-                              </div>
-
-                              {/* Pagination */}
-                              {modalTotalYarnResults > 0 && (
-                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mt-4">
-                                  <div className="text-sm text-gray-500 whitespace-nowrap">
-                                    Showing {((modalCurrentYarnPage - 1) * yarnsPerPage) + 1} to{' '}
-                                    {Math.min(modalCurrentYarnPage * yarnsPerPage, modalTotalYarnResults)} of{' '}
-                                    {modalTotalYarnResults} yarn catalogs
-                                  </div>
-                                  <div className="flex items-center gap-3">
-                                    <button
-                                      type="button"
-                                      onClick={() => setModalCurrentYarnPage(prev => Math.max(prev - 1, 1))}
-                                      disabled={modalCurrentYarnPage === 1 || isModalLoading}
-                                      className="ti-btn ti-btn-outline-secondary whitespace-nowrap"
-                                    >
-                                      <i className="ri-arrow-left-s-line"></i> Previous
-                                    </button>
-                                    <span className="px-4 py-2 text-sm text-gray-600 whitespace-nowrap">
-                                      Page {modalCurrentYarnPage} of {modalTotalYarnPages}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => setModalCurrentYarnPage(prev => Math.min(prev + 1, modalTotalYarnPages))}
-                                      disabled={modalCurrentYarnPage === modalTotalYarnPages || isModalLoading}
-                                      className="ti-btn ti-btn-outline-secondary whitespace-nowrap"
-                                    >
-                                      Next <i className="ri-arrow-right-s-line"></i>
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Processes Tab */}
-                {!isDesign && !isFinal && activeTab === 'processes' && (
-                  <ProcessSequenceEditor
-                    items={formData.processes.map((proc) => ({
-                      processId:
-                        typeof proc.processId === 'object' &&
-                        proc.processId !== null &&
-                        'id' in proc.processId
-                          ? String((proc.processId as { id: string }).id)
-                          : String(proc.processId ?? ''),
-                    }))}
-                    availableProcesses={processes}
-                    onChange={(items) =>
-                      setFormData((prev) => ({ ...prev, processes: items }))
-                    }
+                  <ProductBomTab
+                    fabricItems={formData.bom}
+                    onFabricChange={(bom) => setFormData((prev) => ({ ...prev, bom }))}
+                    packagingItems={formData.rawMaterials || []}
+                    onPackagingChange={(rawMaterials) => setFormData((prev) => ({ ...prev, rawMaterials }))}
                     disabled={isLoading}
                   />
+                )}
+
+                {!isDesign && !isFinal && activeTab === 'processes' && (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" className="ti-btn ti-btn-outline-primary" onClick={() => applyProcessTemplate('normal')} disabled={isLoading}>
+                        Apply Normal template
+                      </button>
+                      <button type="button" className="ti-btn ti-btn-outline-primary" onClick={() => applyProcessTemplate('embroidery')} disabled={isLoading}>
+                        Apply Embroidery template
+                      </button>
+                    </div>
+                    <ProcessSequenceEditor
+                      items={formData.processes.map((proc) => ({
+                        processId:
+                          typeof proc.processId === 'object' &&
+                          proc.processId !== null &&
+                          'id' in proc.processId
+                            ? String((proc.processId as { id: string }).id)
+                            : String(proc.processId ?? ''),
+                      }))}
+                      availableProcesses={processes}
+                      onChange={(items) =>
+                        setFormData((prev) => ({ ...prev, processes: items }))
+                      }
+                      disabled={isLoading}
+                    />
+                  </div>
                 )}
 
                 <div className="mt-6 flex justify-end space-x-4">

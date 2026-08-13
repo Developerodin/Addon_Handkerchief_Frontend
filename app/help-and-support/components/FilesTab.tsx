@@ -16,10 +16,6 @@ import { FileUploadService } from '@/shared/services/fileUploadService';
 import DeleteHubItemConfirmModal from './DeleteHubItemConfirmModal';
 import { resolveHubFileVisual, splitDisplayFileName } from '@/shared/utils/hubFileDisplay';
 
-interface FilesTabProps {
-  isManagement: boolean;
-}
-
 interface UploadProgressState {
   fileName: string;
   fileIndex: number;
@@ -33,7 +29,7 @@ const getOverallUploadPercent = (progress: UploadProgressState) =>
 /**
  * Shared file workspace for Management and Dev team.
  */
-export default function FilesTab({ isManagement }: FilesTabProps) {
+export default function FilesTab() {
   const [items, setItems] = useState<HubItem[]>([]);
   const [currentFolder, setCurrentFolder] = useState<HubFolder | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<{ id: string; name: string }[]>([]);
