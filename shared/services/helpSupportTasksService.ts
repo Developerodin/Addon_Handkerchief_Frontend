@@ -8,6 +8,7 @@ import type {
   TaskAttachment,
   TaskStatus,
   TasksListResponse,
+  TasksQueryParams,
 } from '@/shared/types/helpSupportTasks';
 
 const getAccessToken = (): string | null => {
@@ -53,8 +54,8 @@ class HelpSupportTasksService {
     return q ? `?${q}` : '';
   }
 
-  listTasks(params?: Record<string, string | number | undefined>) {
-    return this.request<TasksListResponse>(this.buildQuery(params));
+  listTasks(params?: TasksQueryParams) {
+    return this.request<TasksListResponse>(this.buildQuery(params as Record<string, string | number | undefined>));
   }
 
   getTask(taskId: string) {
@@ -63,6 +64,13 @@ class HelpSupportTasksService {
 
   createTask(payload: CreateTaskPayload) {
     return this.request<HelpSupportTask>('', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
+  updateTask(taskId: string, payload: Partial<CreateTaskPayload>) {
+    return this.request<HelpSupportTask>(`/${encodeURIComponent(taskId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
   }
 
   updateStatus(taskId: string, status: TaskStatus) {

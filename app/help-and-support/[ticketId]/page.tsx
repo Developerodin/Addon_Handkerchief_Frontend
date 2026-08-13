@@ -2,9 +2,12 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-hot-toast';
 import Seo from '@/shared/layout-components/seo/seo';
+import { useNavigation, canAccessHelpSupportTab } from '@/shared/contextapi/navigationContext';
+import { getFirstAvailableRoute } from '@/shared/utils/routeUtils';
 import { helpSupportService } from '@/shared/services/helpSupportService';
 import type { HelpSupportTicket, TicketDisposition, TicketStatus } from '@/shared/types/helpSupport';
 import { humanizeDuration } from '@/shared/utils/duration.util';
@@ -52,9 +55,12 @@ function StatTile({ icon, label, value }: { icon: string; label: string; value: 
  */
 export default function TicketDetailPage({ params }: TicketDetailPageProps) {
   const { ticketId } = params;
+  const router = useRouter();
+  const { permissions, isLoading: navLoading } = useNavigation();
   const user = useSelector(
     (state: { auth?: { user?: { role?: string; email?: string; id?: string } } }) => state.auth?.user
   );
+  const canViewTickets = canAccessHelpSupportTab(permissions, 'tickets', user?.role);
   const isAgent = isManagementSide(user?.role, user?.email);
 
   const [ticket, setTicket] = useState<HelpSupportTicket | null>(null);
@@ -65,6 +71,13 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
   const [commentUploading, setCommentUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [conversationOpen, setConversationOpen] = useState(false);
+
+  useEffect(() => {
+    if (navLoading) return;
+    if (!canViewTickets) {
+      router.replace(getFirstAvailableRoute(permissions));
+    }
+  }, [navLoading, canViewTickets, permissions, router]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -119,6 +132,14 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
     load();
   };
 
+  if (navLoading || !canViewTickets) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600" />
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="mx-auto max-w-6xl p-4">
@@ -156,14 +177,23 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
     <>
       <Seo title={`${ticket.ticketNumber} — Help & Support`} />
       <div className="mx-auto max-w-6xl space-y-4 p-4">
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-1.5 text-xs text-gray-500" aria-label="Breadcrumb">
-          <Link href="/help-and-support" className="font-semibold text-gray-600 hover:text-indigo-600">
-            Help & Support
+        {/* Back + breadcrumb */}
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/help-and-support?tab=tickets"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
+          >
+            <i className="ri-arrow-left-line text-sm" aria-hidden />
+            Back to tickets
           </Link>
-          <i className="ri-arrow-right-s-line text-gray-400" aria-hidden />
-          <span className="font-bold text-gray-800">{ticket.ticketNumber}</span>
-        </nav>
+          <nav className="flex items-center gap-1.5 text-xs text-gray-500" aria-label="Breadcrumb">
+            <Link href="/help-and-support" className="font-semibold text-gray-600 hover:text-indigo-600">
+              Help & Support
+            </Link>
+            <i className="ri-arrow-right-s-line text-gray-400" aria-hidden />
+            <span className="font-bold text-gray-800">{ticket.ticketNumber}</span>
+          </nav>
+        </div>
 
         {/* Header card */}
         <header className="overflow-hidden rounded-xl border border-gray-300 bg-white shadow-sm">
@@ -302,6 +332,7 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
                 />
                 <StatusChangeControl
                   allowedStatuses={ticket.allowedNextStatuses || []}
+                  currentStatus={ticket.status}
                   currentDisposition={ticket.disposition}
                   onStatusChange={handleStatus}
                   onDispositionChange={handleDisposition}

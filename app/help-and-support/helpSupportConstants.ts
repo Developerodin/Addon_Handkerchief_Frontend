@@ -257,9 +257,9 @@ export function isEmptyUserRef(
 }
 
 /** Human-readable created/updated timestamp for tickets and tasks. */
-export function formatHubDateTime(iso?: string | null): string {
+export function formatHubDateTime(iso?: string | Date | null): string {
   if (!iso) return '—';
-  const date = new Date(iso);
+  const date = iso instanceof Date ? iso : new Date(iso);
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleString(undefined, {
     day: '2-digit',

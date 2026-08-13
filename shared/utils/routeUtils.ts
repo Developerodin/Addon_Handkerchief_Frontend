@@ -1,4 +1,5 @@
 import type { NavigationPermissions, CatalogModule } from '@/shared/types/permissions';
+import { hasHelpSupportHubAccess } from '@/shared/types/permissions';
 
 const hasRead = (crud?: { read?: boolean } | boolean): boolean => {
   if (crud === true) return true;
@@ -35,7 +36,7 @@ export const getFirstAvailableRoute = (permissions: NavigationPermissions | null
   }
 
   if (hasRead(permissions.Users)) return '/users';
-  if (permissions['Help & Support'] === true) return '/help-and-support';
+  if (hasHelpSupportHubAccess(permissions['Help & Support'])) return '/help-and-support';
 
   return '/dashboards/main';
 };

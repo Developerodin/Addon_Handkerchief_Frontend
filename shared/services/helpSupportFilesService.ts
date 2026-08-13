@@ -24,6 +24,7 @@ export interface HubFolder {
     description?: string;
     parentFolder?: string | null;
     path: string;
+    metadata?: Record<string, unknown>;
     createdBy?: { id: string; name?: string; email?: string; role?: string };
   };
 }
@@ -37,6 +38,7 @@ export interface HubFile {
     fileKey: string;
     fileSize?: number;
     mimeType?: string;
+    metadata?: Record<string, unknown>;
     uploadedBy?: { id: string; name?: string; email?: string; role?: string };
     parentFolder?: string | null;
   };
@@ -218,8 +220,27 @@ class HelpSupportFilesService {
     parentFolder?: string | null;
     fileSize?: number;
     mimeType?: string;
+    metadata?: Record<string, unknown>;
   }) {
     return this.request<HubFile>('/files', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
+  async getTaskDocumentsFolder() {
+    const res = await this.request<HubFolder>('/task-documents-folder');
+    const normalized = normalizeHubItem(res);
+    if (!normalized || !isHubFolder(normalized)) {
+      throw new Error('Task Documents folder unavailable');
+    }
+    return normalized;
+  }
+
+  async getTicketDocumentsFolder() {
+    const res = await this.request<HubFolder>('/ticket-documents-folder');
+    const normalized = normalizeHubItem(res);
+    if (!normalized || !isHubFolder(normalized)) {
+      throw new Error('Ticket Documents folder unavailable');
+    }
+    return normalized;
   }
 
   async deleteItem(itemId: string) {

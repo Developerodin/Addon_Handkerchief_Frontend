@@ -37,6 +37,7 @@ interface TicketTableProps {
   isAgent: boolean;
   canDelete?: boolean;
   onDeleteTicket?: (ticket: HelpSupportTicket) => void;
+  onEditTicket?: (ticket: HelpSupportTicket) => void;
   page: number;
   limit: number;
   totalPages: number;
@@ -49,6 +50,10 @@ interface TicketTableProps {
 }
 
 const PAGE_SIZES = [10, 15, 25, 50, 100];
+
+/** Shared pill size for status, priority, and category badges in the table. */
+const TABLE_BADGE =
+  'inline-flex items-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold leading-none';
 
 /**
  * Builds a compact page-number list with ellipses around the current page.
@@ -91,7 +96,6 @@ function UserCell({
   }
 
   const name = userDisplayName(user);
-  const email = typeof user === 'object' && user ? user.email : undefined;
   return (
     <div className="flex items-center gap-2">
       <span
@@ -100,10 +104,7 @@ function UserCell({
       >
         {userInitials(user)}
       </span>
-      <div className="min-w-0">
-        <p className="truncate text-xs font-medium text-gray-700">{name}</p>
-        {email && email !== name && <p className="truncate text-[11px] text-gray-400">{email}</p>}
-      </div>
+      <p className="truncate text-xs font-medium text-gray-700">{name}</p>
     </div>
   );
 }
@@ -113,8 +114,8 @@ function DispositionBadge({ disposition }: { disposition?: TicketDisposition | s
   const isUnset = !disposition || disposition === 'unset';
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${
-        isUnset ? 'bg-gray-100 text-gray-500' : 'bg-violet-50 text-violet-800 ring-1 ring-violet-100'
+      className={`${TABLE_BADGE} ${
+        isUnset ? 'bg-gray-100 text-gray-500 ring-1 ring-gray-200' : 'bg-violet-100 text-violet-800 ring-1 ring-violet-200'
       }`}
     >
       {label}
@@ -135,6 +136,7 @@ export default function TicketTable({
   isAgent,
   canDelete = false,
   onDeleteTicket,
+  onEditTicket,
   page,
   limit,
   totalPages,
@@ -175,14 +177,14 @@ export default function TicketTable({
   const hasActiveFilters =
     filters.status || filters.priority || filters.disposition || filters.category || filters.search;
 
-  // Ticket + Raised by + Status + Priority + Disposition + (Assignee) + Age + Created + View + (Actions)
-  const colSpan = (isAgent ? 8 : 7) + 1 + (canDelete ? 1 : 0);
+  const hasActions = true;
+  const colSpan = (isAgent ? 8 : 7) + 1;
 
   return (
     <div className="space-y-3">
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-gray-50/60 p-2.5">
-        <div className="relative min-w-[180px] flex-1">
+        <div className="relative w-[11rem] shrink-0 sm:w-[12.5rem]">
           <i
             className="ri-search-line pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"
             aria-hidden
@@ -280,8 +282,7 @@ export default function TicketTable({
                 {isAgent && <th className="px-4 py-3">Assignee</th>}
                 <th className="px-4 py-3">Age in status</th>
                 <th className="px-4 py-3">Created</th>
-                <th className="px-4 py-3 text-right">View</th>
-                {canDelete && <th className="px-4 py-3 text-right">Actions</th>}
+                {hasActions && <th className="px-4 py-3 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -306,7 +307,7 @@ export default function TicketTable({
                     className="cursor-pointer transition hover:bg-indigo-50/50"
                     onClick={() => openTicket(ticket.id)}
                   >
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       <Link
                         href={ticketHref(ticket.id)}
                         onClick={(e) => e.stopPropagation()}
@@ -314,21 +315,13 @@ export default function TicketTable({
                       >
                         {ticket.ticketNumber}
                       </Link>
-                      <p className="mt-0.5 max-w-[260px] truncate text-sm font-semibold text-gray-900">
-                        {ticket.title}
-                      </p>
-                      {ticket.category && (
-                        <span className="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
-                          {CATEGORY_LABELS[ticket.category] || ticket.category}
-                        </span>
-                      )}
                     </td>
                     <td className="px-4 py-3">
                       <UserCell user={ticket.raisedBy as { name?: string; email?: string }} />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${STATUS_COLORS[ticket.status as TicketStatus]}`}
+                        className={`${TABLE_BADGE} gap-1.5 ${STATUS_COLORS[ticket.status as TicketStatus]}`}
                       >
                         <span
                           className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[ticket.status as TicketStatus]}`}
@@ -337,14 +330,12 @@ export default function TicketTable({
                         {STATUS_LABELS[ticket.status as TicketStatus]}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase ${PRIORITY_COLORS[ticket.priority]}`}
-                      >
+                    <td className="px-4 py-3.5">
+                      <span className={`${TABLE_BADGE} ${PRIORITY_COLORS[ticket.priority]}`}>
                         {PRIORITY_LABELS[ticket.priority]}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       <DispositionBadge disposition={ticket.disposition} />
                     </td>
                     {isAgent && (
@@ -358,32 +349,48 @@ export default function TicketTable({
                     <td className="px-4 py-3 text-xs font-medium text-gray-600">
                       {currentStatusAge(ticket)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-600">
+                    <td className="px-4 py-3.5 text-xs text-gray-600">
                       <time dateTime={ticket.createdAt || undefined}>{formatHubDateTime(ticket.createdAt)}</time>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        href={ticketHref(ticket.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700 transition hover:bg-indigo-100"
-                      >
-                        Open
-                        <i className="ri-arrow-right-s-line text-sm" aria-hidden />
-                      </Link>
-                    </td>
-                    {canDelete && (
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteTicket?.(ticket);
-                          }}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 text-gray-500 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600"
-                          aria-label={`Delete ticket ${ticket.ticketNumber}`}
-                        >
-                          <i className="ri-delete-bin-line text-sm" aria-hidden />
-                        </button>
+                    {hasActions && (
+                      <td className="px-4 py-3.5 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <Link
+                            href={ticketHref(ticket.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 text-gray-500 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600"
+                            aria-label={`View ticket ${ticket.ticketNumber}`}
+                            title="View ticket"
+                          >
+                            <i className="ri-eye-line text-sm" aria-hidden />
+                          </Link>
+                          {isAgent && onEditTicket && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEditTicket(ticket);
+                              }}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 text-gray-500 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600"
+                              aria-label={`Edit ticket ${ticket.ticketNumber}`}
+                            >
+                              <i className="ri-pencil-line text-sm" aria-hidden />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDeleteTicket?.(ticket);
+                              }}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 text-gray-500 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600"
+                              aria-label={`Delete ticket ${ticket.ticketNumber}`}
+                            >
+                              <i className="ri-delete-bin-line text-sm" aria-hidden />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>

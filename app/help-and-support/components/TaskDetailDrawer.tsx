@@ -1,10 +1,13 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
-import type { HelpSupportTask, TaskActivityEntry, TaskStatus } from '@/shared/types/helpSupportTasks';
+import type { HelpSupportTask, TaskActivityEntry, TaskAttachment, TaskStatus } from '@/shared/types/helpSupportTasks';
 import { helpSupportTasksService } from '@/shared/services/helpSupportTasksService';
 import { userDisplayName } from '../helpSupportConstants';
+import TaskStatusConfirmModal from './TaskStatusConfirmModal';
+import AttachmentList from './AttachmentList';
+import TaskDocumentUploader from './TaskDocumentUploader';
 
 interface TaskDetailDrawerProps {
   task: HelpSupportTask | null;
@@ -12,8 +15,10 @@ interface TaskDetailDrawerProps {
   loading?: boolean;
   isManagement: boolean;
   teamNameBySlug: Map<string, string>;
+  highlightComment?: boolean;
+  onHighlightCommentDone?: () => void;
   onClose: () => void;
-  onStatusChange: (taskId: string, status: TaskStatus) => void;
+  onStatusChange: (taskId: string, status: TaskStatus) => Promise<void> | void;
   onTaskUpdated: (task: HelpSupportTask) => void;
   onRefresh: () => void;
 }
@@ -59,10 +64,7 @@ function collectKnownUserNames(task: HelpSupportTask): Map<string, string> {
   return map;
 }
 
-function resolveTimelineActor(
-  entry: TaskActivityEntry,
-  knownNames: Map<string, string>
-): string {
+function resolveTimelineActor(entry: TaskActivityEntry, knownNames: Map<string, string>): string {
   if (entry.actorName?.trim()) return entry.actorName.trim();
   if (typeof entry.actor === 'string' && knownNames.has(entry.actor)) {
     return knownNames.get(entry.actor)!;
@@ -123,7 +125,7 @@ function buildTimeline(task: HelpSupportTask, teamNameBySlug: Map<string, string
   );
 }
 
-function timelineMeta(entry: TaskActivityEntry, teamNameBySlug: Map<string, string>) {
+function timelineMeta(entry: TaskActivityEntry) {
   switch (entry.type) {
     case 'created':
       return {
@@ -186,7 +188,10 @@ export default function TaskDetailDrawer({
   task,
   open,
   loading = false,
+  isManagement,
   teamNameBySlug,
+  highlightComment = false,
+  onHighlightCommentDone,
   onClose,
   onStatusChange,
   onTaskUpdated,
@@ -194,6 +199,11 @@ export default function TaskDetailDrawer({
 }: TaskDetailDrawerProps) {
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<TaskStatus | null>(null);
+  const [uploadingDocs, setUploadingDocs] = useState(false);
+  const commentFormRef = useRef<HTMLFormElement>(null);
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
 
   const timeline = useMemo(
     () => (task ? buildTimeline(task, teamNameBySlug) : []),
@@ -201,6 +211,16 @@ export default function TaskDetailDrawer({
   );
 
   const knownUserNames = useMemo(() => (task ? collectKnownUserNames(task) : new Map()), [task]);
+
+  useEffect(() => {
+    if (!highlightComment || !open) return;
+    const timer = window.setTimeout(() => {
+      commentFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      commentInputRef.current?.focus();
+      onHighlightCommentDone?.();
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [highlightComment, open, onHighlightCommentDone]);
 
   if (!open || !task) return null;
 
@@ -223,6 +243,29 @@ export default function TaskDetailDrawer({
     }
   };
 
+  const handleConfirmStatus = async () => {
+    if (!pendingStatus) return;
+    setStatusBusy(true);
+    try {
+      await onStatusChange(task.id, pendingStatus);
+      setPendingStatus(null);
+    } finally {
+      setStatusBusy(false);
+    }
+  };
+
+  const handleAttachmentsUpdated = async (attachments: TaskAttachment[]) => {
+    if (!isManagement) return;
+    try {
+      const updated = await helpSupportTasksService.updateTask(task.id, { attachments });
+      onTaskUpdated(updated);
+      onRefresh();
+      toast.success('Documents updated');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save documents');
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true">
       <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-gray-900/50" />
@@ -239,6 +282,26 @@ export default function TaskDetailDrawer({
             <p className="text-sm font-medium text-gray-800">{teamLabels}</p>
           </div>
 
+          {(task.attachments?.length ?? 0) > 0 && (
+            <div>
+              <p className="mb-2 text-[10px] font-bold uppercase text-gray-500">Documents</p>
+              <AttachmentList attachments={task.attachments as import('@/shared/types/helpSupport').TicketAttachment[]} />
+            </div>
+          )}
+
+          {isManagement && (
+            <div>
+              <p className="mb-2 text-[10px] font-bold uppercase text-gray-500">Add documents (optional)</p>
+              <TaskDocumentUploader
+                taskId={task.id}
+                taskNumber={task.taskNumber}
+                existingAttachments={task.attachments || []}
+                onUploadingChange={setUploadingDocs}
+                onAttachmentsChange={handleAttachmentsUpdated}
+              />
+            </div>
+          )}
+
           <div>
             <p className="mb-3 text-[10px] font-bold uppercase text-gray-500">Update status</p>
             <div className="flex flex-wrap gap-2">
@@ -246,9 +309,9 @@ export default function TaskDetailDrawer({
                 <button
                   key={value}
                   type="button"
-                  disabled={task.status === value}
-                  onClick={() => onStatusChange(task.id, value)}
-                  className={`whitespace-nowrap rounded-lg px-4 py-2 text-xs font-semibold transition ${
+                  disabled={task.status === value || statusBusy}
+                  onClick={() => setPendingStatus(value)}
+                  className={`whitespace-nowrap rounded-lg px-4 py-2.5 text-xs font-semibold transition ${
                     task.status === value
                       ? 'bg-indigo-600 text-white shadow-sm'
                       : 'bg-gray-100 text-gray-700 hover:bg-indigo-50 hover:text-indigo-700'
@@ -272,7 +335,7 @@ export default function TaskDetailDrawer({
             ) : (
               <ol className="relative space-y-0 border-l-2 border-indigo-100 pl-4">
                 {timeline.map((entry, index) => {
-                  const meta = timelineMeta(entry, teamNameBySlug);
+                  const meta = timelineMeta(entry);
                   const actorName = resolveTimelineActor(entry, knownUserNames);
                   const isLast = index === timeline.length - 1;
                   return (
@@ -302,27 +365,49 @@ export default function TaskDetailDrawer({
           </div>
         </div>
 
-        <form onSubmit={handleNote} className="border-t p-4">
+        <form
+          ref={commentFormRef}
+          onSubmit={handleNote}
+          className={`border-t p-4 transition-shadow duration-500 ${
+            highlightComment ? 'ring-2 ring-inset ring-indigo-400 ring-offset-2' : ''
+          }`}
+        >
           <label htmlFor="task-note" className="mb-1 block text-xs font-semibold text-gray-600">
             Add update to timeline
+            {highlightComment && (
+              <span className="ml-2 font-normal text-indigo-600">Status updated — add a comment?</span>
+            )}
           </label>
           <textarea
             id="task-note"
+            ref={commentInputRef}
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Write an update for the team…"
             rows={2}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"
+            disabled={uploadingDocs}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
           />
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || uploadingDocs}
             className="mt-2 inline-flex min-w-[130px] items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
           >
             {submitting ? 'Posting…' : 'Post Update'}
           </button>
         </form>
       </div>
+
+      {pendingStatus && (
+        <TaskStatusConfirmModal
+          open
+          fromStatus={task.status}
+          toStatus={pendingStatus}
+          busy={statusBusy}
+          onConfirm={handleConfirmStatus}
+          onCancel={() => !statusBusy && setPendingStatus(null)}
+        />
+      )}
     </div>
   );
 }

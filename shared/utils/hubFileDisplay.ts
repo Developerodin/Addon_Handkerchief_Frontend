@@ -81,6 +81,7 @@ export function normalizeDisplayFileName(name: string): string {
     result = result
       .replace(/â€"/g, '—')
       .replace(/â€"/g, '–')
+      .replace(/â¦+/g, '…')
       .replace(/\uFFFD/g, '-');
   }
 
@@ -104,6 +105,17 @@ export function splitDisplayFileName(name: string): { base: string; ext: string;
     ext: full.slice(lastDot),
     full,
   };
+}
+
+/** Hub-stored names use "REF — originalFileName"; show the readable original part. */
+export function getAttachmentDisplayName(fileName?: string): string {
+  if (!fileName?.trim()) return 'Attachment';
+  const normalized = normalizeDisplayFileName(fileName.trim());
+  const hubPrefix = normalized.match(/^(?:HS-\d{4}-\d{6}|HT-\d{4}-\d{5})\s*[—–-]\s*(.+)$/);
+  if (hubPrefix?.[1]) {
+    return normalizeDisplayFileName(hubPrefix[1]);
+  }
+  return normalized;
 }
 
 export function inferMimeFromFileName(fileName?: string): string | undefined {
