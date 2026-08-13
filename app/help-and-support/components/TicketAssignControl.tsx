@@ -12,6 +12,7 @@ import {
   userDisplayName,
 } from '../helpSupportConstants';
 import HubFilterSelect from './HubFilterSelect';
+import TicketConfirmModal from './TicketConfirmModal';
 
 interface TicketAssignControlProps {
   ticketId: string;
@@ -19,6 +20,8 @@ interface TicketAssignControlProps {
   currentUserId?: string;
   onAssigned: () => void;
 }
+
+type PendingAssign = { assigneeId: string | null; label: string };
 
 function currentAssigneeId(assignee?: HelpSupportTicket['assignedTo']): string {
   if (!assignee || typeof assignee === 'string') return typeof assignee === 'string' ? assignee : '';
@@ -38,6 +41,7 @@ export default function TicketAssignControl({
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [selectedId, setSelectedId] = useState('');
   const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<PendingAssign | null>(null);
 
   const assignedId = currentAssigneeId(currentAssignee);
 
@@ -76,6 +80,7 @@ export default function TicketAssignControl({
     try {
       await helpSupportService.assignTicket(ticketId, assigneeId);
       toast.success(assigneeId ? 'Ticket assigned' : 'Assignment cleared');
+      setPending(null);
       onAssigned();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update assignment');
@@ -93,18 +98,19 @@ export default function TicketAssignControl({
       toast.error('Ticket is already assigned to this person');
       return;
     }
-    runAssign(selectedId);
+    const label = assigneeOptions.find((o) => o.id === selectedId)?.label || 'selected user';
+    setPending({ assigneeId: selectedId, label });
   };
 
   const handleAssignToMe = () => {
     if (!currentUserId) return;
     setSelectedId(currentUserId);
-    runAssign(currentUserId);
+    setPending({ assigneeId: currentUserId, label: 'yourself' });
   };
 
   const handleUnassign = () => {
     setSelectedId('');
-    runAssign(null);
+    setPending({ assigneeId: null, label: 'Unassigned' });
   };
 
   const currentLabel = isEmptyUserRef(currentAssignee as { name?: string; email?: string })
@@ -112,80 +118,97 @@ export default function TicketAssignControl({
     : userDisplayName(currentAssignee as { name?: string; email?: string });
 
   return (
-    <section className="rounded-xl border border-gray-300 bg-white shadow-sm" aria-label="Assign ticket">
-      <header className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
-          <i className="ri-user-shared-line text-sm" aria-hidden />
-        </span>
-        <div>
-          <h3 className="text-sm font-bold text-gray-900">Assign ticket</h3>
-          <p className="text-[11px] text-gray-500">
-            Currently: <span className="font-semibold text-gray-700">{currentLabel}</span>
-          </p>
+    <>
+      <section className="rounded-xl border border-gray-300 bg-white shadow-sm" aria-label="Assign ticket">
+        <header className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+            <i className="ri-user-shared-line text-sm" aria-hidden />
+          </span>
+          <div>
+            <h3 className="text-sm font-bold text-gray-900">Assign ticket</h3>
+            <p className="text-[11px] text-gray-500">
+              Currently: <span className="font-semibold text-gray-700">{currentLabel}</span>
+            </p>
+          </div>
+        </header>
+
+        <div className="space-y-3 p-4">
+          {loadingUsers ? (
+            <p className="text-xs text-gray-500">Loading team members…</p>
+          ) : !assigneeOptions.length ? (
+            <p className="text-xs text-gray-500">No assignable users found.</p>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <label htmlFor="ticket-assignee" className="block text-xs font-bold text-gray-700">
+                  Assign to
+                </label>
+                <HubFilterSelect
+                  id="ticket-assignee"
+                  value={selectedId}
+                  onChange={(e) => setSelectedId(e.target.value)}
+                  wrapperClassName="w-full"
+                  disabled={busy}
+                >
+                  <option value="">Select team member…</option>
+                  {assigneeOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </HubFilterSelect>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={!selectedId || busy}
+                  onClick={handleAssign}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <i className="ri-check-line" aria-hidden />
+                  Assign
+                </button>
+                {currentUserId && currentUserId !== assignedId && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={handleAssignToMe}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-50"
+                  >
+                    Assign to me
+                  </button>
+                )}
+                {assignedId && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={handleUnassign}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Unassign
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
-      </header>
+      </section>
 
-      <div className="space-y-3 p-4">
-        {loadingUsers ? (
-          <p className="text-xs text-gray-500">Loading team members…</p>
-        ) : !assigneeOptions.length ? (
-          <p className="text-xs text-gray-500">No assignable users found.</p>
-        ) : (
-          <>
-            <div className="space-y-2">
-              <label htmlFor="ticket-assignee" className="block text-xs font-bold text-gray-700">
-                Assign to
-              </label>
-              <HubFilterSelect
-                id="ticket-assignee"
-                value={selectedId}
-                onChange={(e) => setSelectedId(e.target.value)}
-                wrapperClassName="w-full"
-                disabled={busy}
-              >
-                <option value="">Select team member…</option>
-                {assigneeOptions.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </HubFilterSelect>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={!selectedId || busy}
-                onClick={handleAssign}
-                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <i className="ri-check-line" aria-hidden />
-                Assign
-              </button>
-              {currentUserId && currentUserId !== assignedId && (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={handleAssignToMe}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-50"
-                >
-                  Assign to me
-                </button>
-              )}
-              {assignedId && (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={handleUnassign}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Unassign
-                </button>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    </section>
+      <TicketConfirmModal
+        open={Boolean(pending)}
+        title={pending?.assigneeId ? 'Assign ticket?' : 'Clear assignment?'}
+        message={
+          pending?.assigneeId
+            ? `Assign this ticket to ${pending.label}?`
+            : 'Remove the current assignee from this ticket?'
+        }
+        confirmLabel={pending?.assigneeId ? 'Assign' : 'Unassign'}
+        busy={busy}
+        iconClassName="ri-user-shared-line"
+        onConfirm={() => pending && runAssign(pending.assigneeId)}
+        onCancel={() => !busy && setPending(null)}
+      />
+    </>
   );
 }

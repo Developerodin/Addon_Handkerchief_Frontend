@@ -2,20 +2,18 @@
 
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { FileUploadService } from '@/shared/services/fileUploadService';
 import type {
   CreateTicketPayload,
-  TicketAttachment,
   TicketCategory,
   TicketPriority,
 } from '@/shared/types/helpSupport';
-import AttachmentUploader from './AttachmentUploader';
 import HubFilterSelect from './HubFilterSelect';
+import TicketDocumentUploader from './TicketDocumentUploader';
 
 interface RaiseTicketModalProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (payload: CreateTicketPayload) => Promise<void>;
+  onSubmit: (payload: CreateTicketPayload, pendingFiles: File[]) => Promise<void>;
 }
 
 const CATEGORY_OPTIONS: { value: TicketCategory; label: string }[] = [
@@ -43,7 +41,7 @@ export default function RaiseTicketModal({ open, onClose, onSubmit }: RaiseTicke
   const [category, setCategory] = useState<TicketCategory>('other');
   const [priority, setPriority] = useState<TicketPriority>('medium');
   const [points, setPoints] = useState<string[]>(['']);
-  const [attachments, setAttachments] = useState<TicketAttachment[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [entered, setEntered] = useState(false);
@@ -66,21 +64,11 @@ export default function RaiseTicketModal({ open, onClose, onSubmit }: RaiseTicke
     setCategory('other');
     setPriority('medium');
     setPoints(['']);
-    setAttachments([]);
-  };
-
-  /** Best-effort cleanup of orphaned S3 uploads when the user cancels. */
-  const cleanupOrphans = async () => {
-    await Promise.all(
-      attachments
-        .filter((a) => a.key)
-        .map((a) => FileUploadService.deleteFile(a.key as string).catch(() => undefined))
-    );
+    setPendingFiles([]);
   };
 
   const handleClose = async () => {
     if (submitting || uploading) return;
-    await cleanupOrphans();
     reset();
     onClose();
   };
@@ -97,14 +85,16 @@ export default function RaiseTicketModal({ open, onClose, onSubmit }: RaiseTicke
     }
     setSubmitting(true);
     try {
-      await onSubmit({
-        title: title.trim(),
-        description: description.trim() || undefined,
-        category,
-        priority,
-        pointsToBeCovered: points.map((p) => p.trim()).filter(Boolean),
-        ...(attachments.length ? { attachments } : {}),
-      });
+      await onSubmit(
+        {
+          title: title.trim(),
+          description: description.trim() || undefined,
+          category,
+          priority,
+          pointsToBeCovered: points.map((p) => p.trim()).filter(Boolean),
+        },
+        pendingFiles
+      );
       reset();
       onClose();
     } catch (err) {
@@ -263,10 +253,9 @@ export default function RaiseTicketModal({ open, onClose, onSubmit }: RaiseTicke
           </fieldset>
 
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-gray-600">Attachments</label>
-            <AttachmentUploader
-              value={attachments}
-              onChange={setAttachments}
+            <label className="mb-1.5 block text-xs font-semibold text-gray-600">Documents</label>
+            <TicketDocumentUploader
+              onPendingFilesChange={setPendingFiles}
               onUploadingChange={setUploading}
               disabled={submitting}
             />

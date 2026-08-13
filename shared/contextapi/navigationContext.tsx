@@ -9,6 +9,13 @@ import {
   mergeNavigationWithDefaults,
   getCrudAtPath,
   CATALOG_PATH_TO_MODULE,
+  hasHelpSupportHubAccess,
+  hasHelpSupportTabAccess,
+  type HubTabSlug,
+  type HelpSupportPermissions,
+  HELP_SUPPORT_TABS,
+  FULL_HELP_SUPPORT,
+  EMPTY_HELP_SUPPORT,
 } from '@/shared/types/permissions';
 
 interface NavigationContextType {
@@ -20,7 +27,7 @@ interface NavigationContextType {
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
-const CACHE_VERSION = '2';
+const CACHE_VERSION = '3';
 
 interface NavigationProviderProps {
   children: ReactNode;
@@ -121,16 +128,28 @@ export const useNavigation = (): NavigationContextType => {
 export { mergeNavigationWithDefaults };
 
 /**
- * Whether Help & Support hub is enabled for this user.
- * Explicit false disables; missing/legacy nav defaults to allowed for hub roles.
+ * Whether Help & Support hub is enabled for this user (any tab allowed).
  */
 export function canAccessHelpSupport(
-  permissions: { 'Help & Support'?: boolean } | null | undefined,
+  permissions: { 'Help & Support'?: HelpSupportPermissions | boolean } | null | undefined,
   role?: string
 ): boolean {
-  if (permissions?.['Help & Support'] === true) return true;
-  if (permissions?.['Help & Support'] === false) return false;
+  if (permissions?.['Help & Support'] !== undefined) {
+    return hasHelpSupportHubAccess(permissions['Help & Support']);
+  }
   const normalized = role?.trim().toLowerCase().replace(/\s+/g, '_');
   if (normalized === 'superadmin') return true;
   return ['user', 'accounts', 'admin', 'super_admin'].includes(normalized || '');
+}
+
+/** Whether a specific Help & Support tab is allowed. */
+export function canAccessHelpSupportTab(
+  permissions: { 'Help & Support'?: HelpSupportPermissions | boolean } | null | undefined,
+  tab: HubTabSlug,
+  role?: string
+): boolean {
+  if (permissions?.['Help & Support'] !== undefined) {
+    return hasHelpSupportTabAccess(permissions['Help & Support'], tab);
+  }
+  return canAccessHelpSupport(permissions, role);
 }

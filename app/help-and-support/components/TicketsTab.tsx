@@ -3,9 +3,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { helpSupportService } from '@/shared/services/helpSupportService';
+import { uploadTicketDocuments } from '@/shared/utils/ticketDocumentUpload';
 import type { HelpSupportTicket } from '@/shared/types/helpSupport';
 import { isHelpSupportAgent, canDeleteHelpSupportTickets } from '../helpSupportConstants';
 import RaiseTicketModal from './RaiseTicketModal';
+import EditTicketModal from './EditTicketModal';
 import TicketTable, { TicketFilters } from './TicketTable';
 import AnalyticsTab from './AnalyticsTab';
 import DeleteTicketConfirmModal from './DeleteTicketConfirmModal';
@@ -40,6 +42,8 @@ export default function TicketsTab({ isManagement, userRole, userEmail }: Ticket
     search: '',
   });
   const [modalOpen, setModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [ticketToEdit, setTicketToEdit] = useState<HelpSupportTicket | null>(null);
   const [ticketToDelete, setTicketToDelete] = useState<HelpSupportTicket | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -70,8 +74,23 @@ export default function TicketsTab({ isManagement, userRole, userEmail }: Ticket
     if (subTab === 'list') loadTickets();
   }, [subTab, loadTickets]);
 
-  const handleCreate = async (payload: Parameters<typeof helpSupportService.createTicket>[0]) => {
-    await helpSupportService.createTicket(payload);
+  const openEditTicket = async (ticket: HelpSupportTicket) => {
+    setTicketToEdit(ticket);
+    setEditModalOpen(true);
+    try {
+      const full = await helpSupportService.getTicket(ticket.id);
+      setTicketToEdit(full);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to load ticket for editing');
+    }
+  };
+
+  const handleCreate = async (payload: Parameters<typeof helpSupportService.createTicket>[0], pendingFiles: File[]) => {
+    const created = await helpSupportService.createTicket(payload);
+    if (pendingFiles.length) {
+      const attachments = await uploadTicketDocuments(pendingFiles, created.id, created.ticketNumber);
+      await helpSupportService.updateTicket(created.id, { attachments });
+    }
     toast.success('Ticket raised successfully');
     setPage(1);
     loadTickets();
@@ -130,6 +149,7 @@ export default function TicketsTab({ isManagement, userRole, userEmail }: Ticket
           isAgent={isAgent}
           canDelete={canDelete}
           onDeleteTicket={setTicketToDelete}
+          onEditTicket={isAgent ? openEditTicket : undefined}
           page={page}
           limit={limit}
           totalPages={totalPages}
@@ -145,6 +165,15 @@ export default function TicketsTab({ isManagement, userRole, userEmail }: Ticket
       )}
 
       <RaiseTicketModal open={modalOpen} onClose={() => setModalOpen(false)} onSubmit={handleCreate} />
+      <EditTicketModal
+        open={editModalOpen}
+        ticket={ticketToEdit}
+        onClose={() => {
+          setEditModalOpen(false);
+          setTicketToEdit(null);
+        }}
+        onUpdated={loadTickets}
+      />
       <DeleteTicketConfirmModal
         open={Boolean(ticketToDelete)}
         ticket={ticketToDelete}

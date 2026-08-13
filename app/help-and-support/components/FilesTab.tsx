@@ -15,10 +15,8 @@ import {
 import { FileUploadService } from '@/shared/services/fileUploadService';
 import DeleteHubItemConfirmModal from './DeleteHubItemConfirmModal';
 import { resolveHubFileVisual, splitDisplayFileName } from '@/shared/utils/hubFileDisplay';
-
-interface FilesTabProps {
-  isManagement: boolean;
-}
+import { getHubFileTaskNumber, isSystemHubFolder } from '@/shared/utils/taskDocumentUpload';
+import { getHubFileTicketNumber } from '@/shared/utils/ticketDocumentUpload';
 
 interface UploadProgressState {
   fileName: string;
@@ -33,7 +31,7 @@ const getOverallUploadPercent = (progress: UploadProgressState) =>
 /**
  * Shared file workspace for Management and Dev team.
  */
-export default function FilesTab({ isManagement }: FilesTabProps) {
+export default function FilesTab() {
   const [items, setItems] = useState<HubItem[]>([]);
   const [currentFolder, setCurrentFolder] = useState<HubFolder | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<{ id: string; name: string }[]>([]);
@@ -268,6 +266,11 @@ export default function FilesTab({ isManagement }: FilesTabProps) {
     const description =
       folderItem?.folder?.description?.trim() || (folderItem ? 'Click to open and upload files inside' : undefined);
 
+    const systemFolder = folderItem ? isSystemHubFolder(folderItem) : false;
+    const taskNumber = !folderItem ? getHubFileTaskNumber(item) : null;
+    const ticketNumber = !folderItem ? getHubFileTicketNumber(item) : null;
+    const refNumber = taskNumber || ticketNumber;
+
     return (
       <div
         key={item.id}
@@ -287,14 +290,21 @@ export default function FilesTab({ isManagement }: FilesTabProps) {
           <span
             className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset ${visual.bgClass}`}
           >
-            <i className={`${visual.icon} text-2xl ${visual.colorClass}`} aria-hidden />
+            <i className={`${systemFolder ? 'ri-lock-2-fill' : visual.icon} text-2xl ${visual.colorClass}`} aria-hidden />
           </span>
           <div className="min-w-0 flex-1 pr-6">
             {folderItem ? (
               <>
-                <p className="line-clamp-2 break-words text-sm font-semibold leading-snug text-gray-900 group-hover:text-indigo-700">
-                  {name}
-                </p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <p className="line-clamp-2 break-words text-sm font-semibold leading-snug text-gray-900 group-hover:text-indigo-700">
+                    {name}
+                  </p>
+                  {systemFolder && (
+                    <span className="inline-flex rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-slate-600">
+                      System
+                    </span>
+                  )}
+                </div>
                 <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-gray-500">{description}</p>
               </>
             ) : (
@@ -309,20 +319,27 @@ export default function FilesTab({ isManagement }: FilesTabProps) {
                   <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${visual.bgClass} ${visual.colorClass}`}>
                     {visual.label}
                   </span>
+                  {refNumber && (
+                    <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-indigo-700 ring-1 ring-indigo-100">
+                      {refNumber}
+                    </span>
+                  )}
                   <span className="text-[10px] text-gray-500">{FileUploadService.formatFileSize(getHubItemFileSize(item))}</span>
                 </div>
               </>
             )}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={(event) => handleDeleteRequest(event, item)}
-          className="absolute right-3 top-3 rounded-md p-1.5 text-gray-400 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 focus:opacity-100"
-          aria-label={`Delete ${name}`}
-        >
-          <i className="ri-delete-bin-line text-base" aria-hidden />
-        </button>
+        {!systemFolder && (
+          <button
+            type="button"
+            onClick={(event) => handleDeleteRequest(event, item)}
+            className="absolute right-3 top-3 rounded-md p-1.5 text-gray-400 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 focus:opacity-100"
+            aria-label={`Delete ${name}`}
+          >
+            <i className="ri-delete-bin-line text-base" aria-hidden />
+          </button>
+        )}
       </div>
     );
   };

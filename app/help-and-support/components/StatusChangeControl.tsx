@@ -4,19 +4,26 @@ import React, { useState } from 'react';
 import type { TicketDisposition, TicketStatus } from '@/shared/types/helpSupport';
 import { DISPOSITION_LABELS, STATUS_LABELS } from '../helpSupportConstants';
 import HubFilterSelect from './HubFilterSelect';
+import TicketConfirmModal from './TicketConfirmModal';
 
 interface StatusChangeControlProps {
   allowedStatuses: TicketStatus[];
+  currentStatus: TicketStatus;
   currentDisposition: TicketDisposition;
   onStatusChange: (status: TicketStatus, note?: string) => Promise<void>;
   onDispositionChange: (disposition: TicketDisposition, note?: string) => Promise<void>;
 }
+
+type PendingAction =
+  | { kind: 'status'; status: TicketStatus }
+  | { kind: 'disposition'; disposition: TicketDisposition };
 
 /**
  * Agent controls for status and disposition changes.
  */
 export default function StatusChangeControl({
   allowedStatuses,
+  currentStatus,
   currentDisposition,
   onStatusChange,
   onDispositionChange,
@@ -25,26 +32,21 @@ export default function StatusChangeControl({
   const [disposition, setDisposition] = useState<TicketDisposition | ''>('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<PendingAction | null>(null);
 
-  const handleStatus = async () => {
-    if (!status) return;
+  const runPending = async () => {
+    if (!pending) return;
     setBusy(true);
     try {
-      await onStatusChange(status, note || undefined);
-      setStatus('');
+      if (pending.kind === 'status') {
+        await onStatusChange(pending.status, note || undefined);
+        setStatus('');
+      } else {
+        await onDispositionChange(pending.disposition, note || undefined);
+        setDisposition('');
+      }
       setNote('');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleDisposition = async () => {
-    if (!disposition) return;
-    setBusy(true);
-    try {
-      await onDispositionChange(disposition, note || undefined);
-      setDisposition('');
-      setNote('');
+      setPending(null);
     } finally {
       setBusy(false);
     }
@@ -54,87 +56,126 @@ export default function StatusChangeControl({
     'inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50';
 
   return (
-    <section className="rounded-xl border border-gray-300 bg-white shadow-sm" aria-label="Agent actions">
-      <header className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
-          <i className="ri-settings-3-line text-sm" aria-hidden />
-        </span>
-        <h3 className="text-sm font-bold text-gray-900">Agent Actions</h3>
-      </header>
+    <>
+      <section className="rounded-xl border border-gray-300 bg-white shadow-sm" aria-label="Agent actions">
+        <header className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
+            <i className="ri-settings-3-line text-sm" aria-hidden />
+          </span>
+          <h3 className="text-sm font-bold text-gray-900">Agent Actions</h3>
+        </header>
 
-      <div className="space-y-4 p-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <label htmlFor="status-change" className="block text-xs font-bold text-gray-700">
-              Change status
-            </label>
-            <HubFilterSelect
-              id="status-change"
-              value={status}
-              onChange={(e) => setStatus(e.target.value as TicketStatus)}
-              wrapperClassName="w-full"
-            >
-              <option value="">Select next status</option>
-              {allowedStatuses.map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_LABELS[s]}
-                </option>
-              ))}
-            </HubFilterSelect>
-            <button
-              type="button"
-              disabled={!status || busy}
-              onClick={handleStatus}
-              className={`${btnBase} bg-indigo-600 text-white hover:bg-indigo-700`}
-            >
-              <i className="ri-refresh-line" aria-hidden />
-              Update Status
-            </button>
+        <div className="space-y-4 p-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label htmlFor="status-change" className="block text-xs font-bold text-gray-700">
+                Change status
+              </label>
+              <HubFilterSelect
+                id="status-change"
+                value={status}
+                onChange={(e) => setStatus(e.target.value as TicketStatus)}
+                wrapperClassName="w-full"
+              >
+                <option value="">Select next status</option>
+                {allowedStatuses.map((s) => (
+                  <option key={s} value={s}>
+                    {STATUS_LABELS[s]}
+                  </option>
+                ))}
+              </HubFilterSelect>
+              <button
+                type="button"
+                disabled={!status || busy}
+                onClick={() => status && setPending({ kind: 'status', status })}
+                className={`${btnBase} bg-indigo-600 text-white hover:bg-indigo-700`}
+              >
+                <i className="ri-refresh-line" aria-hidden />
+                Update Status
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="disposition-change" className="block text-xs font-bold text-gray-700">
+                Set disposition
+              </label>
+              <HubFilterSelect
+                id="disposition-change"
+                value={disposition}
+                onChange={(e) => setDisposition(e.target.value as TicketDisposition)}
+                wrapperClassName="w-full"
+              >
+                <option value="">Select disposition</option>
+                {Object.entries(DISPOSITION_LABELS).map(([value, label]) => (
+                  <option key={value} value={value} disabled={value === currentDisposition}>
+                    {label}
+                  </option>
+                ))}
+              </HubFilterSelect>
+              <button
+                type="button"
+                disabled={!disposition || busy}
+                onClick={() => disposition && setPending({ kind: 'disposition', disposition })}
+                className={`${btnBase} border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100`}
+              >
+                <i className="ri-price-tag-3-line" aria-hidden />
+                Update Disposition
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="disposition-change" className="block text-xs font-bold text-gray-700">
-              Set disposition
+            <label htmlFor="agent-note" className="block text-xs font-bold text-gray-700">
+              Note <span className="font-medium text-gray-500">(optional)</span>
             </label>
-            <HubFilterSelect
-              id="disposition-change"
-              value={disposition}
-              onChange={(e) => setDisposition(e.target.value as TicketDisposition)}
-              wrapperClassName="w-full"
-            >
-              <option value="">Select disposition</option>
-              {Object.entries(DISPOSITION_LABELS).map(([value, label]) => (
-                <option key={value} value={value} disabled={value === currentDisposition}>
-                  {label}
-                </option>
-              ))}
-            </HubFilterSelect>
-            <button
-              type="button"
-              disabled={!disposition || busy}
-              onClick={handleDisposition}
-              className={`${btnBase} border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100`}
-            >
-              <i className="ri-price-tag-3-line" aria-hidden />
-              Update Disposition
-            </button>
+            <textarea
+              id="agent-note"
+              rows={2}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm transition placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              placeholder="Add a reason that will be saved to the timeline..."
+            />
           </div>
         </div>
+      </section>
 
-        <div className="space-y-2">
-          <label htmlFor="agent-note" className="block text-xs font-bold text-gray-700">
-            Note <span className="font-medium text-gray-500">(optional)</span>
-          </label>
-          <textarea
-            id="agent-note"
-            rows={2}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm transition placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            placeholder="Add a reason that will be saved to the timeline..."
-          />
-        </div>
-      </div>
-    </section>
+      <TicketConfirmModal
+        open={pending?.kind === 'status'}
+        title="Update ticket status?"
+        message={
+          pending?.kind === 'status' ? (
+            <>
+              Change status from{' '}
+              <span className="font-semibold text-gray-900">{STATUS_LABELS[currentStatus]}</span> to{' '}
+              <span className="font-semibold text-indigo-700">{STATUS_LABELS[pending.status]}</span>?
+            </>
+          ) : null
+        }
+        confirmLabel="Update status"
+        busy={busy}
+        iconClassName="ri-refresh-line"
+        onConfirm={runPending}
+        onCancel={() => !busy && setPending(null)}
+      />
+
+      <TicketConfirmModal
+        open={pending?.kind === 'disposition'}
+        title="Update disposition?"
+        message={
+          pending?.kind === 'disposition' ? (
+            <>
+              Set disposition to{' '}
+              <span className="font-semibold text-indigo-700">{DISPOSITION_LABELS[pending.disposition]}</span>?
+            </>
+          ) : null
+        }
+        confirmLabel="Update disposition"
+        busy={busy}
+        iconClassName="ri-price-tag-3-line"
+        onConfirm={runPending}
+        onCancel={() => !busy && setPending(null)}
+      />
+    </>
   );
 }

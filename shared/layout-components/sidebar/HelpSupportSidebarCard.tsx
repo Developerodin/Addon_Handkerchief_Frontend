@@ -4,7 +4,9 @@ import React from 'react';
 import Link from 'next/link';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/shared/redux/store';
-import { useNavigation, canAccessHelpSupport } from '@/shared/contextapi/navigationContext';
+import { useNavigation, canAccessHelpSupport, canAccessHelpSupportTab } from '@/shared/contextapi/navigationContext';
+
+const HUB_TAB_SLUGS = ['files', 'tasks', 'tickets'] as const;
 
 const HELP_SUPPORT_PATH = '/help-and-support';
 
@@ -15,6 +17,12 @@ export default function HelpSupportSidebarCard() {
   const { permissions, isLoading } = useNavigation();
   const user = useSelector((state: RootState) => state.auth.user);
   const allowed = canAccessHelpSupport(permissions, user?.role);
+
+  const tabSummary = HUB_TAB_SLUGS.filter((tab) =>
+    canAccessHelpSupportTab(permissions, tab, user?.role)
+  )
+    .map((tab) => tab.charAt(0).toUpperCase() + tab.slice(1))
+    .join(' · ');
 
   if (isLoading) {
     return (
@@ -47,7 +55,7 @@ export default function HelpSupportSidebarCard() {
         </span>
         <span className="help-support-sidebar-card__content">
           <span className="help-support-sidebar-card__title">Help & Support</span>
-          <span className="help-support-sidebar-card__subtitle">Files · Tasks · Tickets</span>
+          <span className="help-support-sidebar-card__subtitle">{tabSummary || 'Hub'}</span>
         </span>
         <span className="help-support-sidebar-card__arrow" aria-hidden>
           <i className="ri-external-link-line" />

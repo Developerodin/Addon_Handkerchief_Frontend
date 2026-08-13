@@ -74,6 +74,17 @@ export interface TasksListResponse {
   totalResults: number;
 }
 
+export interface TasksQueryParams {
+  page?: number;
+  limit?: number;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  search?: string;
+  sortBy?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
 export interface CreateTaskPayload {
   title: string;
   description?: string;

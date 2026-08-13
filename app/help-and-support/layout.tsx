@@ -4,6 +4,7 @@ import RequireAuth from '@/shared/components/auth/RequireAuth';
 import { RequireHelpSupportAccess } from '@/shared/components/auth/RequireHelpSupportAccess';
 import { NavigationProvider } from '@/shared/contextapi/navigationContext';
 import Link from 'next/link';
+import { Suspense } from 'react';
 
 /**
  * Standalone layout for Help & Support — opens in its own tab without the main app sidebar.
@@ -27,7 +28,17 @@ export default function HelpSupportLayout({ children }: { children: React.ReactN
                 Back to main app
               </Link>
             </header>
-            <main>{children}</main>
+            <main>
+              <Suspense
+                fallback={
+                  <div className="flex min-h-[50vh] items-center justify-center">
+                    <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600" />
+                  </div>
+                }
+              >
+                {children}
+              </Suspense>
+            </main>
           </div>
         </RequireHelpSupportAccess>
       </NavigationProvider>

@@ -11,6 +11,11 @@ import {
   applyCrudChange,
   applyCrudDependencies,
   CrudAction,
+  HELP_SUPPORT_TABS,
+  FULL_HELP_SUPPORT,
+  EMPTY_HELP_SUPPORT,
+  type HelpSupportTabKey,
+  type HelpSupportPermissions,
 } from '@/shared/types/permissions';
 
 interface Props {
@@ -178,6 +183,39 @@ export default function NavigationPermissionsEditor({ navigation, onChange, disa
     onChange({ ...safeNav, Catalog });
   };
 
+  const hs = safeNav['Help & Support'];
+  const helpSupportAllChecked = hs.enabled && HELP_SUPPORT_TABS.every((tab) => hs[tab]);
+
+  const updateHelpSupport = (next: HelpSupportPermissions) => {
+    onChange({ ...safeNav, 'Help & Support': next });
+  };
+
+  const toggleHelpSupportAll = (checked: boolean) => {
+    updateHelpSupport(checked ? { ...FULL_HELP_SUPPORT } : { ...EMPTY_HELP_SUPPORT });
+  };
+
+  const toggleHelpSupportEnabled = (checked: boolean) => {
+    if (!checked) {
+      updateHelpSupport({ ...EMPTY_HELP_SUPPORT });
+      return;
+    }
+    updateHelpSupport({
+      enabled: true,
+      Files: hs.Files,
+      Tasks: hs.Tasks,
+      Tickets: hs.Tickets,
+    });
+  };
+
+  const toggleHelpSupportTab = (tab: HelpSupportTabKey, checked: boolean) => {
+    const next = { ...hs, [tab]: checked, enabled: true };
+    if (!next.Files && !next.Tasks && !next.Tickets) {
+      updateHelpSupport({ ...EMPTY_HELP_SUPPORT });
+      return;
+    }
+    updateHelpSupport(next);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -234,6 +272,49 @@ export default function NavigationPermissionsEditor({ navigation, onChange, disa
             idPrefix={`catalog-${subsection.key}`}
             indented
           />
+        ))}
+      </SectionCard>
+
+      {/* Help & Support */}
+      <SectionCard
+        title="Help & Support"
+        icon="ri-customer-service-2-line"
+        allChecked={helpSupportAllChecked}
+        onToggleAll={toggleHelpSupportAll}
+        disabled={disabled}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 py-2.5 hover:bg-gray-50/60 transition-colors">
+          <span className="text-[12px] font-medium text-gray-800 min-w-[140px]">Hub access</span>
+          <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              id="help-support-enabled"
+              type="checkbox"
+              checked={hs.enabled}
+              disabled={disabled}
+              onChange={(e) => toggleHelpSupportEnabled(e.target.checked)}
+              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-3.5 w-3.5"
+            />
+            <span className="text-[11px] font-medium text-gray-600">Enable Help &amp; Support</span>
+          </label>
+        </div>
+        {HELP_SUPPORT_TABS.map((tab) => (
+          <div
+            key={tab}
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 py-2.5 pl-6 sm:pl-8 hover:bg-gray-50/60 transition-colors"
+          >
+            <span className="text-[12px] font-medium text-gray-800 min-w-[140px]">{tab}</span>
+            <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+              <input
+                id={`help-support-${tab}`}
+                type="checkbox"
+                checked={hs.enabled && hs[tab]}
+                disabled={disabled || !hs.enabled}
+                onChange={(e) => toggleHelpSupportTab(tab, e.target.checked)}
+                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-3.5 w-3.5"
+              />
+              <span className="text-[11px] font-medium text-gray-600">Allow access</span>
+            </label>
+          </div>
         ))}
       </SectionCard>
     </div>

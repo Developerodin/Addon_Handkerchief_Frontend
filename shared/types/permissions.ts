@@ -32,11 +32,36 @@ export const CATALOG_MODULES = [
 
 export type CatalogModule = (typeof CATALOG_MODULES)[number];
 
+export type HelpSupportTabKey = 'Files' | 'Tasks' | 'Tickets';
+
+export const HELP_SUPPORT_TABS: HelpSupportTabKey[] = ['Files', 'Tasks', 'Tickets'];
+
+export interface HelpSupportPermissions {
+  enabled: boolean;
+  Files: boolean;
+  Tasks: boolean;
+  Tickets: boolean;
+}
+
+export const FULL_HELP_SUPPORT: HelpSupportPermissions = {
+  enabled: true,
+  Files: true,
+  Tasks: true,
+  Tickets: true,
+};
+
+export const EMPTY_HELP_SUPPORT: HelpSupportPermissions = {
+  enabled: false,
+  Files: false,
+  Tasks: false,
+  Tickets: false,
+};
+
 export interface NavigationPermissions {
   Dashboard: CrudPermissions;
   Catalog: Record<CatalogModule, CrudPermissions>;
   Users: CrudPermissions;
-  'Help & Support': boolean;
+  'Help & Support': HelpSupportPermissions;
 }
 
 export type UserRole = 'user' | 'accounts' | 'admin' | 'super_admin';
@@ -64,7 +89,53 @@ export const DEFAULT_NAVIGATION: NavigationPermissions = {
   Dashboard: { ...EMPTY_CRUD },
   Catalog: buildCatalogDefaults(),
   Users: { ...EMPTY_CRUD },
-  'Help & Support': true,
+  'Help & Support': { ...FULL_HELP_SUPPORT },
+};
+
+/** Normalize legacy boolean or partial object Help & Support permissions. */
+export const normalizeHelpSupport = (value: unknown): HelpSupportPermissions => {
+  if (value === true) return { ...FULL_HELP_SUPPORT };
+  if (value === false || value == null) return { ...EMPTY_HELP_SUPPORT };
+  if (typeof value === 'object') {
+    const v = value as Partial<HelpSupportPermissions>;
+    const enabled = Boolean(v.enabled);
+    if (!enabled) return { ...EMPTY_HELP_SUPPORT };
+    return {
+      enabled: true,
+      Files: Boolean(v.Files),
+      Tasks: Boolean(v.Tasks),
+      Tickets: Boolean(v.Tickets),
+    };
+  }
+  return { ...EMPTY_HELP_SUPPORT };
+};
+
+export type HubTabSlug = 'files' | 'tasks' | 'tickets';
+
+const HUB_TAB_TO_KEY: Record<HubTabSlug, HelpSupportTabKey> = {
+  files: 'Files',
+  tasks: 'Tasks',
+  tickets: 'Tickets',
+};
+
+export const hasHelpSupportHubAccess = (value: unknown): boolean => {
+  const hs = normalizeHelpSupport(value);
+  return hs.enabled && (hs.Files || hs.Tasks || hs.Tickets);
+};
+
+export const hasHelpSupportTabAccess = (value: unknown, tab: HubTabSlug): boolean => {
+  const hs = normalizeHelpSupport(value);
+  if (!hs.enabled) return false;
+  return Boolean(hs[HUB_TAB_TO_KEY[tab]]);
+};
+
+export const firstAllowedHelpSupportTab = (value: unknown): HubTabSlug | null => {
+  const hs = normalizeHelpSupport(value);
+  if (!hs.enabled) return null;
+  if (hs.Files) return 'files';
+  if (hs.Tasks) return 'tasks';
+  if (hs.Tickets) return 'tickets';
+  return null;
 };
 
 export const normalizeCrud = (value: unknown): CrudPermissions => {
@@ -121,10 +192,7 @@ export const mergeNavigationWithDefaults = (
     Dashboard: applyCrudDependencies(normalizeCrud(partial.Dashboard)),
     Catalog: catalog,
     Users: applyCrudDependencies(normalizeCrud(partial.Users)),
-    'Help & Support':
-      typeof partial['Help & Support'] === 'boolean'
-        ? partial['Help & Support']
-        : true,
+    'Help & Support': normalizeHelpSupport(partial['Help & Support']),
   };
 };
 

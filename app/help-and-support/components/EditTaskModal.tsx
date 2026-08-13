@@ -3,15 +3,15 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { helpSupportTasksService } from '@/shared/services/helpSupportTasksService';
-import type { CreateTaskPayload, HelpSupportTaskTeam, TaskPriority } from '@/shared/types/helpSupportTasks';
-import { uploadTaskDocuments } from '@/shared/utils/taskDocumentUpload';
+import type { HelpSupportTask, HelpSupportTaskTeam, TaskPriority } from '@/shared/types/helpSupportTasks';
 import HubFilterSelect from './HubFilterSelect';
 import TaskDocumentUploader from './TaskDocumentUploader';
 
-interface CreateTaskModalProps {
+interface EditTaskModalProps {
   open: boolean;
+  task: HelpSupportTask | null;
   onClose: () => void;
-  onCreated: () => void;
+  onUpdated: () => void;
 }
 
 const PRIORITY_OPTIONS: { value: TaskPriority; label: string }[] = [
@@ -21,7 +21,14 @@ const PRIORITY_OPTIONS: { value: TaskPriority; label: string }[] = [
   { value: 'urgent', label: 'Urgent' },
 ];
 
-export default function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalProps) {
+function toDateInputValue(iso?: string | null) {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toISOString().slice(0, 10);
+}
+
+export default function EditTaskModal({ open, task, onClose, onUpdated }: EditTaskModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('medium');
@@ -30,7 +37,16 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
   const [teams, setTeams] = useState<HelpSupportTaskTeam[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploadingDocs, setUploadingDocs] = useState(false);
+
+  useEffect(() => {
+    if (!open || !task) return;
+    setTitle(task.title || '');
+    setDescription(task.description || '');
+    setPriority(task.priority || 'medium');
+    setDueDate(toDateInputValue(task.dueDate));
+    setAssignedTeams(task.assignedTeams || []);
+  }, [open, task]);
 
   useEffect(() => {
     if (!open) return;
@@ -45,16 +61,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
       .finally(() => setTeamsLoading(false));
   }, [open]);
 
-  if (!open) return null;
-
-  const reset = () => {
-    setTitle('');
-    setDescription('');
-    setPriority('medium');
-    setDueDate('');
-    setAssignedTeams([]);
-    setPendingFiles([]);
-  };
+  if (!open || !task) return null;
 
   const toggleTeam = (slug: string) => {
     setAssignedTeams((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]));
@@ -68,35 +75,54 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
     }
     setSubmitting(true);
     try {
-      const payload: CreateTaskPayload = {
+      await helpSupportTasksService.updateTask(task.id, {
         title: title.trim(),
         description: description.trim() || undefined,
         priority,
         assignedTeams,
-        ...(dueDate && { dueDate: new Date(dueDate).toISOString() }),
-      };
-      const created = await helpSupportTasksService.createTask(payload);
-      if (pendingFiles.length) {
-        const attachments = await uploadTaskDocuments(pendingFiles, created.id, created.taskNumber);
-        await helpSupportTasksService.updateTask(created.id, { attachments });
-      }
-      toast.success('Task assigned');
-      reset();
+        dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+      });
+      toast.success('Task updated');
       onClose();
-      onCreated();
+      onUpdated();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create task');
+      toast.error(err instanceof Error ? err.message : 'Failed to update task');
     } finally {
       setSubmitting(false);
     }
   };
 
+  const handleAttachmentsUpdated = async (attachments: HelpSupportTask['attachments']) => {
+    if (!task) return;
+    try {
+      await helpSupportTasksService.updateTask(task.id, { attachments });
+      toast.success('Documents updated');
+      onUpdated();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save documents');
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/50 p-4" role="dialog" aria-modal="true">
-      <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
-        <h2 className="text-base font-bold text-gray-900">Assign Task</h2>
-        <p className="mt-1 text-xs text-gray-500">Assign work to a team — all members of that team will see the task.</p>
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase text-indigo-600">{task.taskNumber}</p>
+            <h2 className="text-base font-bold text-gray-900">Edit Task</h2>
+            <p className="mt-1 text-xs text-gray-500">Update task details and team assignment.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            aria-label="Close"
+          >
+            <i className="ri-close-line text-lg" aria-hidden />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="text"
             value={title}
@@ -137,7 +163,7 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
                 <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-indigo-600" />
                 Loading teams…
               </div>
-            ) : teams.length ? (
+            ) : (
               <div className="grid gap-2 sm:grid-cols-2">
                 {teams.map((team) => {
                   const selected = assignedTeams.includes(team.slug);
@@ -160,42 +186,42 @@ export default function CreateTaskModal({ open, onClose, onCreated }: CreateTask
                         >
                           <i className={team.slug === 'dev_team' ? 'ri-code-line' : 'ri-team-line'} aria-hidden />
                         </span>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-gray-900">{team.name}</p>
-                          {team.description && (
-                            <p className="line-clamp-2 text-[10px] text-gray-500">{team.description}</p>
-                          )}
-                        </div>
+                        <p className="text-sm font-semibold text-gray-900">{team.name}</p>
                       </div>
                     </button>
                   );
                 })}
               </div>
-            ) : (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
-                <p className="font-semibold">No active teams available</p>
-                <p className="mt-1 text-amber-800">
-                  Open <strong>Teams</strong> (super admin) and click <strong>Activate</strong> on Management or Dev
-                  Team, then try again.
-                </p>
-              </div>
             )}
           </div>
-          <TaskDocumentUploader onPendingFilesChange={setPendingFiles} disabled={submitting} />
+
+          <div>
+            <p className="mb-2 text-xs font-semibold text-gray-700">Documents (optional)</p>
+            <TaskDocumentUploader
+              taskId={task.id}
+              taskNumber={task.taskNumber}
+              existingAttachments={task.attachments || []}
+              disabled={submitting || uploadingDocs}
+              onUploadingChange={setUploadingDocs}
+              onAttachmentsChange={handleAttachmentsUpdated}
+            />
+          </div>
+
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              disabled={submitting}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || uploadingDocs}
               className="inline-flex min-w-[130px] items-center justify-center rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
             >
-              {submitting ? 'Saving…' : 'Assign Task'}
+              {submitting ? 'Saving…' : 'Save changes'}
             </button>
           </div>
         </form>
