@@ -16,12 +16,13 @@ const HelpIcon: React.FC<HelpIconProps> = ({ title, content, className = "" }) =
   return (
     <>
       <button
+        type="button"
         onClick={openModal}
-        className={`inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white hover:bg-primary-dark transition-colors duration-200 shadow-lg hover:shadow-xl ${className}`}
-        title="Help"
-        aria-label="Help"
+        className={`help-icon-btn ${className}`}
+        title="Page help"
+        aria-label="Open page help"
       >
-        <i className="ri-information-line text-lg"></i>
+        <i className="ri-information-line" aria-hidden="true" />
       </button>
       
       <HelpModal

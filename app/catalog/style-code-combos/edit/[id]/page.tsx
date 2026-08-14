@@ -177,7 +177,7 @@ const EditStyleCodeComboPage = () => {
 
   if (loading) {
     return (
-      <div className="main-content">
+      <div className="main-content catalog-master-form">
         <Seo title="Edit Style Code Combo" />
         <div className="flex items-center justify-center py-16">
           <div className="text-center">
@@ -190,7 +190,7 @@ const EditStyleCodeComboPage = () => {
   }
 
   return (
-    <div className="main-content">
+    <div className="main-content catalog-master-form">
       <Seo title="Edit Style Code Combo" />
       <Toaster position="top-right" />
 

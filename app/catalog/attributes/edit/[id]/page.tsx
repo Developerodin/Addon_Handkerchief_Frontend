@@ -259,7 +259,7 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
 
   if (isLoading) {
     return (
-      <div className="main-content">
+      <div className="main-content catalog-master-form">
         <div className="flex items-center justify-center min-h-screen">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
@@ -269,7 +269,7 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
 
   if (error || !attribute) {
     return (
-      <div className="main-content">
+      <div className="main-content catalog-master-form">
         <div className="flex flex-col items-center justify-center min-h-screen">
           <div className="text-center py-8 text-red-500">
             <i className="ri-error-warning-line text-3xl mb-2"></i>
@@ -287,7 +287,7 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
   }
 
   return (
-    <div className="main-content">
+    <div className="main-content catalog-master-form">
       <Toaster position="top-right" />
       <Seo title="Edit Attribute" />
       

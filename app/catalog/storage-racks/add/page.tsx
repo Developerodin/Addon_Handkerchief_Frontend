@@ -68,7 +68,7 @@ const AddStorageRackPage = () => {
   };
 
   return (
-    <div className="main-content">
+    <div className="main-content catalog-master-form">
       <Toaster position="top-right" />
       <Seo title="Add Storage Rack" />
 

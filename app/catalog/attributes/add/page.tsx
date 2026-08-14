@@ -2,13 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Pageheader from '@/shared/layout-components/page-header/pageheader';
-import Seo from '@/shared/layout-components/seo/seo';
 import Image from 'next/image';
 import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
+import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
 
 // Types
 interface OptionValue {
@@ -259,17 +258,16 @@ const AddAttributePage = () => {
   };
 
   return (
-    <div>
+    <>
       <Toaster position="top-right" />
-      <Seo title="Add Attribute" />
-      <Pageheader currentpage="Add Attribute" activepage="Attributes Master" mainpage="Add Attribute" />
-      
-      <div className="grid grid-cols-12 gap-6">
-        <div className="xl:col-span-12 col-span-12">
+      <CatalogMasterFormPage
+        seoTitle="Add Attribute"
+        title="Add Attribute"
+        listHref="/catalog/attributes"
+        listLabel="Attributes Master"
+        currentLabel="Add Attribute"
+      >
           <div className="box">
-            <div className="box-header">
-              <h5 className="box-title">Attribute</h5>
-            </div>
             <div className="box-body">
               <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 gap-6">
@@ -540,9 +538,8 @@ const AddAttributePage = () => {
               </form>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
+      </CatalogMasterFormPage>
+    </>
   );
 };
 

@@ -6,6 +6,8 @@ import Seo from '@/shared/layout-components/seo/seo';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import { styleCodeService, StyleCode } from '@/shared/services/styleCodeService';
 import { StyleCodeSelectModal } from '@/app/catalog/style-codes/components/StyleCodeSelectModal';
+import { StyleCodeDetailFields } from '@/app/catalog/items/components/StyleCodeDetailFields';
+import { mapStyleCodeToItemRow } from '@/shared/utils/styleCodeFields';
 import { ProcessSequenceEditor } from '@/app/catalog/items/components/ProcessSequenceEditor';
 import { ProductBomTab } from '@/app/catalog/items/components/ProductBomTab';
 import ProductImageUploadField from '@/app/catalog/items/components/ProductImageUploadField';
@@ -165,6 +167,38 @@ const EditProductPage = () => {
         // Normalize categories
         const categories = categoriesResponse.data.results || [];
         setCategories(categories);
+
+        let attrCats = attributesResponse.data.results || [];
+        attrCats = attrCats.map((cat: any) => {
+          const hasOptionValues = Array.isArray(cat.optionValues) && cat.optionValues.length > 0;
+          const hasOptions = Array.isArray(cat.options) && cat.options.length > 0;
+          let optionValues = hasOptionValues
+            ? (cat.optionValues || []).map((opt: any) => ({
+                _id: opt._id || opt.id,
+                name: opt.name,
+                sortOrder: opt.sortOrder ?? 0,
+              }))
+            : [];
+          if (!hasOptionValues && hasOptions) {
+            optionValues = cat.options.map((opt: any) => ({
+              _id: opt.id || opt._id,
+              name: opt.name,
+              sortOrder: opt.sortOrder || 0,
+            }));
+          }
+          return {
+            ...cat,
+            optionValues,
+            options: cat.options || [],
+            attributeType: (cat.attributeType === 'Warehouse' ? 'Warehouse' : 'Manufacturing') as string,
+          };
+        });
+        setAttributeCategories(attrCats);
+        const brandOptions =
+          attrCats.find((c: any) => c.name.toLowerCase() === 'brand')?.optionValues ?? [];
+        const packOptions =
+          attrCats.find((c: any) => c.name.toLowerCase() === 'pack')?.optionValues ?? [];
+
         const styleCodesResponse = (styleCodesRes as any)?.results || [];
         const styleOptions = styleCodesResponse.map((sc: any) => ({
           styleCodeId: sc.id,
@@ -247,14 +281,17 @@ const EditProductPage = () => {
             const id = typeof sc === 'string' ? sc : (sc?.styleCodeId ?? sc?._id ?? sc?.id ?? '');
             const sid = String(id || '').trim();
             const match = sid ? optionsById.get(sid) : undefined;
-            return {
-              styleCodeId: sid,
-              styleCode: match?.styleCode ?? (typeof sc === 'object' ? sc.styleCode : '') ?? '',
-              eanCode: match?.eanCode ?? (typeof sc === 'object' ? sc.eanCode : '') ?? '',
-              mrp: match?.mrp ?? (typeof sc === 'object' && (sc.mrp != null) ? sc.mrp : 0) ?? 0,
-              brand: match?.brand ?? (typeof sc === 'object' ? sc.brand : '') ?? '',
-              pack: match?.pack ?? (typeof sc === 'object' ? sc.pack : '') ?? ''
-            };
+            const source = match
+              ? { ...match, styleCodeId: sid }
+              : {
+                  styleCodeId: sid,
+                  styleCode: typeof sc === 'object' ? sc.styleCode : '',
+                  eanCode: typeof sc === 'object' ? sc.eanCode : '',
+                  mrp: typeof sc === 'object' && sc.mrp != null ? sc.mrp : 0,
+                  brand: typeof sc === 'object' ? sc.brand : '',
+                  pack: typeof sc === 'object' ? sc.pack : '',
+                };
+            return mapStyleCodeToItemRow(source, brandOptions, packOptions);
           });
         } else if (product.styleCode || product.eanCode) {
           product.styleCodes = [{
@@ -351,50 +388,6 @@ const EditProductPage = () => {
         console.log('Product data loaded:', product);
         console.log('Product attributes:', product.attributes);
 
-        // Process attribute categories
-        let attrCats = attributesResponse.data.results || [];
-        
-        // Map attribute categories with their option values - handle both data structures
-        attrCats = attrCats.map((cat: any) => {
-          // Check which format is available in the API response
-          const hasOptionValues = Array.isArray(cat.optionValues) && cat.optionValues.length > 0;
-          const hasOptions = Array.isArray(cat.options) && cat.options.length > 0;
-          
-          // Transform options to optionValues format if needed; ensure each option has _id (from id or _id)
-          let optionValues = hasOptionValues
-            ? (cat.optionValues || []).map((opt: any) => ({
-                _id: opt._id || opt.id,
-                name: opt.name,
-                sortOrder: opt.sortOrder ?? 0
-              }))
-            : [];
-          
-          // If only options is available, convert to optionValues format
-          if (!hasOptionValues && hasOptions) {
-            optionValues = cat.options.map((opt: any) => ({
-              _id: opt.id || opt._id,
-              name: opt.name,
-              sortOrder: opt.sortOrder || 0
-            }));
-          }
-          
-          console.log(`Category ${cat.name} options:`, { 
-            hasOptionValues, 
-            hasOptions, 
-            optionValues 
-          });
-          
-          return {
-            ...cat,
-            optionValues: optionValues,
-            options: cat.options || [], // Keep for backward compatibility
-            attributeType: (cat.attributeType === 'Warehouse' ? 'Warehouse' : 'Manufacturing') as string
-          };
-        });
-        
-        console.log('Processed attribute categories:', attrCats);
-        setAttributeCategories(attrCats);
-
         setProcesses((processesResponse.data.results || []) as ProcessType[]);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -471,6 +464,32 @@ const EditProductPage = () => {
     });
   };
 
+  const getBrandPackOptions = () => {
+    const brandOptions =
+      attributeCategories.find((c) => c.name.toLowerCase() === 'brand')?.optionValues ?? [];
+    const packOptions =
+      attributeCategories.find((c) => c.name.toLowerCase() === 'pack')?.optionValues ?? [];
+    return { brandOptions, packOptions };
+  };
+
+  useEffect(() => {
+    if (!attributeCategories.length) return;
+    const { brandOptions, packOptions } = getBrandPackOptions();
+    setFormData((prev) => {
+      if (!prev.styleCodes?.length) return prev;
+      const nextStyleCodes = prev.styleCodes.map((sc) =>
+        mapStyleCodeToItemRow(sc, brandOptions, packOptions)
+      );
+      const unchanged = nextStyleCodes.every(
+        (sc, i) =>
+          sc.brand === (prev.styleCodes?.[i]?.brand ?? '') &&
+          sc.pack === (prev.styleCodes?.[i]?.pack ?? '')
+      );
+      if (unchanged) return prev;
+      return { ...prev, styleCodes: nextStyleCodes };
+    });
+  }, [attributeCategories]);
+
   const handleStyleCodeChange = (index: number, field: 'styleCode' | 'eanCode' | 'mrp' | 'brand' | 'pack', value: string | number) => {
     setFormData(prev => {
       const newStyleCodes = [...(prev.styleCodes || [{ styleCodeId: '', styleCode: '', eanCode: '', mrp: 0, brand: '', pack: '' }])];
@@ -485,16 +504,10 @@ const EditProductPage = () => {
   const handleStyleCodeSelect = (index: number, styleCodeId: string) => {
     const option = styleCodeOptions.find((sc) => sc.styleCodeId === styleCodeId);
     if (!option) return;
-    setFormData(prev => {
+    const { brandOptions, packOptions } = getBrandPackOptions();
+    setFormData((prev) => {
       const newStyleCodes = [...(prev.styleCodes || [{ styleCodeId: '', styleCode: '', eanCode: '', mrp: 0, brand: '', pack: '' }])];
-      newStyleCodes[index] = {
-        styleCodeId: option.styleCodeId,
-        styleCode: option.styleCode,
-        eanCode: option.eanCode,
-        mrp: option.mrp,
-        brand: option.brand,
-        pack: option.pack,
-      };
+      newStyleCodes[index] = mapStyleCodeToItemRow(option, brandOptions, packOptions);
       return { ...prev, styleCodes: newStyleCodes };
     });
   };
@@ -538,18 +551,20 @@ const EditProductPage = () => {
     });
   };
 
-  const handleStyleCodeSelectFromModal = (sc: StyleCode) => {
+  const handleStyleCodeSelectFromModal = async (sc: StyleCode) => {
     if (styleCodeModalIndex === null) return;
-    setFormData(prev => {
+    let source = sc;
+    try {
+      if (sc.id) {
+        source = await styleCodeService.get(sc.id);
+      }
+    } catch {
+      // Fall back to list row if detail fetch fails
+    }
+    const { brandOptions, packOptions } = getBrandPackOptions();
+    setFormData((prev) => {
       const newStyleCodes = [...(prev.styleCodes || [{ styleCodeId: '', styleCode: '', eanCode: '', mrp: 0, brand: '', pack: '' }])];
-      newStyleCodes[styleCodeModalIndex] = {
-        styleCodeId: sc.id,
-        styleCode: sc.styleCode,
-        eanCode: sc.eanCode,
-        mrp: sc.mrp,
-        brand: sc.brand,
-        pack: sc.pack,
-      };
+      newStyleCodes[styleCodeModalIndex] = mapStyleCodeToItemRow(source, brandOptions, packOptions);
       return { ...prev, styleCodes: newStyleCodes };
     });
     setStyleCodeModalOpen(false);
@@ -773,7 +788,7 @@ const EditProductPage = () => {
 
   if (isLoading) {
     return (
-      <div className="main-content">
+      <div className="main-content catalog-master-form">
         <div className="text-center py-10">
           <div className="spinner-border text-primary" role="status">
             <span className="sr-only">Loading...</span>
@@ -784,7 +799,7 @@ const EditProductPage = () => {
   }
 
   return (
-    <div className="main-content">
+    <div className="main-content catalog-master-form">
       <Seo title="Edit Product" />
       
       <div className="grid grid-cols-12 gap-6">
@@ -885,10 +900,7 @@ const EditProductPage = () => {
                             </button>
                           </div>
                           <div className="space-y-4">
-                            {(formData.styleCodes || [{ styleCode: '', eanCode: '', mrp: 0, brand: '', pack: '' }]).map((styleCodeItem, index) => {
-                              const brandOptions = attributeCategories.find(c => c.name.toLowerCase() === 'brand')?.optionValues ?? [];
-                              const packOptions = attributeCategories.find(c => c.name.toLowerCase() === 'pack')?.optionValues ?? [];
-                              return (
+                            {(formData.styleCodes || [{ styleCode: '', eanCode: '', mrp: 0, brand: '', pack: '' }]).map((styleCodeItem, index) => (
                               <div key={index} className="border border-gray-200 rounded-lg p-4">
                                 <div className="flex justify-between items-center mb-3">
                                   <h4 className="font-medium text-sm">Style Code Entry {index + 1}</h4>
@@ -902,59 +914,19 @@ const EditProductPage = () => {
                                     </button>
                                   )}
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                                  <div>
-                                    <label className="form-label">Style Code</label>
-                                    <input
-                                      type="text"
-                                      className="form-control cursor-pointer"
-                                      value={styleCodeItem.styleCode}
-                                      readOnly
-                                      onClick={() => { setStyleCodeModalIndex(index); setStyleCodeModalOpen(true); }}
-                                      placeholder="Click to browse style codes..."
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="form-label">EAN Code</label>
-                                    <input
-                                      type="text"
-                                      className="form-control bg-gray-50"
-                                      value={styleCodeItem.eanCode}
-                                      readOnly
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="form-label">MRP</label>
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      className="form-control bg-gray-50"
-                                      value={styleCodeItem.mrp}
-                                      readOnly
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="form-label">Brand</label>
-                                    <input
-                                      type="text"
-                                      className="form-control bg-gray-50"
-                                      value={styleCodeItem.brand ?? ''}
-                                      readOnly
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="form-label">Pack</label>
-                                    <input
-                                      type="text"
-                                      className="form-control bg-gray-50"
-                                      value={styleCodeItem.pack ?? ''}
-                                      readOnly
-                                    />
-                                  </div>
-                                </div>
+                                <StyleCodeDetailFields
+                                  styleCode={styleCodeItem.styleCode}
+                                  eanCode={styleCodeItem.eanCode}
+                                  mrp={styleCodeItem.mrp}
+                                  brand={styleCodeItem.brand}
+                                  pack={styleCodeItem.pack}
+                                  onBrowseStyleCode={() => {
+                                    setStyleCodeModalIndex(index);
+                                    setStyleCodeModalOpen(true);
+                                  }}
+                                />
                               </div>
-                            );})}
+                            ))}
                           </div>
                         </div>
                         <div className="md:col-span-2">
@@ -1111,10 +1083,7 @@ const EditProductPage = () => {
                                 </button>
                               </div>
                               <div className="space-y-4">
-                                {(formData.styleCodes || [{ styleCode: '', eanCode: '', mrp: 0, brand: '', pack: '' }]).map((styleCodeItem, index) => {
-                                  const brandOptions = attributeCategories.find(c => c.name.toLowerCase() === 'brand')?.optionValues ?? [];
-                                  const packOptions = attributeCategories.find(c => c.name.toLowerCase() === 'pack')?.optionValues ?? [];
-                                  return (
+                                {(formData.styleCodes || [{ styleCode: '', eanCode: '', mrp: 0, brand: '', pack: '' }]).map((styleCodeItem, index) => (
                                   <div key={index} className="border border-gray-200 rounded-lg p-4">
                                     <div className="flex justify-between items-center mb-3">
                                       <h4 className="font-medium text-sm">Style Code Entry {index + 1}</h4>
@@ -1128,59 +1097,19 @@ const EditProductPage = () => {
                                         </button>
                                       )}
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                                      <div>
-                                        <label className="form-label">Style Code</label>
-                                        <input
-                                          type="text"
-                                          className="form-control cursor-pointer"
-                                          value={styleCodeItem.styleCode}
-                                          readOnly
-                                          onClick={() => { setStyleCodeModalIndex(index); setStyleCodeModalOpen(true); }}
-                                          placeholder="Click to browse style codes..."
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="form-label">EAN Code</label>
-                                        <input
-                                          type="text"
-                                          className="form-control bg-gray-50"
-                                          value={styleCodeItem.eanCode}
-                                          readOnly
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="form-label">MRP</label>
-                                        <input
-                                          type="number"
-                                          step="0.01"
-                                          min="0"
-                                          className="form-control bg-gray-50"
-                                          value={styleCodeItem.mrp}
-                                          readOnly
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="form-label">Brand</label>
-                                        <input
-                                          type="text"
-                                          className="form-control bg-gray-50"
-                                          value={styleCodeItem.brand ?? ''}
-                                          readOnly
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="form-label">Pack</label>
-                                        <input
-                                          type="text"
-                                          className="form-control bg-gray-50"
-                                          value={styleCodeItem.pack ?? ''}
-                                          readOnly
-                                        />
-                                      </div>
-                                    </div>
+                                    <StyleCodeDetailFields
+                                      styleCode={styleCodeItem.styleCode}
+                                      eanCode={styleCodeItem.eanCode}
+                                      mrp={styleCodeItem.mrp}
+                                      brand={styleCodeItem.brand}
+                                      pack={styleCodeItem.pack}
+                                      onBrowseStyleCode={() => {
+                                        setStyleCodeModalIndex(index);
+                                        setStyleCodeModalOpen(true);
+                                      }}
+                                    />
                                   </div>
-                                );})}
+                                ))}
                               </div>
                             </div>
                             <div className="md:col-span-2">

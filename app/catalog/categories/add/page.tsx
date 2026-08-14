@@ -6,17 +6,14 @@ import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import { uploadOptionalImage } from '@/shared/utils/imageUpload';
+import {
+  CategoryRecord,
+  getValidParentOptions,
+  getLevelLabel,
+} from '@/shared/utils/categoryHierarchy';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 
-interface Category {
-  id: string;
-  name: string;
-  parent?: string;
-  description?: string;
-  sortOrder: number;
-  status: 'active' | 'inactive';
-  image?: string;
-}
+interface Category extends CategoryRecord {}
 
 const AddCategoryPage = () => {
   const router = useRouter();
@@ -78,6 +75,8 @@ const AddCategoryPage = () => {
     }
   };
 
+  const parentOptions = getValidParentOptions(parentCategories);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -135,7 +134,7 @@ const AddCategoryPage = () => {
   };
 
   return (
-    <div className="main-content">
+    <div className="main-content catalog-master-form">
       <Toaster position="top-right" />
       <Seo title="Add Category"/>
       
@@ -194,13 +193,16 @@ const AddCategoryPage = () => {
                       value={formData.parent}
                       onChange={handleInputChange}
                     >
-                      <option value="">Select Parent Category</option>
-                      {parentCategories.map(category => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
+                      <option value="">None — top-level Category</option>
+                      {parentOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label} ({getLevelLabel(option.level + 1)})
                         </option>
                       ))}
                     </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Hierarchy: Category → Child → Grandchild (max 3 levels)
+                    </p>
                   </div>
 
                   {/* Description */}

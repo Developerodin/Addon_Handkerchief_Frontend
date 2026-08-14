@@ -9,16 +9,15 @@ import HelpIcon from '@/shared/components/HelpIcon';
 import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud';
 import CatalogRowActions from '@/shared/components/catalog/CatalogRowActions';
 import CatalogPageSizeSelect from '@/shared/components/catalog/CatalogPageSizeSelect';
+import {
+  CategoryRecord,
+  buildParentMap,
+  getCategoryLevel,
+  getCategoryPath,
+  getLevelLabel,
+} from '@/shared/utils/categoryHierarchy';
 
-interface Category {
-  id: string;
-  name: string;
-  parent?: string | null | { id: string; name: string };
-  description?: string;
-  sortOrder: number;
-  status: 'active' | 'inactive';
-  image?: string;
-}
+interface Category extends CategoryRecord {}
 
 const getParentCategoryName = (
   parent: Category['parent'],
@@ -51,9 +50,10 @@ const CategoriesPage = () => {
   const [totalResults, setTotalResults] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [categoryNameMap, setCategoryNameMap] = useState<Record<string, string>>({});
+  const [allCategoriesForHierarchy, setAllCategoriesForHierarchy] = useState<Category[]>([]);
   const [importProgress, setImportProgress] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isReplicating, setIsReplicating] = useState(false);
+  // const [isReplicating, setIsReplicating] = useState(false);
 
   // Fetch categories from API (with pagination and search)
   const fetchCategories = async (page = 1, limit = itemsPerPage, search = '') => {
@@ -96,6 +96,7 @@ const CategoriesPage = () => {
           map[cat.id] = cat.name;
         });
         setCategoryNameMap(map);
+        setAllCategoriesForHierarchy(data.results || []);
       } catch {
         // Non-critical lookup for parent names
       }
@@ -154,6 +155,8 @@ const CategoriesPage = () => {
     }
   };
 
+  // Replicate temporarily disabled — uncomment when needed
+  /*
   const handleReplicate = async (category: Category) => {
     if (!canCreate) return;
     setIsReplicating(true);
@@ -190,6 +193,7 @@ const CategoriesPage = () => {
       setIsReplicating(false);
     }
   };
+  */
 
   const handleDeleteSelected = async () => {
     if (!guardDelete()) return;
@@ -266,6 +270,13 @@ const CategoriesPage = () => {
           'Description': 'Plain handkerchief styles',
           'Parent Category': 'Handkerchief',
           'Sort Order': 2,
+          'Status': 'active',
+        },
+        {
+          'Category Name': 'Floral',
+          'Description': 'Floral embroidery grandchild category',
+          'Parent Category': 'Embroidery',
+          'Sort Order': 1,
           'Status': 'active',
         },
       ];
@@ -407,6 +418,8 @@ const CategoriesPage = () => {
     }
   };
 
+  const hierarchyParentMap = buildParentMap(allCategoriesForHierarchy);
+
   // Condensed pagination helper
   function getPagination(currentPage: number, totalPages: number) {
     const pages = [];
@@ -445,14 +458,14 @@ const CategoriesPage = () => {
                     <div>
                       <h4 className="font-semibold text-lg mb-2">What is this page?</h4>
                       <p className="text-gray-700">
-                        Manage handkerchief product categories (e.g. Handkerchief, Embroidery, Plain) and organize them in a hierarchy for the catalog.
+                        Manage handkerchief product categories in a 3-level hierarchy: Category → Child → Grandchild.
                       </p>
                     </div>
                     <div>
                       <h4 className="font-semibold text-lg mb-2">What can you do here?</h4>
                       <ul className="list-disc list-inside space-y-1 text-gray-700">
                         <li><strong>View Categories:</strong> Browse all product categories with pagination and search</li>
-                        <li><strong>Add / Edit / Replicate:</strong> Create, modify, or copy categories</li>
+                        <li><strong>Add / Edit:</strong> Create or modify categories at any level</li>
                         <li><strong>Delete Categories:</strong> Remove individual or selected categories</li>
                         <li><strong>Import/Export:</strong> Bulk load from Excel using the handkerchief template</li>
                       </ul>
@@ -460,8 +473,8 @@ const CategoriesPage = () => {
                     <div>
                       <h4 className="font-semibold text-lg mb-2">Tips:</h4>
                       <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li>Use parent-child relationships for styles under Handkerchief</li>
-                        <li>Use Replicate to quickly copy a category as &quot;Name (Copy)&quot;</li>
+                        <li>Use parent-child relationships: Handkerchief → Embroidery → Floral</li>
+                        <li>Grandchild is the deepest level allowed (max 3 levels)</li>
                         <li>Export before making bulk changes</li>
                       </ul>
                     </div>
@@ -572,6 +585,8 @@ const CategoriesPage = () => {
                     <input type="checkbox" checked={selectAll} onChange={handleSelectAll} className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" />
                   </th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Category Name</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Level</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Path</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Parent Category</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Sort Order</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Status</th>
@@ -583,12 +598,20 @@ const CategoriesPage = () => {
               <tbody>
                 {categories.map((category: Category) => {
                   const parentName = getParentCategoryName(category.parent, categoryNameMap);
+                  const level = getCategoryLevel(category.id, hierarchyParentMap);
+                  const path = getCategoryPath(category.id, allCategoriesForHierarchy).join(' › ');
                   return (
                   <tr key={category.id} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="pl-[10px] pr-1 py-2.5 border border-gray-200">
                       <input type="checkbox" checked={selectedCategories.includes(category.id)} onChange={() => handleCategorySelect(category.id)} className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" />
                     </td>
                     <td className="px-1.5 py-2.5 text-[12px] font-bold text-gray-900 border border-gray-200">{category.name}</td>
+                    <td className="px-1.5 py-2.5 border border-gray-200">
+                      <span className="inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded uppercase tracking-tight bg-purple-50 text-purple-700">
+                        {getLevelLabel(level)}
+                      </span>
+                    </td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{path || category.name}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">
                       {parentName ? (
                         <span className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-100 text-gray-700">
@@ -612,8 +635,6 @@ const CategoriesPage = () => {
                         segment="categories"
                         editHref={`/catalog/categories/edit/${category.id}`}
                         onDelete={() => handleDelete(category.id)}
-                        onReplicate={() => handleReplicate(category)}
-                        replicateLoading={isReplicating}
                       />
                     </td>
                     )}

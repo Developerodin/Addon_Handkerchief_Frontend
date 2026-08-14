@@ -8,6 +8,8 @@ import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import HelpIcon from '@/shared/components/HelpIcon';
 import { styleCodeService, StyleCode } from '@/shared/services/styleCodeService';
 import { StyleCodeSelectModal } from '@/app/catalog/style-codes/components/StyleCodeSelectModal';
+import { StyleCodeDetailFields } from '@/app/catalog/items/components/StyleCodeDetailFields';
+import { mapStyleCodeToItemRow } from '@/shared/utils/styleCodeFields';
 import { ProcessSequenceEditor } from '@/app/catalog/items/components/ProcessSequenceEditor';
 import { ProductBomTab } from '@/app/catalog/items/components/ProductBomTab';
 import { RawMaterialBomItem } from '@/app/catalog/items/components/RawMaterialBomTable';
@@ -283,18 +285,20 @@ const AddProductPage = () => {
     setStyleCodes(newStyleCodes);
   };
 
+  const getBrandPackOptions = () => {
+    const brandOptions =
+      attributeDefinitions.find((a) => a.name.toLowerCase() === 'brand')?.optionValues ?? [];
+    const packOptions =
+      attributeDefinitions.find((a) => a.name.toLowerCase() === 'pack')?.optionValues ?? [];
+    return { brandOptions, packOptions };
+  };
+
   const handleStyleCodeSelect = (index: number, styleCodeId: string) => {
     const option = styleCodeOptions.find((sc) => sc.styleCodeId === styleCodeId);
     if (!option) return;
+    const { brandOptions, packOptions } = getBrandPackOptions();
     const newStyleCodes = [...styleCodes];
-    newStyleCodes[index] = {
-      styleCodeId: option.styleCodeId,
-      styleCode: option.styleCode,
-      eanCode: option.eanCode,
-      mrp: option.mrp,
-      brand: option.brand,
-      pack: option.pack,
-    };
+    newStyleCodes[index] = mapStyleCodeToItemRow(option, brandOptions, packOptions);
     setStyleCodes(newStyleCodes);
   };
 
@@ -329,17 +333,19 @@ const AddProductPage = () => {
     }
   };
 
-  const handleStyleCodeSelectFromModal = (sc: StyleCode) => {
+  const handleStyleCodeSelectFromModal = async (sc: StyleCode) => {
     if (styleCodeModalIndex === null) return;
+    let source = sc;
+    try {
+      if (sc.id) {
+        source = await styleCodeService.get(sc.id);
+      }
+    } catch {
+      // Fall back to list row if detail fetch fails
+    }
+    const { brandOptions, packOptions } = getBrandPackOptions();
     const newStyleCodes = [...styleCodes];
-    newStyleCodes[styleCodeModalIndex] = {
-      styleCodeId: sc.id,
-      styleCode: sc.styleCode,
-      eanCode: sc.eanCode,
-      mrp: sc.mrp,
-      brand: sc.brand,
-      pack: sc.pack,
-    };
+    newStyleCodes[styleCodeModalIndex] = mapStyleCodeToItemRow(source, brandOptions, packOptions);
     setStyleCodes(newStyleCodes);
     setStyleCodeModalOpen(false);
     setStyleCodeModalIndex(null);
@@ -561,7 +567,7 @@ const AddProductPage = () => {
   };
 
   return (
-    <div className="main-content">
+    <div className="main-content catalog-master-form">
       <Seo title="Add Product"/>
       
       <form onSubmit={handleSubmit}>
@@ -760,10 +766,7 @@ const AddProductPage = () => {
                               </button>
                             </div>
                             <div className="space-y-4">
-                              {styleCodes.map((styleCodeItem, index) => {
-                                const brandOptions = attributeDefinitions.find(a => a.name.toLowerCase() === 'brand')?.optionValues ?? [];
-                                const packOptions = attributeDefinitions.find(a => a.name.toLowerCase() === 'pack')?.optionValues ?? [];
-                                return (
+                              {styleCodes.map((styleCodeItem, index) => (
                                 <div key={index} className="border border-gray-200 rounded-lg p-4">
                                   <div className="flex justify-between items-center mb-3">
                                     <h4 className="font-medium text-sm">Style Code Entry {index + 1}</h4>
@@ -777,59 +780,20 @@ const AddProductPage = () => {
                                       </button>
                                     )}
                                   </div>
-                                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                                    <div>
-                                      <label className="form-label">Style Code</label>
-                                      <input
-                                        type="text"
-                                        className="form-control cursor-pointer"
-                                        value={styleCodeItem.styleCode}
-                                        readOnly
-                                        onClick={() => { setStyleCodeModalIndex(index); setStyleCodeModalOpen(true); }}
-                                        placeholder="Click to browse style codes..."
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="form-label">EAN Code</label>
-                                      <input
-                                        type="text"
-                                        className="form-control bg-gray-50"
-                                        value={styleCodeItem.eanCode}
-                                        readOnly
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="form-label">MRP</label>
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        className="form-control bg-gray-50"
-                                        value={styleCodeItem.mrp}
-                                        readOnly
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="form-label">Brand</label>
-                                      <input
-                                        type="text"
-                                        className="form-control bg-gray-50"
-                                        value={styleCodeItem.brand ?? ''}
-                                        readOnly
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="form-label">Pack</label>
-                                      <input
-                                        type="text"
-                                        className="form-control bg-gray-50"
-                                        value={styleCodeItem.pack ?? ''}
-                                        readOnly
-                                      />
-                                    </div>
-                                  </div>
+                                  <StyleCodeDetailFields
+                                    styleCode={styleCodeItem.styleCode}
+                                    eanCode={styleCodeItem.eanCode}
+                                    mrp={styleCodeItem.mrp}
+                                    brand={styleCodeItem.brand}
+                                    pack={styleCodeItem.pack}
+                                    onBrowseStyleCode={() => {
+                                      setStyleCodeModalIndex(index);
+                                      setStyleCodeModalOpen(true);
+                                    }}
+                                    browseDisabled={isLoading}
+                                  />
                                 </div>
-                              );})}
+                              ))}
                             </div>
                           </div>
                           <div>
@@ -957,10 +921,7 @@ const AddProductPage = () => {
                                     </button>
                                   </div>
                                   <div className="space-y-4">
-                                    {styleCodes.map((styleCodeItem, index) => {
-                                      const brandOptions = attributeDefinitions.find(a => a.name.toLowerCase() === 'brand')?.optionValues ?? [];
-                                      const packOptions = attributeDefinitions.find(a => a.name.toLowerCase() === 'pack')?.optionValues ?? [];
-                                      return (
+                                    {styleCodes.map((styleCodeItem, index) => (
                                       <div key={index} className="border border-gray-200 rounded-lg p-4">
                                         <div className="flex justify-between items-center mb-3">
                                           <h4 className="font-medium text-sm">Style Code Entry {index + 1}</h4>
@@ -974,67 +935,20 @@ const AddProductPage = () => {
                                             </button>
                                           )}
                                         </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                                          <div>
-                                            <label className="form-label">Style Code</label>
-                                            <input
-                                              type="text"
-                                              className="form-control cursor-pointer"
-                                              value={styleCodeItem.styleCode}
-                                              readOnly
-                                              onClick={() => { setStyleCodeModalIndex(index); setStyleCodeModalOpen(true); }}
-                                              placeholder="Click to browse style codes..."
-                                            />
-                                          </div>
-                                          <div>
-                                            <label className="form-label">EAN Code</label>
-                                            <input
-                                              type="text"
-                                              className="form-control"
-                                              value={styleCodeItem.eanCode}
-                                              onChange={(e) => handleStyleCodeChange(index, 'eanCode', e.target.value)}
-                                            />
-                                          </div>
-                                          <div>
-                                            <label className="form-label">MRP</label>
-                                            <input
-                                              type="number"
-                                              step="0.01"
-                                              min="0"
-                                              className="form-control"
-                                              value={styleCodeItem.mrp}
-                                              onChange={(e) => handleStyleCodeChange(index, 'mrp', e.target.value)}
-                                            />
-                                          </div>
-                                          <div>
-                                            <label className="form-label">Brand</label>
-                                            <select
-                                              className="form-control"
-                                              value={styleCodeItem.brand ?? ''}
-                                              onChange={(e) => handleStyleCodeChange(index, 'brand', e.target.value)}
-                                            >
-                                              <option value="">Select Brand</option>
-                                              {brandOptions.map((opt) => (
-                                                <option key={opt._id} value={opt.name}>{opt.name}</option>
-                                              ))}
-                                            </select>
-                                          </div>
-                                          <div>
-                                            <label className="form-label">Pack</label>
-                                            <select
-                                              className="form-control"
-                                              value={styleCodeItem.pack ?? ''}
-                                              onChange={(e) => handleStyleCodeChange(index, 'pack', e.target.value)}
-                                            >
-                                              <option value="">Select Pack</option>
-                                              {packOptions.map((opt) => (
-                                                <option key={opt._id} value={opt.name}>{opt.name}</option>
-                                              ))}
-                                            </select>
-                                          </div>
-                                        </div>
+                                        <StyleCodeDetailFields
+                                          styleCode={styleCodeItem.styleCode}
+                                          eanCode={styleCodeItem.eanCode}
+                                          mrp={styleCodeItem.mrp}
+                                          brand={styleCodeItem.brand}
+                                          pack={styleCodeItem.pack}
+                                          onBrowseStyleCode={() => {
+                                            setStyleCodeModalIndex(index);
+                                            setStyleCodeModalOpen(true);
+                                          }}
+                                          browseDisabled={isLoading}
+                                        />
                                       </div>
-                                    );})}
+                                    ))}
                                   </div>
                                 </div>
                                 <div>

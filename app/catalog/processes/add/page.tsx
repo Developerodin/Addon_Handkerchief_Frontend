@@ -2,14 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Pageheader from '@/shared/layout-components/page-header/pageheader';
-import Seo from '@/shared/layout-components/seo/seo';
 import Image from 'next/image';
 import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { filterDigitsOnly } from '@/shared/utils/formInputFilters';
+import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
 
 interface ProcessStep {
   stepTitle: string;
@@ -201,17 +200,16 @@ const AddProcessPage = () => {
   };
 
   return (
-    <div>
+    <>
       <Toaster position="top-right" />
-      <Seo title="Add Process" />
-      <Pageheader currentpage="Add Process" activepage="Process Master" mainpage="Add Process" />
-      
-      <div className="grid grid-cols-12 gap-6">
-        <div className="xl:col-span-12 col-span-12">
+      <CatalogMasterFormPage
+        seoTitle="Add Process"
+        title="Add New Process"
+        listHref="/catalog/processes"
+        listLabel="Process Master"
+        currentLabel="Add Process"
+      >
           <div className="box">
-            <div className="box-header">
-              <h5 className="box-title">Add New Process</h5>
-            </div>
             <div className="box-body">
               <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 gap-6">
@@ -580,9 +578,8 @@ const AddProcessPage = () => {
               </form>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
+      </CatalogMasterFormPage>
+    </>
   );
 };
 

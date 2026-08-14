@@ -6,21 +6,21 @@ import { toast, Toaster } from 'react-hot-toast';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import { uploadOptionalImage } from '@/shared/utils/imageUpload';
+import {
+  CategoryRecord,
+  buildParentMap,
+  getCategoryLevel,
+  getDescendantIds,
+  getValidParentOptions,
+  getLevelLabel,
+} from '@/shared/utils/categoryHierarchy';
 
-interface Category {
-  id: string;
-  name: string;
-  parent?: string | null;
-  description?: string;
-  sortOrder: number;
-  status: 'active' | 'inactive';
-  image?: string;
-}
+interface Category extends CategoryRecord {}
 
 function EditCategoryPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [parentCategories, setParentCategories] = useState<Category[]>([]);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [formData, setFormData] = useState<Category>({
     id: '',
     name: '',
@@ -43,7 +43,7 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
         setFormData({
           id: data.id,
           name: data.name,
-          parent: data.parent,
+          parent: typeof data.parent === 'object' && data.parent ? data.parent.id : (data.parent || null),
           description: data.description || '',
           sortOrder: data.sortOrder,
           status: data.status,
@@ -66,9 +66,7 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
         const response = await fetch(`${API_BASE_URL}/categories?page=1&limit=100000`);
         if (!response.ok) throw new Error('Failed to fetch categories');
         const data = await response.json();
-        // Filter out the current category and its children to prevent circular references
-        const filteredCategories = data.results.filter((cat: Category) => cat.id !== params.id);
-        setParentCategories(filteredCategories);
+        setAllCategories(Array.isArray(data.results) ? data.results : []);
       } catch (error) {
         console.error('Error fetching parent categories:', error);
         toast.error('Failed to load parent categories');
@@ -98,6 +96,16 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
       reader.readAsDataURL(file);
     }
   };
+
+  const parentMap = buildParentMap(allCategories);
+  const excludeIds = [
+    params.id,
+    ...getDescendantIds(params.id, parentMap),
+  ];
+  const parentOptions = getValidParentOptions(allCategories, { excludeIds });
+  const currentLevel = formData.id
+    ? getCategoryLevel(formData.id, parentMap)
+    : 1;
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -143,7 +151,7 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
 
   if (isLoading) {
     return (
-      <div className="main-content">
+      <div className="main-content catalog-master-form">
         <div className="flex items-center justify-center min-h-screen">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
@@ -152,7 +160,7 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
   }
 
   return (
-    <div className="main-content">
+    <div className="main-content catalog-master-form">
       <Toaster position="top-right" />
       <Seo title="Edit Category" />
       
@@ -179,6 +187,16 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
               </div>
 
               <div>
+                <label className="form-label">Level</label>
+                <input
+                  type="text"
+                  className="form-control bg-gray-50"
+                  value={getLevelLabel(currentLevel)}
+                  readOnly
+                />
+              </div>
+
+              <div>
                 <label className="form-label">Parent Category</label>
                 <select
                   name="parent"
@@ -186,13 +204,16 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
                   value={formData.parent || ''}
                   onChange={handleInputChange}
                 >
-                  <option value="">None (Root Category)</option>
-                  {parentCategories.map(category => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
+                  <option value="">None — top-level Category</option>
+                  {parentOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label} ({getLevelLabel(option.level + 1)})
                     </option>
                   ))}
                 </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Hierarchy: Category → Child → Grandchild (max 3 levels)
+                </p>
               </div>
 
               <div>

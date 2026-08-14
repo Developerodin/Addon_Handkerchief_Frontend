@@ -124,7 +124,7 @@ function EditWorkerPage({ params }: { params: { id: string } }) {
 
   if (isLoading) {
     return (
-      <div className="main-content">
+      <div className="main-content catalog-master-form">
         <div className="flex items-center justify-center min-h-screen">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
@@ -133,7 +133,7 @@ function EditWorkerPage({ params }: { params: { id: string } }) {
   }
 
   return (
-    <div className="main-content">
+    <div className="main-content catalog-master-form">
       <Toaster position="top-right" />
       <Seo title="Edit Worker" />
 

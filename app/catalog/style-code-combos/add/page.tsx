@@ -137,7 +137,7 @@ const AddStyleCodeComboPage = () => {
   }
 
   return (
-    <div className="main-content">
+    <div className="main-content catalog-master-form">
       <Seo title="Add Style Code Combo" />
       <Toaster position="top-right" />
 

@@ -185,7 +185,7 @@ const EditStyleCodePage = () => {
 
   if (loading) {
     return (
-      <div className="main-content">
+      <div className="main-content catalog-master-form">
         <Seo title="Edit Style Code" />
         <div className="flex items-center justify-center py-16">
           <div className="text-center">
@@ -198,7 +198,7 @@ const EditStyleCodePage = () => {
   }
 
   return (
-    <div className="main-content">
+    <div className="main-content catalog-master-form">
       <Seo title="Edit Style Code" />
       <Toaster position="top-right" />
 

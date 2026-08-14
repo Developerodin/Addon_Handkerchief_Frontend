@@ -1,4 +1,7 @@
-import React from 'react';
+'use client';
+
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 interface HelpModalProps {
   isOpen: boolean;
@@ -8,53 +11,64 @@ interface HelpModalProps {
 }
 
 const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, title, content }) => {
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (!isOpen) return undefined;
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        {/* Background overlay */}
-        <div 
-          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
-          onClick={onClose}
-        ></div>
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
 
-        {/* Modal panel */}
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
-          {/* Header */}
-          <div className="bg-primary text-white px-6 py-4 flex justify-between items-center">
-            <h3 className="text-lg font-semibold flex items-center">
-              <i className="ri-information-line me-2"></i>
-              {title}
-            </h3>
-            <button
-              onClick={onClose}
-              className="text-white hover:text-gray-200 transition-colors"
-            >
-              <i className="ri-close-line text-xl"></i>
-            </button>
-          </div>
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
 
-          {/* Content */}
-          <div className="px-6 py-4 max-h-96 overflow-y-auto">
-            <div className="prose prose-sm max-w-none">
-              {content}
-            </div>
-          </div>
+    document.addEventListener('keydown', handleKeyDown);
 
-          {/* Footer */}
-          <div className="bg-gray-50 px-6 py-3 flex justify-end">
-            <button
-              onClick={onClose}
-              className="ti-btn ti-btn-primary"
-            >
-              Got it!
-            </button>
-          </div>
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen || typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title">
+      <button
+        type="button"
+        className="help-modal__backdrop"
+        aria-label="Close help dialog"
+        onClick={onClose}
+      />
+
+      <div className="help-modal__panel">
+        <div className="help-modal__header">
+          <h3 id="help-modal-title" className="help-modal__title">
+            <i className="ri-information-line" aria-hidden="true" />
+            <span>{title}</span>
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="help-modal__close"
+            aria-label="Close"
+          >
+            <i className="ri-close-line" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="help-modal__body">{content}</div>
+
+        <div className="help-modal__footer">
+          <button type="button" onClick={onClose} className="ti-btn ti-btn-primary-full help-modal__action">
+            Got it!
+          </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
-export default HelpModal; 
+export default HelpModal;

@@ -431,13 +431,6 @@ const StyleCodesPage = () => {
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Link
-                href="/catalog/style-code-combos"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-[11px] font-bold rounded border border-gray-200 hover:bg-gray-50 transition-colors"
-              >
-                <i className="ri-stack-line text-xs" />
-                Combos
-              </Link>
               <div className="relative">
                 <input
                   type="text"
@@ -558,6 +551,13 @@ const StyleCodesPage = () => {
                 className="hidden"
                 onChange={handleSyncFromExcel}
               /> */}
+              <Link
+                href="/catalog/style-code-combos"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-[11px] font-bold rounded border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm"
+              >
+                <i className="ri-stack-line text-xs" />
+                Combos
+              </Link>
               {canCreate && (
               <Link
                 href="/catalog/style-codes/add"
