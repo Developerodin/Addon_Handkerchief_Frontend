@@ -17,6 +17,7 @@ import DeleteHubItemConfirmModal from './DeleteHubItemConfirmModal';
 import { resolveHubFileVisual, splitDisplayFileName } from '@/shared/utils/hubFileDisplay';
 import { getHubFileTaskNumber, isSystemHubFolder } from '@/shared/utils/taskDocumentUpload';
 import { getHubFileTicketNumber } from '@/shared/utils/ticketDocumentUpload';
+import { useHelpSupportCrud } from '@/shared/hooks/useHelpSupportCrud';
 
 interface UploadProgressState {
   fileName: string;
@@ -32,6 +33,7 @@ const getOverallUploadPercent = (progress: UploadProgressState) =>
  * Shared file workspace for Management and Dev team.
  */
 export default function FilesTab() {
+  const { canCreate, canDelete, guardCreate, guardDelete } = useHelpSupportCrud('Files');
   const [items, setItems] = useState<HubItem[]>([]);
   const [currentFolder, setCurrentFolder] = useState<HubFolder | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<{ id: string; name: string }[]>([]);
@@ -84,6 +86,7 @@ export default function FilesTab() {
   }, [loadRoot]);
 
   const handleCreateFolder = async () => {
+    if (!guardCreate()) return;
     if (!newFolderName.trim()) return;
     try {
       const created = await helpSupportFilesService.createFolder(
@@ -110,6 +113,7 @@ export default function FilesTab() {
   const processUploadFiles = useCallback(
     async (files: File[]) => {
       if (!files.length || uploading) return;
+      if (!guardCreate()) return;
       if (!currentFolder) {
         toast.error('Open a folder first — files must be uploaded inside a folder');
         return;
@@ -159,7 +163,7 @@ export default function FilesTab() {
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     },
-    [currentFolder, loadRoot, openFolder, uploading]
+    [currentFolder, loadRoot, openFolder, uploading, guardCreate]
   );
 
   const handleUpload = async (files: FileList | null) => {
@@ -201,11 +205,12 @@ export default function FilesTab() {
 
   const handleDeleteRequest = (event: React.MouseEvent, item: HubItem) => {
     event.stopPropagation();
+    if (!guardDelete()) return;
     setDeleteTarget(item);
   };
 
   const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || !guardDelete()) return;
     setDeleting(true);
     try {
       if (isHubFolder(deleteTarget)) await helpSupportFilesService.deleteFolder(deleteTarget.id);
@@ -253,7 +258,7 @@ export default function FilesTab() {
 
   const folderItems = items.filter(isHubFolder);
   const fileItems = items.filter((item) => !isHubFolder(item));
-  const canUpload = Boolean(currentFolder);
+  const canUpload = canCreate && Boolean(currentFolder);
 
   const renderItemCard = (item: HubItem) => {
     const name = getHubItemName(item);
@@ -330,7 +335,7 @@ export default function FilesTab() {
             )}
           </div>
         </div>
-        {!systemFolder && (
+        {!systemFolder && canDelete && (
           <button
             type="button"
             onClick={(event) => handleDeleteRequest(event, item)}
@@ -431,13 +436,15 @@ export default function FilesTab() {
           </nav>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setShowNewFolder(true)}
-            className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            <i className="ri-folder-add-line" aria-hidden /> New Folder
-          </button>
+          {canCreate && (
+            <button
+              type="button"
+              onClick={() => setShowNewFolder(true)}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              <i className="ri-folder-add-line" aria-hidden /> New Folder
+            </button>
+          )}
           {canUpload && (
             <>
               <button

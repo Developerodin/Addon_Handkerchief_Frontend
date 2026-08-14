@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-hot-toast';
@@ -20,13 +20,16 @@ const TAB_LABELS: Record<HubTab, string> = {
   tickets: 'Tickets',
 };
 
+const isHubTab = (value: string | null): value is HubTab =>
+  value === 'files' || value === 'tasks' || value === 'tickets';
+
 /**
  * Handkerchief Help & Support hub — Files, Tasks, Tickets.
  */
 export default function HelpAndSupportPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { permissions } = useNavigation();
+  const { permissions, isLoading } = useNavigation();
   const user = useSelector(
     (state: { auth?: { user?: { role?: string; email?: string } } }) => state.auth?.user
   );
@@ -45,21 +48,33 @@ export default function HelpAndSupportPage() {
     [permissions, allowedTabs]
   );
 
-  const [activeTab, setActiveTab] = useState<HubTab>(defaultTab);
+  const tabParam = searchParams.get('tab');
+  const activeTab = useMemo((): HubTab => {
+    if (isHubTab(tabParam) && allowedTabs.includes(tabParam)) return tabParam;
+    return allowedTabs.includes(defaultTab) ? defaultTab : allowedTabs[0] || 'files';
+  }, [tabParam, allowedTabs, defaultTab]);
+
   const canAccessTasks = canAccessHelpSupportTab(permissions, 'tasks', user?.role);
   const deepLinkTaskId = canAccessTasks ? searchParams.get('taskId') || undefined : undefined;
   const redirectedRef = useRef<string | null>(null);
 
+  const handleTabClick = (tab: HubTab) => {
+    const params = new URLSearchParams();
+    params.set('tab', tab);
+    if (tab === 'tasks') {
+      const taskId = searchParams.get('taskId');
+      if (taskId) params.set('taskId', taskId);
+    }
+    router.replace(`/help-and-support/?${params.toString()}`);
+  };
+
   useEffect(() => {
-    const tabParam = searchParams.get('tab') as HubTab | null;
-    const taskIdParam = searchParams.get('taskId');
+    if (isLoading) return;
+
+    const taskIdParam = searchParams.get('tab') === 'tasks' ? searchParams.get('taskId') : null;
     const signature = `${tabParam || ''}|${taskIdParam || ''}|${allowedTabs.join(',')}`;
 
-    const tabAllowed =
-      tabParam === 'files' || tabParam === 'tasks' || tabParam === 'tickets'
-        ? canAccessHelpSupportTab(permissions, tabParam, user?.role)
-        : false;
-
+    const tabAllowed = isHubTab(tabParam) ? canAccessHelpSupportTab(permissions, tabParam, user?.role) : false;
     const taskDeepLinkBlocked =
       Boolean(taskIdParam) && !canAccessHelpSupportTab(permissions, 'tasks', user?.role);
     const tabDeepLinkBlocked = Boolean(tabParam) && !tabAllowed;
@@ -82,33 +97,42 @@ export default function HelpAndSupportPage() {
         nextParams.set('tab', defaultTab);
       }
       router.replace(
-        nextParams.toString() ? `/help-and-support?${nextParams.toString()}` : '/help-and-support'
+        nextParams.toString() ? `/help-and-support/?${nextParams.toString()}` : '/help-and-support/'
       );
-      setActiveTab(defaultTab);
       return;
     }
 
     redirectedRef.current = null;
 
-    if (tabParam === 'tasks' || tabParam === 'tickets' || tabParam === 'files') {
-      setActiveTab(tabParam);
-      return;
+    if (!tabParam && allowedTabs.length) {
+      const nextTab = allowedTabs.includes(defaultTab) ? defaultTab : allowedTabs[0];
+      router.replace(`/help-and-support/?tab=${nextTab}`);
     }
-    if (!allowedTabs.includes(activeTab)) {
-      setActiveTab(defaultTab);
-    }
-  }, [searchParams, permissions, user?.role, allowedTabs, activeTab, defaultTab, router]);
+  }, [isLoading, searchParams, tabParam, permissions, user?.role, allowedTabs, defaultTab, router]);
 
   useEffect(() => {
-    if (!allowedTabs.length) {
+    if (!isLoading && !allowedTabs.length) {
       router.replace('/dashboards/main');
     }
-  }, [allowedTabs.length, router]);
+  }, [allowedTabs.length, isLoading, router]);
 
   const sideLabel = isManagement ? 'Management' : isDev ? 'Dev team' : 'Collaboration';
 
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600" />
+      </div>
+    );
+  }
+
   if (!allowedTabs.length) {
-    return null;
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-2 text-center">
+        <p className="text-sm font-medium text-gray-600">You do not have access to Help &amp; Support.</p>
+        <p className="text-xs text-gray-500">Redirecting…</p>
+      </div>
+    );
   }
 
   return (
@@ -137,7 +161,7 @@ export default function HelpAndSupportPage() {
                 type="button"
                 role="tab"
                 aria-selected={activeTab === tab}
-                onClick={() => setActiveTab(tab)}
+                onClick={() => handleTabClick(tab)}
                 className={`-mb-px border-b-2 px-4 py-2 text-xs font-bold ${
                   activeTab === tab
                     ? 'border-indigo-600 text-indigo-700'

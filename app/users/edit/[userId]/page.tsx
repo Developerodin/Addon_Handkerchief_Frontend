@@ -29,6 +29,7 @@ export default function EditUserPage() {
     role: 'user' as UserRole,
   });
   const [navigation, setNavigation] = useState<NavPerms>(mergeNavigationWithDefaults());
+  const [showPassword, setShowPassword] = useState(false);
 
   const canUpdate = hasCrudPermission('Users', 'update');
 
@@ -146,14 +147,25 @@ export default function EditUserPage() {
                   <label className="block text-[11px] font-bold text-gray-600 mb-1">
                     New Password <span className="font-normal text-gray-400">(optional)</span>
                   </label>
-                  <input
-                    type="password"
-                    className="w-full px-3 py-2 text-[12px] border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
-                    minLength={8}
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    placeholder="Leave blank to keep current"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      className="w-full px-3 py-2 pr-9 text-[12px] border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                      minLength={8}
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      placeholder="Leave blank to keep current"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:text-gray-600"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      <i className={`${showPassword ? 'ri-eye-line' : 'ri-eye-off-line'} text-base`} aria-hidden />
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-gray-600 mb-1">Role</label>

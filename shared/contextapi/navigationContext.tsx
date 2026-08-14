@@ -27,7 +27,7 @@ interface NavigationContextType {
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
-const CACHE_VERSION = '3';
+const CACHE_VERSION = '4';
 
 interface NavigationProviderProps {
   children: ReactNode;

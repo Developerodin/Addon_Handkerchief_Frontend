@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { helpSupportTasksService } from '@/shared/services/helpSupportTasksService';
 import type { HelpSupportTask, HelpSupportTaskTeam, TaskStatus } from '@/shared/types/helpSupportTasks';
+import { useHelpSupportCrud } from '@/shared/hooks/useHelpSupportCrud';
 import CreateTaskModal from './CreateTaskModal';
 import EditTaskModal from './EditTaskModal';
 import ManageTeamsModal from './ManageTeamsModal';
@@ -29,6 +30,7 @@ const DEFAULT_FILTERS: TaskFilters = {
  * Task assignment between teams (Management, Dev Team, etc.).
  */
 export default function TasksTab({ isManagement, isSuperAdmin, initialTaskId }: TasksTabProps) {
+  const { canCreate, canUpdate } = useHelpSupportCrud('Tasks');
   const [tasks, setTasks] = useState<HelpSupportTask[]>([]);
   const [teams, setTeams] = useState<HelpSupportTaskTeam[]>([]);
   const [loading, setLoading] = useState(true);
@@ -159,8 +161,8 @@ export default function TasksTab({ isManagement, isSuperAdmin, initialTaskId }: 
         teamNameBySlug={teamNameBySlug}
         isManagement={isManagement}
         isSuperAdmin={isSuperAdmin}
-        onTeamsClick={() => setTeamsModalOpen(true)}
-        onAssignClick={() => setModalOpen(true)}
+        onTeamsClick={canUpdate ? () => setTeamsModalOpen(true) : undefined}
+        onAssignClick={canCreate ? () => setModalOpen(true) : undefined}
         onPageChange={setPage}
         onLimitChange={(l) => {
           setLimit(l);
@@ -172,7 +174,7 @@ export default function TasksTab({ isManagement, isSuperAdmin, initialTaskId }: 
           setPage(1);
         }}
         onOpenTask={openTask}
-        onEditTask={isManagement ? openEditTask : undefined}
+        onEditTask={isManagement && canUpdate ? openEditTask : undefined}
       />
 
       <CreateTaskModal open={modalOpen} onClose={() => setModalOpen(false)} onCreated={load} />
@@ -197,6 +199,7 @@ export default function TasksTab({ isManagement, isSuperAdmin, initialTaskId }: 
         open={Boolean(selectedTask)}
         loading={taskDetailLoading}
         isManagement={isManagement}
+        canUpdate={canUpdate}
         teamNameBySlug={teamNameBySlug}
         highlightComment={highlightComment}
         onHighlightCommentDone={() => setHighlightComment(false)}

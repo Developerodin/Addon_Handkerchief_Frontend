@@ -7,6 +7,7 @@ import { useSelector } from 'react-redux';
 import { toast } from 'react-hot-toast';
 import Seo from '@/shared/layout-components/seo/seo';
 import { useNavigation, canAccessHelpSupportTab } from '@/shared/contextapi/navigationContext';
+import { useHelpSupportCrud } from '@/shared/hooks/useHelpSupportCrud';
 import { getFirstAvailableRoute } from '@/shared/utils/routeUtils';
 import { helpSupportService } from '@/shared/services/helpSupportService';
 import type { HelpSupportTicket, TicketDisposition, TicketStatus } from '@/shared/types/helpSupport';
@@ -61,7 +62,9 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
     (state: { auth?: { user?: { role?: string; email?: string; id?: string } } }) => state.auth?.user
   );
   const canViewTickets = canAccessHelpSupportTab(permissions, 'tickets', user?.role);
+  const { canUpdate } = useHelpSupportCrud('Tickets');
   const isAgent = isManagementSide(user?.role, user?.email);
+  const canManageTicket = isAgent && canUpdate;
 
   const [ticket, setTicket] = useState<HelpSupportTicket | null>(null);
   const [loading, setLoading] = useState(true);
@@ -322,7 +325,7 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
               </div>
             </section>
 
-            {isAgent && (
+            {canManageTicket && (
               <>
                 <TicketAssignControl
                   ticketId={ticketId}

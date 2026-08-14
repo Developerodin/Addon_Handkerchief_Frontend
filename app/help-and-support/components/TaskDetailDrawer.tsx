@@ -14,6 +14,7 @@ interface TaskDetailDrawerProps {
   open: boolean;
   loading?: boolean;
   isManagement: boolean;
+  canUpdate?: boolean;
   teamNameBySlug: Map<string, string>;
   highlightComment?: boolean;
   onHighlightCommentDone?: () => void;
@@ -189,6 +190,7 @@ export default function TaskDetailDrawer({
   open,
   loading = false,
   isManagement,
+  canUpdate = false,
   teamNameBySlug,
   highlightComment = false,
   onHighlightCommentDone,
@@ -289,7 +291,7 @@ export default function TaskDetailDrawer({
             </div>
           )}
 
-          {isManagement && (
+          {isManagement && canUpdate && (
             <div>
               <p className="mb-2 text-[10px] font-bold uppercase text-gray-500">Add documents (optional)</p>
               <TaskDocumentUploader
@@ -302,8 +304,9 @@ export default function TaskDetailDrawer({
             </div>
           )}
 
-          <div>
-            <p className="mb-3 text-[10px] font-bold uppercase text-gray-500">Update status</p>
+          {canUpdate && (
+            <div>
+              <p className="mb-3 text-[10px] font-bold uppercase text-gray-500">Update status</p>
             <div className="flex flex-wrap gap-2">
               {STATUS_OPTIONS.map(({ value, label }) => (
                 <button
@@ -322,6 +325,7 @@ export default function TaskDetailDrawer({
               ))}
             </div>
           </div>
+          )}
 
           <div>
             <p className="mb-3 text-[10px] font-bold uppercase text-gray-500">Activity timeline</p>
@@ -365,6 +369,7 @@ export default function TaskDetailDrawer({
           </div>
         </div>
 
+        {canUpdate && (
         <form
           ref={commentFormRef}
           onSubmit={handleNote}
@@ -396,6 +401,7 @@ export default function TaskDetailDrawer({
             {submitting ? 'Posting…' : 'Post Update'}
           </button>
         </form>
+        )}
       </div>
 
       {pendingStatus && (

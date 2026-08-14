@@ -1,4 +1,5 @@
 import type { TicketDisposition, TicketPriority, TicketStatus } from '@/shared/types/helpSupport';
+import { normalizeHelpSupport } from '@/shared/types/permissions';
 
 /** Display labels for ticket statuses */
 export const STATUS_LABELS: Record<TicketStatus, string> = {
@@ -182,11 +183,14 @@ export function isHelpSupportAgent(role?: string, email?: string): boolean {
   return Boolean(normalized && AGENT_ROLES.has(normalized));
 }
 
-/**
- * Whether the user may delete help & support tickets (admin@addon.in only).
- * @param email - User email from auth state
- */
-export function canDeleteHelpSupportTickets(email?: string): boolean {
+export function canDeleteHelpSupportTickets(
+  email?: string,
+  permissions?: { 'Help & Support'?: unknown } | null
+): boolean {
+  if (permissions?.['Help & Support'] != null) {
+    const hs = normalizeHelpSupport(permissions['Help & Support']);
+    return hs.enabled && hs.Tickets.delete;
+  }
   return email?.trim().toLowerCase() === HELP_SUPPORT_SUPER_EMAIL;
 }
 

@@ -14,6 +14,7 @@ import {
   HELP_SUPPORT_TABS,
   FULL_HELP_SUPPORT,
   EMPTY_HELP_SUPPORT,
+  isFullHelpSupportCrud,
   type HelpSupportTabKey,
   type HelpSupportPermissions,
 } from '@/shared/types/permissions';
@@ -184,7 +185,7 @@ export default function NavigationPermissionsEditor({ navigation, onChange, disa
   };
 
   const hs = safeNav['Help & Support'];
-  const helpSupportAllChecked = hs.enabled && HELP_SUPPORT_TABS.every((tab) => hs[tab]);
+  const helpSupportAllChecked = isFullHelpSupportCrud(hs);
 
   const updateHelpSupport = (next: HelpSupportPermissions) => {
     onChange({ ...safeNav, 'Help & Support': next });
@@ -207,9 +208,10 @@ export default function NavigationPermissionsEditor({ navigation, onChange, disa
     });
   };
 
-  const toggleHelpSupportTab = (tab: HelpSupportTabKey, checked: boolean) => {
-    const next = { ...hs, [tab]: checked, enabled: true };
-    if (!next.Files && !next.Tasks && !next.Tickets) {
+  const updateHelpSupportTab = (tab: HelpSupportTabKey, crud: CrudPermissions) => {
+    const nextTab = applyCrudDependencies(crud);
+    const next = { ...hs, [tab]: nextTab, enabled: true };
+    if (!HELP_SUPPORT_TABS.some((t) => next[t].read)) {
       updateHelpSupport({ ...EMPTY_HELP_SUPPORT });
       return;
     }
@@ -298,23 +300,15 @@ export default function NavigationPermissionsEditor({ navigation, onChange, disa
           </label>
         </div>
         {HELP_SUPPORT_TABS.map((tab) => (
-          <div
+          <PermissionRow
             key={tab}
-            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 py-2.5 pl-6 sm:pl-8 hover:bg-gray-50/60 transition-colors"
-          >
-            <span className="text-[12px] font-medium text-gray-800 min-w-[140px]">{tab}</span>
-            <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
-              <input
-                id={`help-support-${tab}`}
-                type="checkbox"
-                checked={hs.enabled && hs[tab]}
-                disabled={disabled || !hs.enabled}
-                onChange={(e) => toggleHelpSupportTab(tab, e.target.checked)}
-                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-3.5 w-3.5"
-              />
-              <span className="text-[11px] font-medium text-gray-600">Allow access</span>
-            </label>
-          </div>
+            label={tab}
+            value={hs[tab]}
+            onChange={(crud) => updateHelpSupportTab(tab, crud)}
+            disabled={disabled || !hs.enabled}
+            idPrefix={`help-support-${tab}`}
+            indented
+          />
         ))}
       </SectionCard>
     </div>

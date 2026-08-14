@@ -54,7 +54,7 @@ function notificationHref(
   if (!canAccessHelpSupport(permissions, role)) return null;
   if (!canViewNotification(item, permissions, role)) return null;
   if (item.type === 'task_created') {
-    return `/help-and-support?tab=tasks&taskId=${encodeURIComponent(item.taskId)}`;
+    return `/help-and-support/?tab=tasks&taskId=${encodeURIComponent(item.taskId)}`;
   }
   return `/help-and-support/${encodeURIComponent(item.ticketId)}/`;
 }

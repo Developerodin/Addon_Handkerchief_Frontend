@@ -55,23 +55,56 @@ export const HELP_SUPPORT_TABS: HelpSupportTabKey[] = ['Files', 'Tasks', 'Ticket
 
 export interface HelpSupportPermissions {
   enabled: boolean;
-  Files: boolean;
-  Tasks: boolean;
-  Tickets: boolean;
+  Files: CrudPermissions;
+  Tasks: CrudPermissions;
+  Tickets: CrudPermissions;
 }
 
 export const FULL_HELP_SUPPORT: HelpSupportPermissions = {
   enabled: true,
-  Files: true,
-  Tasks: true,
-  Tickets: true,
+  Files: { ...FULL_CRUD },
+  Tasks: { ...FULL_CRUD },
+  Tickets: { ...FULL_CRUD },
 };
 
 export const EMPTY_HELP_SUPPORT: HelpSupportPermissions = {
   enabled: false,
-  Files: false,
-  Tasks: false,
-  Tickets: false,
+  Files: { ...EMPTY_CRUD },
+  Tasks: { ...EMPTY_CRUD },
+  Tickets: { ...EMPTY_CRUD },
+};
+
+const normalizeCrud = (value: unknown): CrudPermissions => {
+  if (value === true) return { ...FULL_CRUD };
+  if (value === false || value == null) return { ...EMPTY_CRUD };
+  if (typeof value === 'object') {
+    const v = value as Partial<CrudPermissions>;
+    return {
+      create: Boolean(v.create),
+      read: Boolean(v.read),
+      update: Boolean(v.update),
+      delete: Boolean(v.delete),
+    };
+  }
+  return { ...EMPTY_CRUD };
+};
+
+/** Create, update, and delete all require read access. */
+const applyCrudDependencies = (crud: CrudPermissions): CrudPermissions => {
+  const next = { ...crud };
+  if (next.create || next.update || next.delete) {
+    next.read = true;
+  }
+  if (!next.read) {
+    return { ...EMPTY_CRUD };
+  }
+  return next;
+};
+
+const normalizeHelpSupportTab = (value: unknown): CrudPermissions => {
+  if (value === true) return { ...FULL_CRUD };
+  if (value === false) return { ...EMPTY_CRUD };
+  return applyCrudDependencies(normalizeCrud(value));
 };
 
 export interface NavigationPermissions {
@@ -114,18 +147,24 @@ export const normalizeHelpSupport = (value: unknown): HelpSupportPermissions => 
   if (value === true) return { ...FULL_HELP_SUPPORT };
   if (value === false || value == null) return { ...EMPTY_HELP_SUPPORT };
   if (typeof value === 'object') {
-    const v = value as Partial<HelpSupportPermissions>;
+    const v = value as Partial<HelpSupportPermissions> & Record<string, unknown>;
     const enabled = Boolean(v.enabled);
     if (!enabled) return { ...EMPTY_HELP_SUPPORT };
     return {
       enabled: true,
-      Files: Boolean(v.Files),
-      Tasks: Boolean(v.Tasks),
-      Tickets: Boolean(v.Tickets),
+      Files: normalizeHelpSupportTab(v.Files),
+      Tasks: normalizeHelpSupportTab(v.Tasks),
+      Tickets: normalizeHelpSupportTab(v.Tickets),
     };
   }
   return { ...EMPTY_HELP_SUPPORT };
 };
+
+export const isFullHelpSupportCrud = (value: HelpSupportPermissions): boolean =>
+  value.enabled && HELP_SUPPORT_TABS.every((tab) => {
+    const crud = value[tab];
+    return crud.create && crud.read && crud.update && crud.delete;
+  });
 
 export type HubTabSlug = 'files' | 'tasks' | 'tickets';
 
@@ -137,50 +176,25 @@ const HUB_TAB_TO_KEY: Record<HubTabSlug, HelpSupportTabKey> = {
 
 export const hasHelpSupportHubAccess = (value: unknown): boolean => {
   const hs = normalizeHelpSupport(value);
-  return hs.enabled && (hs.Files || hs.Tasks || hs.Tickets);
+  return hs.enabled && HELP_SUPPORT_TABS.some((tab) => hs[tab].read);
 };
 
 export const hasHelpSupportTabAccess = (value: unknown, tab: HubTabSlug): boolean => {
   const hs = normalizeHelpSupport(value);
   if (!hs.enabled) return false;
-  return Boolean(hs[HUB_TAB_TO_KEY[tab]]);
+  return Boolean(hs[HUB_TAB_TO_KEY[tab]].read);
 };
 
 export const firstAllowedHelpSupportTab = (value: unknown): HubTabSlug | null => {
   const hs = normalizeHelpSupport(value);
   if (!hs.enabled) return null;
-  if (hs.Files) return 'files';
-  if (hs.Tasks) return 'tasks';
-  if (hs.Tickets) return 'tickets';
+  if (hs.Files.read) return 'files';
+  if (hs.Tasks.read) return 'tasks';
+  if (hs.Tickets.read) return 'tickets';
   return null;
 };
 
-export const normalizeCrud = (value: unknown): CrudPermissions => {
-  if (value === true) return { ...FULL_CRUD };
-  if (value === false || value == null) return { ...EMPTY_CRUD };
-  if (typeof value === 'object') {
-    const v = value as Partial<CrudPermissions>;
-    return {
-      create: Boolean(v.create),
-      read: Boolean(v.read),
-      update: Boolean(v.update),
-      delete: Boolean(v.delete),
-    };
-  }
-  return { ...EMPTY_CRUD };
-};
-
-/** Create, update, and delete all require read access. */
-export const applyCrudDependencies = (crud: CrudPermissions): CrudPermissions => {
-  const next = { ...crud };
-  if (next.create || next.update || next.delete) {
-    next.read = true;
-  }
-  if (!next.read) {
-    return { ...EMPTY_CRUD };
-  }
-  return next;
-};
+export { normalizeCrud, applyCrudDependencies };
 
 export const applyCrudChange = (
   current: CrudPermissions,
@@ -227,6 +241,15 @@ export const getCrudAtPath = (
   path: string
 ): CrudPermissions => {
   if (!permissions) return { ...EMPTY_CRUD };
+
+  if (path.startsWith('Help & Support.')) {
+    const hs = normalizeHelpSupport(permissions['Help & Support']);
+    if (!hs.enabled) return { ...EMPTY_CRUD };
+    const tabKey = path.slice('Help & Support.'.length) as HelpSupportTabKey;
+    if (!HELP_SUPPORT_TABS.includes(tabKey)) return { ...EMPTY_CRUD };
+    return applyCrudDependencies(normalizeCrud(hs[tabKey]));
+  }
+
   const keys = path.split('.');
   let current: unknown = permissions;
   for (const key of keys) {

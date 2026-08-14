@@ -5,7 +5,8 @@ import { toast } from 'react-hot-toast';
 import { helpSupportService } from '@/shared/services/helpSupportService';
 import { uploadTicketDocuments } from '@/shared/utils/ticketDocumentUpload';
 import type { HelpSupportTicket } from '@/shared/types/helpSupport';
-import { isHelpSupportAgent, canDeleteHelpSupportTickets } from '../helpSupportConstants';
+import { useHelpSupportCrud } from '@/shared/hooks/useHelpSupportCrud';
+import { isHelpSupportAgent } from '../helpSupportConstants';
 import RaiseTicketModal from './RaiseTicketModal';
 import EditTicketModal from './EditTicketModal';
 import TicketTable, { TicketFilters } from './TicketTable';
@@ -24,8 +25,8 @@ type SubTab = 'list' | 'analytics';
  * Issue tickets — raise, track, and resolve problems.
  */
 export default function TicketsTab({ isManagement, userRole, userEmail }: TicketsTabProps) {
+  const { canCreate, canUpdate, canDelete } = useHelpSupportCrud('Tickets');
   const isAgent = isManagement || isHelpSupportAgent(userRole, userEmail);
-  const canDelete = canDeleteHelpSupportTickets(userEmail);
 
   const [subTab, setSubTab] = useState<SubTab>('list');
   const [tickets, setTickets] = useState<HelpSupportTicket[]>([]);
@@ -136,7 +137,8 @@ export default function TicketsTab({ isManagement, userRole, userEmail }: Ticket
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+          disabled={!canCreate}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <i className="ri-add-line text-base" aria-hidden /> Raise Ticket
         </button>
@@ -149,7 +151,7 @@ export default function TicketsTab({ isManagement, userRole, userEmail }: Ticket
           isAgent={isAgent}
           canDelete={canDelete}
           onDeleteTicket={setTicketToDelete}
-          onEditTicket={isAgent ? openEditTicket : undefined}
+          onEditTicket={isAgent && canUpdate ? openEditTicket : undefined}
           page={page}
           limit={limit}
           totalPages={totalPages}
