@@ -1,4 +1,5 @@
-"use client"
+'use client';
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -8,15 +9,34 @@ import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermissio
 import {
   getFabricSupplier,
   updateFabricSupplier,
+  FabricSupplierFabricDetail,
 } from '@/shared/services/fabricSupplierService';
+import { FabricSupplierDetailsSection } from '@/shared/components/catalog/FabricSupplierDetailsSection';
+import { getLookupId } from '@/shared/services/fabricCatalogService';
+
+function mapFabricDetailsFromApi(details: unknown[] | undefined): FabricSupplierFabricDetail[] {
+  if (!Array.isArray(details)) return [];
+  return details.map((detail) => {
+    const row = detail as FabricSupplierFabricDetail & {
+      fabricCatalogId?: string | { id?: string; _id?: string };
+    };
+    return {
+      fabricCatalogId: getLookupId(row.fabricCatalogId),
+      fabricName: row.fabricName || '',
+      fabricSortNo: row.fabricSortNo || '',
+      fabricTypeName: row.fabricTypeName || '',
+      colourName: row.colourName || '',
+    };
+  });
+}
 
 function EditFabricSupplierPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [fabricDetails, setFabricDetails] = useState<FabricSupplierFabricDetail[]>([]);
   const [formData, setFormData] = useState({
     name: '',
-    code: '',
     contactPerson: '',
     contactNumber: '',
     email: '',
@@ -27,7 +47,7 @@ function EditFabricSupplierPage({ params }: { params: { id: string } }) {
     country: 'India',
     gstin: '',
     paymentTerms: '',
-    leadTimeDays: '0',
+    fabricMill: '',
     bankName: '',
     accountHolder: '',
     accountNumber: '',
@@ -41,7 +61,6 @@ function EditFabricSupplierPage({ params }: { params: { id: string } }) {
         const data = await getFabricSupplier(params.id);
         setFormData({
           name: data.name || '',
-          code: data.code || '',
           contactPerson: data.contactPerson || '',
           contactNumber: data.contactNumber || '',
           email: data.email || '',
@@ -52,13 +71,14 @@ function EditFabricSupplierPage({ params }: { params: { id: string } }) {
           country: data.country || 'India',
           gstin: data.gstin || '',
           paymentTerms: data.paymentTerms || '',
-          leadTimeDays: String(data.leadTimeDays ?? 0),
+          fabricMill: data.fabricMill || '',
           bankName: data.bankDetails?.bankName || '',
           accountHolder: data.bankDetails?.accountHolder || '',
           accountNumber: data.bankDetails?.accountNumber || '',
           ifsc: data.bankDetails?.ifsc || '',
           status: data.status || 'active',
         });
+        setFabricDetails(mapFabricDetailsFromApi(data.fabricDetails));
       } catch (error) {
         console.error('Error fetching fabric supplier:', error);
         toast.error('Failed to load fabric supplier');
@@ -84,9 +104,8 @@ function EditFabricSupplierPage({ params }: { params: { id: string } }) {
       return;
     }
 
-    const leadTimeDays = parseInt(formData.leadTimeDays || '0', 10);
-    if (isNaN(leadTimeDays) || leadTimeDays < 0) {
-      alert('Lead time days must be a valid number (0 or greater)');
+    if (fabricDetails.some((detail) => !detail.fabricCatalogId)) {
+      alert('Each fabric detail must have a fabric selected');
       return;
     }
 
@@ -95,7 +114,6 @@ function EditFabricSupplierPage({ params }: { params: { id: string } }) {
       setIsSaving(true);
       await updateFabricSupplier(params.id, {
         name: formData.name.trim(),
-        code: formData.code.trim(),
         contactPerson: formData.contactPerson.trim(),
         contactNumber: formData.contactNumber.trim(),
         email: formData.email.trim(),
@@ -106,7 +124,10 @@ function EditFabricSupplierPage({ params }: { params: { id: string } }) {
         country: formData.country.trim() || 'India',
         gstin: formData.gstin.trim(),
         paymentTerms: formData.paymentTerms.trim(),
-        leadTimeDays,
+        fabricMill: formData.fabricMill.trim(),
+        fabricDetails: fabricDetails.map((detail) => ({
+          fabricCatalogId: detail.fabricCatalogId,
+        })),
         bankDetails: {
           bankName: formData.bankName.trim(),
           accountHolder: formData.accountHolder.trim(),
@@ -175,10 +196,6 @@ function EditFabricSupplierPage({ params }: { params: { id: string } }) {
                 <input type="text" name="name" className="form-control" value={formData.name} onChange={handleInputChange} required />
               </div>
               <div>
-                <label className="form-label">Code</label>
-                <input type="text" name="code" className="form-control" value={formData.code} onChange={handleInputChange} />
-              </div>
-              <div>
                 <label className="form-label">Contact Person *</label>
                 <input type="text" name="contactPerson" className="form-control" value={formData.contactPerson} onChange={handleInputChange} required />
               </div>
@@ -219,8 +236,8 @@ function EditFabricSupplierPage({ params }: { params: { id: string } }) {
                 <input type="text" name="paymentTerms" className="form-control" value={formData.paymentTerms} onChange={handleInputChange} />
               </div>
               <div>
-                <label className="form-label">Lead Time Days</label>
-                <input type="number" name="leadTimeDays" className="form-control" min="0" value={formData.leadTimeDays} onChange={handleInputChange} />
+                <label className="form-label">Fabric Mill</label>
+                <input type="text" name="fabricMill" className="form-control" value={formData.fabricMill} onChange={handleInputChange} />
               </div>
               <div>
                 <label className="form-label">Status</label>
@@ -229,6 +246,8 @@ function EditFabricSupplierPage({ params }: { params: { id: string } }) {
                   <option value="inactive">Inactive</option>
                 </select>
               </div>
+
+              <FabricSupplierDetailsSection value={fabricDetails} onChange={setFabricDetails} />
 
               <div className="md:col-span-2">
                 <h3 className="text-sm font-semibold text-gray-700">Bank Details</h3>

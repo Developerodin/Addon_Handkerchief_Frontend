@@ -12,65 +12,63 @@ import {
   FabricCatalog,
   createFabricCatalog,
   deleteFabricCatalog,
+  getLookupName,
   listFabricCatalogs,
   updateFabricCatalog,
 } from '@/shared/services/fabricCatalogService';
-import { listFabricSuppliers } from '@/shared/services/fabricSupplierService';
+import {
+  fabricTypeApi,
+  fabricColorApi,
+  fabricQualityApi,
+  fabricYarnCountApi,
+  fabricMeasurementApi,
+} from '@/shared/services/fabricLookupService';
 
 interface ExcelRow {
   'ID'?: string;
   'Name'?: string;
-  'Code'?: string;
+  'Fabric Sort No.'?: string;
   'Fabric Type'?: string;
-  'Composition'?: string;
-  'GSM'?: string | number;
-  'Width'?: string | number;
-  'Colour'?: string;
-  'Shade'?: string;
-  'Pantone'?: string;
-  'Design'?: string;
+  'Color'?: string;
+  'Quality'?: string;
+  'Yarn/Count'?: string;
+  'Construction'?: string;
+  'Weave'?: string;
+  'GLM'?: string | number;
+  'GLM Measurement'?: string;
+  'Finished Width'?: string | number;
+  'Finished Width Measurement'?: string;
   'Rate'?: string | number;
   'GST'?: string;
   'HSN Code'?: string;
-  'Min Quantity'?: string | number;
-  'Supplier Name'?: string;
+  'Min Quantity in Kg'?: string | number;
   'Status'?: string;
-  'Remark'?: string;
+  'Remarks'?: string;
 }
 
-const excelColWidths = [
-  { wch: 24 }, { wch: 22 }, { wch: 12 }, { wch: 14 }, { wch: 18 },
-  { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
-  { wch: 14 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 12 },
-  { wch: 20 }, { wch: 10 }, { wch: 24 },
-];
-
-const getSupplierDisplay = (fabric: FabricCatalog): string => {
-  if (fabric.supplier && typeof fabric.supplier === 'object' && fabric.supplier.name) {
-    return fabric.supplier.name;
-  }
-  return fabric.supplierName || '—';
-};
+const excelColWidths = Array.from({ length: 19 }, () => ({ wch: 16 }));
 
 const toExportRow = (fabric: FabricCatalog) => ({
   'ID': fabric.id,
   'Name': fabric.name,
-  'Code': fabric.code || '',
-  'Fabric Type': fabric.fabricType || '',
-  'Composition': fabric.composition || '',
-  'GSM': fabric.gsm ?? '',
-  'Width': fabric.width ?? '',
-  'Colour': fabric.colour || '',
-  'Shade': fabric.shade || '',
-  'Pantone': fabric.pantone || '',
-  'Design': fabric.design || '',
+  'Fabric Sort No.': fabric.fabricSortNo || '',
+  'Fabric Type': fabric.fabricTypeName || getLookupName(fabric.fabricType),
+  'Color': fabric.colourName || getLookupName(fabric.color),
+  'Quality': fabric.qualityName || getLookupName(fabric.quality),
+  'Yarn/Count': fabric.yarnCountName || getLookupName(fabric.yarnCount),
+  'Construction': fabric.construction || '',
+  'Weave': fabric.weave || '',
+  'GLM': fabric.glm ?? '',
+  'GLM Measurement': fabric.glmMeasurementName || getLookupName(fabric.glmMeasurement),
+  'Finished Width': fabric.finishedWidth ?? '',
+  'Finished Width Measurement':
+    fabric.finishedWidthMeasurementName || getLookupName(fabric.finishedWidthMeasurement),
   'Rate': fabric.rate ?? '',
   'GST': fabric.gst || '',
   'HSN Code': fabric.hsnCode || '',
-  'Min Quantity': fabric.minQuantity ?? '',
-  'Supplier Name': getSupplierDisplay(fabric) === '—' ? '' : getSupplierDisplay(fabric),
+  'Min Quantity in Kg': fabric.minQuantity ?? '',
   'Status': fabric.status,
-  'Remark': fabric.remark || '',
+  'Remarks': fabric.remark || '',
 });
 
 const parseNumber = (value: string | number | undefined, fallback = 0): number => {
@@ -184,41 +182,23 @@ const FabricMasterPage = () => {
       const sampleData = [
         {
           'Name': 'White Cotton Voile',
-          'Code': 'FC-VOILE-01',
+          'Fabric Sort No.': 'FC-VOILE-01',
           'Fabric Type': 'Voile',
-          'Composition': '100% Cotton',
-          'GSM': 60,
-          'Width': 44,
-          'Colour': 'White',
-          'Shade': 'Optical',
-          'Pantone': '11-0601',
-          'Design': 'Plain',
+          'Color': 'White',
+          'Quality': 'Premium',
+          'Yarn/Count': "60's Compact+2/100 Cotton",
+          'Construction': '92x80',
+          'Weave': 'Plain',
+          'GLM': 60,
+          'GLM Measurement': 'GSM',
+          'Finished Width': 44,
+          'Finished Width Measurement': 'Inch',
           'Rate': 85,
           'GST': '5',
           'HSN Code': '52082100',
-          'Min Quantity': 50,
-          'Supplier Name': 'Surat Weave Mills',
+          'Min Quantity in Kg': 50,
           'Status': 'active',
-          'Remark': 'Handkerchief base fabric',
-        },
-        {
-          'Name': 'Printed Soft Cambric',
-          'Code': 'FC-CAMB-02',
-          'Fabric Type': 'Cambric',
-          'Composition': '100% Cotton',
-          'GSM': 90,
-          'Width': 48,
-          'Colour': 'Multi',
-          'Shade': 'Pastel',
-          'Pantone': '',
-          'Design': 'Floral print',
-          'Rate': 120,
-          'GST': '5',
-          'HSN Code': '52085100',
-          'Min Quantity': 30,
-          'Supplier Name': 'Coimbatore Soft Cloth',
-          'Status': 'active',
-          'Remark': 'Printed handkerchief fabric',
+          'Remarks': 'Handkerchief base fabric',
         },
       ];
       const ws = XLSX.utils.json_to_sheet(sampleData);
@@ -264,12 +244,18 @@ const FabricMasterPage = () => {
           let successCount = 0;
           let errorCount = 0;
 
-          const [allData, suppliersData] = await Promise.all([
+          const [allData, typesData, colorsData, qualitiesData, yarnCountsData, measurementsData] =
+            await Promise.all([
             listFabricCatalogs({ page: 1, limit: 100000 }),
-            listFabricSuppliers({ page: 1, limit: 500, status: 'active' }),
+            fabricTypeApi.list({ page: 1, limit: 1000, status: 'active' }),
+            fabricColorApi.list({ page: 1, limit: 1000, status: 'active' }),
+            fabricQualityApi.list({ page: 1, limit: 1000, status: 'active' }),
+            fabricYarnCountApi.list({ page: 1, limit: 1000, status: 'active' }),
+            fabricMeasurementApi.list({ page: 1, limit: 1000, status: 'active' }),
           ]);
           const allFabrics = allData.results;
-          const suppliers = suppliersData.results;
+          const resolveByName = <T extends { id: string; name: string }>(items: T[], label?: string) =>
+            label ? items.find((item) => item.name.trim().toLowerCase() === label.trim().toLowerCase())?.id || null : null;
 
           for (let i = 0; i < jsonData.length; i++) {
             const row = jsonData[i];
@@ -277,35 +263,30 @@ const FabricMasterPage = () => {
               const name = (row['Name'] || '').toString().trim();
               if (!name) throw new Error('Name is required');
 
-              const supplierName = (row['Supplier Name'] || '').toString().trim();
-              const matchedSupplier = supplierName
-                ? suppliers.find((s) => s.name.trim().toLowerCase() === supplierName.toLowerCase())
-                : undefined;
-
               const payload = {
                 name,
-                code: (row['Code'] || '').toString().trim(),
-                fabricType: (row['Fabric Type'] || '').toString().trim(),
-                composition: (row['Composition'] || '').toString().trim(),
-                gsm: parseNumber(row['GSM']),
-                width: parseNumber(row['Width']),
-                colour: (row['Colour'] || '').toString().trim(),
-                shade: (row['Shade'] || '').toString().trim(),
-                pantone: (row['Pantone'] || '').toString().trim(),
-                design: (row['Design'] || '').toString().trim(),
+                fabricSortNo: (row['Fabric Sort No.'] || '').toString().trim(),
+                fabricType: resolveByName(typesData.results, (row['Fabric Type'] || '').toString()),
+                color: resolveByName(colorsData.results, (row['Color'] || '').toString()),
+                quality: resolveByName(qualitiesData.results, (row['Quality'] || '').toString()),
+                yarnCount: resolveByName(yarnCountsData.results, (row['Yarn/Count'] || '').toString()),
+                construction: (row['Construction'] || '').toString().trim(),
+                weave: (row['Weave'] || '').toString().trim(),
+                glm: parseNumber(row['GLM']),
+                glmMeasurement: resolveByName(measurementsData.results, (row['GLM Measurement'] || '').toString()),
+                finishedWidth: parseNumber(row['Finished Width']),
+                finishedWidthMeasurement: resolveByName(
+                  measurementsData.results,
+                  (row['Finished Width Measurement'] || '').toString()
+                ),
                 rate: parseNumber(row['Rate']),
                 gst: (row['GST'] || '').toString().trim(),
                 hsnCode: (row['HSN Code'] || '').toString().trim(),
-                minQuantity: parseNumber(row['Min Quantity']),
-                supplier: matchedSupplier?.id || null,
-                supplierName: supplierName || matchedSupplier?.name || '',
-                uomRolls: true,
-                uomKg: true,
-                uomMetres: true,
+                minQuantity: parseNumber(row['Min Quantity in Kg']),
                 status: (row['Status']?.toString()?.toLowerCase() === 'inactive' ? 'inactive' : 'active') as
                   | 'active'
                   | 'inactive',
-                remark: (row['Remark'] || '').toString().trim(),
+                remark: (row['Remarks'] || row['Remark'] || '').toString().trim(),
               };
 
               let fabricId = row['ID']?.toString().trim();
@@ -381,14 +362,14 @@ const FabricMasterPage = () => {
                     <div>
                       <h4 className="font-semibold text-lg mb-2">What is this page?</h4>
                       <p className="text-gray-700">
-                        Manage handkerchief fabric catalog — type, composition, GSM, colour, rate, HSN/GST, and linked suppliers.
+                        Manage handkerchief fabric catalog — type, color, quality, GLM, finished width, rate, HSN/GST, and remarks.
                       </p>
                     </div>
                     <div>
                       <h4 className="font-semibold text-lg mb-2">What can you do here?</h4>
                       <ul className="list-disc list-inside space-y-1 text-gray-700">
                         <li>Search, paginate, and export fabrics</li>
-                        <li>Import via Excel (upsert by ID or name; resolve supplier by name)</li>
+                        <li>Import via Excel (upsert by ID or name; resolve lookups by name)</li>
                         <li>Add, edit, or delete fabric records</li>
                       </ul>
                     </div>
@@ -507,12 +488,12 @@ const FabricMasterPage = () => {
                     />
                   </th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Name</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Code</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Sort No</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Type</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Colour</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">GSM</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Color</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Quality</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">GLM</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Rate</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Supplier</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Status</th>
                   {(canUpdate || canDelete) && (
                     <th className="px-1.5 py-3 text-right pr-[10px] text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
@@ -531,12 +512,12 @@ const FabricMasterPage = () => {
                       />
                     </td>
                     <td className="px-1.5 py-2.5 text-[12px] font-bold text-gray-900 border border-gray-200">{fabric.name}</td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.code || '—'}</td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.fabricType || '—'}</td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.colour || '—'}</td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.gsm ?? '—'}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.fabricSortNo || '—'}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.fabricTypeName || getLookupName(fabric.fabricType) || '—'}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.colourName || getLookupName(fabric.color) || '—'}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.qualityName || getLookupName(fabric.quality) || '—'}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.glm ?? '—'}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.rate ?? '—'}</td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{getSupplierDisplay(fabric)}</td>
                     <td className="px-1.5 py-2.5 border border-gray-200">
                       <span
                         className={`inline-flex px-1.5 py-0.5 text-[9px] font-bold rounded uppercase tracking-tight ${

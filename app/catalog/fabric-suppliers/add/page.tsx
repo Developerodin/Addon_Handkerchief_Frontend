@@ -1,18 +1,23 @@
-"use client"
+'use client';
+
 import React, { useState } from 'react';
 import Seo from '@/shared/layout-components/seo/seo';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
-import { createFabricSupplier } from '@/shared/services/fabricSupplierService';
+import {
+  createFabricSupplier,
+  FabricSupplierFabricDetail,
+} from '@/shared/services/fabricSupplierService';
+import { FabricSupplierDetailsSection } from '@/shared/components/catalog/FabricSupplierDetailsSection';
 
 const AddFabricSupplierPage = () => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [fabricDetails, setFabricDetails] = useState<FabricSupplierFabricDetail[]>([]);
   const [formData, setFormData] = useState({
     name: '',
-    code: '',
     contactPerson: '',
     contactNumber: '',
     email: '',
@@ -23,7 +28,7 @@ const AddFabricSupplierPage = () => {
     country: 'India',
     gstin: '',
     paymentTerms: '',
-    leadTimeDays: '0',
+    fabricMill: '',
     bankName: '',
     accountHolder: '',
     accountNumber: '',
@@ -46,9 +51,8 @@ const AddFabricSupplierPage = () => {
       return;
     }
 
-    const leadTimeDays = parseInt(formData.leadTimeDays || '0', 10);
-    if (isNaN(leadTimeDays) || leadTimeDays < 0) {
-      alert('Lead time days must be a valid number (0 or greater)');
+    if (fabricDetails.some((detail) => !detail.fabricCatalogId)) {
+      alert('Each fabric detail must have a fabric selected');
       return;
     }
 
@@ -56,7 +60,6 @@ const AddFabricSupplierPage = () => {
       setIsLoading(true);
       await createFabricSupplier({
         name: formData.name.trim(),
-        code: formData.code.trim(),
         contactPerson: formData.contactPerson.trim(),
         contactNumber: formData.contactNumber.trim(),
         email: formData.email.trim(),
@@ -67,7 +70,10 @@ const AddFabricSupplierPage = () => {
         country: formData.country.trim() || 'India',
         gstin: formData.gstin.trim(),
         paymentTerms: formData.paymentTerms.trim(),
-        leadTimeDays,
+        fabricMill: formData.fabricMill.trim(),
+        fabricDetails: fabricDetails.map((detail) => ({
+          fabricCatalogId: detail.fabricCatalogId,
+        })),
         bankDetails: {
           bankName: formData.bankName.trim(),
           accountHolder: formData.accountHolder.trim(),
@@ -127,10 +133,6 @@ const AddFabricSupplierPage = () => {
                     <input type="text" id="name" name="name" className="form-control" placeholder="Supplier name" value={formData.name} onChange={handleInputChange} required />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="code" className="form-label">Code</label>
-                    <input type="text" id="code" name="code" className="form-control" placeholder="Supplier code" value={formData.code} onChange={handleInputChange} />
-                  </div>
-                  <div className="form-group">
                     <label htmlFor="contactPerson" className="form-label">Contact Person *</label>
                     <input type="text" id="contactPerson" name="contactPerson" className="form-control" placeholder="Contact person" value={formData.contactPerson} onChange={handleInputChange} required />
                   </div>
@@ -171,8 +173,8 @@ const AddFabricSupplierPage = () => {
                     <input type="text" id="paymentTerms" name="paymentTerms" className="form-control" placeholder="e.g. Net 30" value={formData.paymentTerms} onChange={handleInputChange} />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="leadTimeDays" className="form-label">Lead Time Days</label>
-                    <input type="number" id="leadTimeDays" name="leadTimeDays" className="form-control" min="0" value={formData.leadTimeDays} onChange={handleInputChange} />
+                    <label htmlFor="fabricMill" className="form-label">Fabric Mill</label>
+                    <input type="text" id="fabricMill" name="fabricMill" className="form-control" placeholder="Fabric mill name" value={formData.fabricMill} onChange={handleInputChange} />
                   </div>
                   <div className="form-group">
                     <label htmlFor="status" className="form-label">Status</label>
@@ -181,6 +183,8 @@ const AddFabricSupplierPage = () => {
                       <option value="inactive">Inactive</option>
                     </select>
                   </div>
+
+                  <FabricSupplierDetailsSection value={fabricDetails} onChange={setFabricDetails} />
 
                   <div className="col-span-1 md:col-span-2">
                     <h3 className="text-sm font-semibold text-gray-700 mb-2">Bank Details</h3>

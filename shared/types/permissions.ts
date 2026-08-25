@@ -27,6 +27,11 @@ export const CATALOG_MODULES = [
   'Category',
   'Style codes',
   'Fabric master',
+  'Fabric Type',
+  'Fabric Color',
+  'Fabric Quality',
+  'Fabric Yarn/Count',
+  'Fabric Measurement',
   'Fabric Suppliers',
   'Packaging materials',
   'Process Master',
@@ -39,6 +44,15 @@ export const CATALOG_MODULES = [
 ] as const;
 
 export type CatalogModule = (typeof CATALOG_MODULES)[number];
+
+/** Fabric lookup sub-masters inherit Catalog.Fabric master when their own CRUD is unset. */
+export const FABRIC_LOOKUP_MODULES: CatalogModule[] = [
+  'Fabric Type',
+  'Fabric Color',
+  'Fabric Quality',
+  'Fabric Yarn/Count',
+  'Fabric Measurement',
+];
 
 /** Map legacy Catalog keys from older user navigation documents. */
 export const CATALOG_KEY_ALIASES: Record<string, CatalogModule> = {
@@ -228,6 +242,15 @@ export const mergeNavigationWithDefaults = (
     }
   }
 
+  const fabricMaster = catalog['Fabric master'];
+  for (const key of FABRIC_LOOKUP_MODULES) {
+    const hasOwn =
+      catalog[key].create || catalog[key].read || catalog[key].update || catalog[key].delete;
+    if (!hasOwn && (fabricMaster.read || fabricMaster.create || fabricMaster.update || fabricMaster.delete)) {
+      catalog[key] = { ...fabricMaster };
+    }
+  }
+
   return {
     Dashboard: applyCrudDependencies(normalizeCrud(partial.Dashboard)),
     Catalog: catalog,
@@ -236,7 +259,7 @@ export const mergeNavigationWithDefaults = (
   };
 };
 
-export const getCrudAtPath = (
+const getCrudAtPathDirect = (
   permissions: NavigationPermissions | null,
   path: string
 ): CrudPermissions => {
@@ -259,6 +282,26 @@ export const getCrudAtPath = (
   return applyCrudDependencies(normalizeCrud(current));
 };
 
+const mergeCrudOr = (primary: CrudPermissions, fallback: CrudPermissions): CrudPermissions =>
+  applyCrudDependencies({
+    create: primary.create || fallback.create,
+    read: primary.read || fallback.read,
+    update: primary.update || fallback.update,
+    delete: primary.delete || fallback.delete,
+  });
+
+export const getCrudAtPath = (
+  permissions: NavigationPermissions | null,
+  path: string
+): CrudPermissions => {
+  const direct = getCrudAtPathDirect(permissions, path);
+  if (path.startsWith('Catalog.') && FABRIC_LOOKUP_MODULES.some((module) => path === `Catalog.${module}`)) {
+    const fabricMaster = getCrudAtPathDirect(permissions, 'Catalog.Fabric master');
+    return mergeCrudOr(direct, fabricMaster);
+  }
+  return direct;
+};
+
 /** Map catalog route segment to permission key */
 export const CATALOG_PATH_TO_MODULE: Record<string, CatalogModule> = {
   items: 'Items',
@@ -267,6 +310,12 @@ export const CATALOG_PATH_TO_MODULE: Record<string, CatalogModule> = {
   'style-code-combos': 'Style codes',
   fabric: 'Fabric master',
   'fabric-master': 'Fabric master',
+  'fabric-lookups': 'Fabric master',
+  'fabric-type': 'Fabric Type',
+  'fabric-color': 'Fabric Color',
+  'fabric-quality': 'Fabric Quality',
+  'fabric-yarn-count': 'Fabric Yarn/Count',
+  'fabric-measurement': 'Fabric Measurement',
   'fabric-suppliers': 'Fabric Suppliers',
   'packaging-materials': 'Packaging materials',
   'raw-material': 'Packaging materials',

@@ -1,26 +1,36 @@
 import { API_BASE_URL } from '@/shared/data/utilities/api';
+import {
+  FabricColorLookup,
+  FabricMeasurementLookup,
+  FabricQualityLookup,
+  FabricTypeLookup,
+  FabricYarnCountLookup,
+} from '@/shared/services/fabricLookupService';
 
 export interface FabricCatalog {
   id: string;
   name: string;
-  code?: string;
-  fabricType?: string;
-  composition?: string;
-  gsm?: number;
-  width?: number;
-  colour?: string;
-  shade?: string;
-  pantone?: string;
-  design?: string;
+  fabricSortNo?: string;
+  fabricType?: string | FabricTypeLookup | null;
+  fabricTypeName?: string;
+  color?: string | FabricColorLookup | null;
+  colourName?: string;
+  quality?: string | FabricQualityLookup | null;
+  qualityName?: string;
+  yarnCount?: string | FabricYarnCountLookup | null;
+  yarnCountName?: string;
+  construction?: string;
+  weave?: string;
+  glm?: number;
+  glmMeasurement?: string | FabricMeasurementLookup | null;
+  glmMeasurementName?: string;
+  finishedWidth?: number;
+  finishedWidthMeasurement?: string | FabricMeasurementLookup | null;
+  finishedWidthMeasurementName?: string;
   rate?: number;
   gst?: string;
   hsnCode?: string;
   minQuantity?: number;
-  supplier?: string | { id: string; name?: string } | null;
-  supplierName?: string;
-  uomRolls?: boolean;
-  uomKg?: boolean;
-  uomMetres?: boolean;
   status?: 'active' | 'inactive';
   remark?: string;
   createdAt?: string;
@@ -41,17 +51,14 @@ export interface FabricCatalogQueryParams {
   search?: string;
   sortBy?: string;
   name?: string;
-  code?: string;
+  fabricSortNo?: string;
   fabricType?: string;
-  colour?: string;
+  color?: string;
+  quality?: string;
   status?: 'active' | 'inactive' | string;
-  supplier?: string;
 }
 
-export type CreateFabricCatalogPayload = Omit<
-  FabricCatalog,
-  'id' | 'createdAt' | 'updatedAt'
->;
+export type CreateFabricCatalogPayload = Omit<FabricCatalog, 'id' | 'createdAt' | 'updatedAt'>;
 
 export type UpdateFabricCatalogPayload = Partial<CreateFabricCatalogPayload>;
 
@@ -69,6 +76,24 @@ function normalizeFabric(row: Record<string, unknown>): FabricCatalog {
   };
 }
 
+export const getLookupId = (value: unknown): string => {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object' && value !== null) {
+    const obj = value as { id?: string; _id?: string };
+    return String(obj.id ?? obj._id ?? '');
+  }
+  return '';
+};
+
+export const getLookupName = (value: unknown, fallback = ''): string => {
+  if (!value) return fallback;
+  if (typeof value === 'object' && value !== null && 'name' in value) {
+    return String((value as { name?: string }).name || fallback);
+  }
+  return fallback;
+};
+
 export async function listFabricCatalogs(
   params: FabricCatalogQueryParams = {}
 ): Promise<FabricCatalogListResponse> {
@@ -78,11 +103,11 @@ export async function listFabricCatalogs(
   if (params.search?.trim()) searchParams.set('search', params.search.trim());
   if (params.sortBy) searchParams.set('sortBy', params.sortBy);
   if (params.name) searchParams.set('name', params.name);
-  if (params.code) searchParams.set('code', params.code);
+  if (params.fabricSortNo) searchParams.set('fabricSortNo', params.fabricSortNo);
   if (params.fabricType) searchParams.set('fabricType', params.fabricType);
-  if (params.colour) searchParams.set('colour', params.colour);
+  if (params.color) searchParams.set('color', params.color);
+  if (params.quality) searchParams.set('quality', params.quality);
   if (params.status) searchParams.set('status', params.status);
-  if (params.supplier) searchParams.set('supplier', params.supplier);
 
   const query = searchParams.toString();
   const response = await fetch(`${BASE}${query ? `?${query}` : ''}`, {
@@ -148,7 +173,6 @@ const fabricCatalogService = {
   create: createFabricCatalog,
   update: updateFabricCatalog,
   delete: deleteFabricCatalog,
-  /** Alias matching yarnCatalogService naming used by Items pages */
   getFabricCatalogs: listFabricCatalogs,
 };
 

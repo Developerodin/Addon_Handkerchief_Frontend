@@ -7,10 +7,17 @@ export interface FabricSupplierBankDetails {
   ifsc?: string;
 }
 
+export interface FabricSupplierFabricDetail {
+  fabricCatalogId: string;
+  fabricName?: string;
+  fabricSortNo?: string;
+  fabricTypeName?: string;
+  colourName?: string;
+}
+
 export interface FabricSupplier {
   id: string;
   name: string;
-  code?: string;
   contactPerson: string;
   contactNumber?: string;
   email?: string;
@@ -21,7 +28,8 @@ export interface FabricSupplier {
   country?: string;
   gstin?: string;
   paymentTerms?: string;
-  leadTimeDays?: number;
+  fabricMill?: string;
+  fabricDetails?: FabricSupplierFabricDetail[];
   bankDetails?: FabricSupplierBankDetails;
   status: 'active' | 'inactive';
   createdAt?: string;
@@ -42,7 +50,6 @@ export interface FabricSupplierQueryParams {
   search?: string;
   sortBy?: string;
   name?: string;
-  code?: string;
   status?: 'active' | 'inactive';
 }
 
@@ -69,7 +76,6 @@ export async function listFabricSuppliers(
   if (params.search?.trim()) searchParams.set('search', params.search.trim());
   if (params.sortBy) searchParams.set('sortBy', params.sortBy);
   if (params.name) searchParams.set('name', params.name);
-  if (params.code) searchParams.set('code', params.code);
   if (params.status) searchParams.set('status', params.status);
 
   const query = searchParams.toString();

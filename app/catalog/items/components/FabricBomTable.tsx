@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { listFabricCatalogs, FabricCatalog } from '@/shared/services/fabricCatalogService';
+import { listFabricCatalogs, FabricCatalog, getLookupName } from '@/shared/services/fabricCatalogService';
 import {
   FabricBomItem,
   BomSectionCard,
@@ -231,7 +231,7 @@ export function FabricBomTable({ items, onChange, disabled }: FabricBomTableProp
                           Name
                         </th>
                         <th className="px-3 py-2.5 text-left text-[11px] font-bold text-gray-600 uppercase border border-gray-200">
-                          Code
+                          Sort No
                         </th>
                         <th className="px-3 py-2.5 text-left text-[11px] font-bold text-gray-600 uppercase border border-gray-200">
                           Type
@@ -248,10 +248,10 @@ export function FabricBomTable({ items, onChange, disabled }: FabricBomTableProp
                             {fabric.name}
                           </td>
                           <td className="px-3 py-2 text-[12px] text-gray-600 border border-gray-200">
-                            {fabric.code || '—'}
+                            {fabric.fabricSortNo || '—'}
                           </td>
                           <td className="px-3 py-2 text-[12px] text-gray-600 border border-gray-200">
-                            {fabric.fabricType || '—'}
+                            {fabric.fabricTypeName || getLookupName(fabric.fabricType) || '—'}
                           </td>
                           <td className="px-3 py-2 text-right border border-gray-200">
                             <button

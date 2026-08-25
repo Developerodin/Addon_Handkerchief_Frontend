@@ -19,7 +19,6 @@ import {
 interface ExcelRow {
   'ID'?: string;
   'Name'?: string;
-  'Code'?: string;
   'Contact Person'?: string;
   'Contact Number'?: string;
   'Email'?: string;
@@ -30,7 +29,7 @@ interface ExcelRow {
   'Country'?: string;
   'GSTIN'?: string;
   'Payment Terms'?: string;
-  'Lead Time Days'?: string | number;
+  'Fabric Mill'?: string;
   'Bank Name'?: string;
   'Account Holder'?: string;
   'Account Number'?: string;
@@ -39,7 +38,7 @@ interface ExcelRow {
 }
 
 const excelColWidths = [
-  { wch: 24 }, { wch: 22 }, { wch: 12 }, { wch: 18 }, { wch: 14 },
+  { wch: 24 }, { wch: 22 }, { wch: 18 }, { wch: 14 },
   { wch: 22 }, { wch: 28 }, { wch: 14 }, { wch: 14 }, { wch: 10 },
   { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 18 },
   { wch: 18 }, { wch: 16 }, { wch: 12 }, { wch: 10 },
@@ -48,7 +47,6 @@ const excelColWidths = [
 const toExportRow = (supplier: FabricSupplier) => ({
   'ID': supplier.id,
   'Name': supplier.name,
-  'Code': supplier.code || '',
   'Contact Person': supplier.contactPerson,
   'Contact Number': supplier.contactNumber || '',
   'Email': supplier.email || '',
@@ -59,7 +57,7 @@ const toExportRow = (supplier: FabricSupplier) => ({
   'Country': supplier.country || 'India',
   'GSTIN': supplier.gstin || '',
   'Payment Terms': supplier.paymentTerms || '',
-  'Lead Time Days': supplier.leadTimeDays ?? 0,
+  'Fabric Mill': supplier.fabricMill || '',
   'Bank Name': supplier.bankDetails?.bankName || '',
   'Account Holder': supplier.bankDetails?.accountHolder || '',
   'Account Number': supplier.bankDetails?.accountNumber || '',
@@ -172,7 +170,6 @@ const FabricSuppliersPage = () => {
       const sampleData = [
         {
           'Name': 'Surat Weave Mills',
-          'Code': 'SWM001',
           'Contact Person': 'Ravi Patel',
           'Contact Number': '9876543210',
           'Email': 'ravi@suratweave.com',
@@ -183,7 +180,7 @@ const FabricSuppliersPage = () => {
           'Country': 'India',
           'GSTIN': '24AABCU9603R1ZM',
           'Payment Terms': 'Net 30',
-          'Lead Time Days': 7,
+          'Fabric Mill': 'Surat Weave Mills',
           'Bank Name': 'HDFC Bank',
           'Account Holder': 'Surat Weave Mills',
           'Account Number': '50100123456789',
@@ -192,7 +189,6 @@ const FabricSuppliersPage = () => {
         },
         {
           'Name': 'Coimbatore Soft Cloth',
-          'Code': 'CSC002',
           'Contact Person': 'Meena Krishnan',
           'Contact Number': '9123456780',
           'Email': 'meena@cscotton.in',
@@ -203,7 +199,7 @@ const FabricSuppliersPage = () => {
           'Country': 'India',
           'GSTIN': '33AABCU9603R1ZN',
           'Payment Terms': 'Advance 50%',
-          'Lead Time Days': 10,
+          'Fabric Mill': 'Coimbatore Soft Cloth',
           'Bank Name': 'SBI',
           'Account Holder': 'Coimbatore Soft Cloth',
           'Account Number': '30123456789',
@@ -267,7 +263,6 @@ const FabricSuppliersPage = () => {
 
               const payload = {
                 name,
-                code: (row['Code'] || '').toString().trim(),
                 contactPerson,
                 contactNumber: (row['Contact Number'] || '').toString().trim(),
                 email: (row['Email'] || '').toString().trim(),
@@ -278,7 +273,7 @@ const FabricSuppliersPage = () => {
                 country: (row['Country'] || 'India').toString().trim() || 'India',
                 gstin: (row['GSTIN'] || '').toString().trim(),
                 paymentTerms: (row['Payment Terms'] || '').toString().trim(),
-                leadTimeDays: parseInt(row['Lead Time Days']?.toString() || '0', 10) || 0,
+                fabricMill: (row['Fabric Mill'] || '').toString().trim(),
                 bankDetails: {
                   bankName: (row['Bank Name'] || '').toString().trim(),
                   accountHolder: (row['Account Holder'] || '').toString().trim(),
@@ -489,7 +484,6 @@ const FabricSuppliersPage = () => {
                     />
                   </th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Name</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Code</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Contact Person</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">City</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">GSTIN</th>
@@ -511,7 +505,6 @@ const FabricSuppliersPage = () => {
                       />
                     </td>
                     <td className="px-1.5 py-2.5 text-[12px] font-bold text-gray-900 border border-gray-200">{supplier.name}</td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{supplier.code || '—'}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{supplier.contactPerson}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{supplier.city || '—'}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{supplier.gstin || '—'}</td>
