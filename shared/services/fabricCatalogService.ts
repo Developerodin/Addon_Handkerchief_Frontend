@@ -21,6 +21,9 @@ export interface FabricCatalog {
   yarnCountName?: string;
   construction?: string;
   weave?: string;
+  design?: '' | 'Plain' | 'Print';
+  wash?: '' | 'Yes' | 'No';
+  finish?: '' | 'NA' | 'N9' | 'Silverdor' | 'Anti Micobacterial';
   glm?: number;
   glmMeasurement?: string | FabricMeasurementLookup | null;
   glmMeasurementName?: string;

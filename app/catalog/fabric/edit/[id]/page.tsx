@@ -11,6 +11,11 @@ import { getFabricCatalog, getLookupId, updateFabricCatalog } from '@/shared/ser
 import { CatalogLookupField } from '@/shared/components/catalog/CatalogLookupField';
 import { fabricCatalogLookupFields, fabricWeaveItems } from '@/shared/config/fabricCatalogLookupFields';
 import {
+  FABRIC_DESIGN_OPTIONS,
+  FABRIC_FINISH_OPTIONS,
+  FABRIC_WASH_OPTIONS,
+} from '@/shared/constants/handkerchiefCatalog';
+import {
   fabricTypeApi,
   fabricColorApi,
   fabricQualityApi,
@@ -41,6 +46,9 @@ function EditFabricPage({ params }: { params: { id: string } }) {
     yarnCount: '',
     construction: '',
     weave: '',
+    design: '',
+    wash: '',
+    finish: '',
     glm: '',
     glmMeasurement: '',
     finishedWidth: '',
@@ -89,6 +97,9 @@ function EditFabricPage({ params }: { params: { id: string } }) {
           yarnCount: getLookupId(data.yarnCount),
           construction: data.construction || '',
           weave: data.weave || '',
+          design: data.design || '',
+          wash: data.wash || '',
+          finish: data.finish || '',
           glm: data.glm != null ? String(data.glm) : '',
           glmMeasurement: getLookupId(data.glmMeasurement),
           finishedWidth: data.finishedWidth != null ? String(data.finishedWidth) : '',
@@ -134,6 +145,9 @@ function EditFabricPage({ params }: { params: { id: string } }) {
     yarnCount: formData.yarnCount || null,
     construction: formData.construction.trim(),
     weave: formData.weave.trim(),
+    design: formData.design,
+    wash: formData.wash,
+    finish: formData.finish,
     glm: formData.glm === '' ? 0 : Number(formData.glm),
     glmMeasurement: formData.glmMeasurement || null,
     finishedWidth: formData.finishedWidth === '' ? 0 : Number(formData.finishedWidth),
@@ -207,6 +221,9 @@ function EditFabricPage({ params }: { params: { id: string } }) {
               onChange={(id) => setFormData((prev) => ({ ...prev, weave: id }))}
               {...fabricCatalogLookupFields.weave}
             />
+            <div><label className="form-label">Design</label><select name="design" className="form-control" value={formData.design} onChange={handleInputChange}>{FABRIC_DESIGN_OPTIONS.map((option) => (<option key={option.value || 'empty'} value={option.value}>{option.label}</option>))}</select></div>
+            <div><label className="form-label">Wash</label><select name="wash" className="form-control" value={formData.wash} onChange={handleInputChange}>{FABRIC_WASH_OPTIONS.map((option) => (<option key={option.value || 'empty'} value={option.value}>{option.label}</option>))}</select></div>
+            <div><label className="form-label">Finish</label><select name="finish" className="form-control" value={formData.finish} onChange={handleInputChange}>{FABRIC_FINISH_OPTIONS.map((option) => (<option key={option.value || 'empty'} value={option.value}>{option.label}</option>))}</select></div>
             <div><label className="form-label">GLM (weight)</label><input name="glm" className="form-control" inputMode="decimal" value={formData.glm} onChange={handleDecimalChange} /></div>
             <CatalogLookupField label="GLM Measurement" value={formData.glmMeasurement} items={weightMeasurements} onChange={(id) => setFormData((prev) => ({ ...prev, glmMeasurement: id }))} {...fabricCatalogLookupFields.measurement} modalTitle="Select GLM Measurement" />
             <div><label className="form-label">Finished Width</label><input name="finishedWidth" className="form-control" inputMode="decimal" value={formData.finishedWidth} onChange={handleDecimalChange} /></div>

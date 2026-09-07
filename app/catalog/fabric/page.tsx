@@ -23,6 +23,11 @@ import {
   fabricYarnCountApi,
   fabricMeasurementApi,
 } from '@/shared/services/fabricLookupService';
+import {
+  normalizeFabricDesign,
+  normalizeFabricFinish,
+  normalizeFabricWash,
+} from '@/shared/constants/handkerchiefCatalog';
 
 interface ExcelRow {
   'ID'?: string;
@@ -34,6 +39,9 @@ interface ExcelRow {
   'Yarn/Count'?: string;
   'Construction'?: string;
   'Weave'?: string;
+  'Design'?: string;
+  'Wash'?: string;
+  'Finish'?: string;
   'GLM'?: string | number;
   'GLM Measurement'?: string;
   'Finished Width'?: string | number;
@@ -46,7 +54,7 @@ interface ExcelRow {
   'Remarks'?: string;
 }
 
-const excelColWidths = Array.from({ length: 19 }, () => ({ wch: 16 }));
+const excelColWidths = Array.from({ length: 22 }, () => ({ wch: 16 }));
 
 const toExportRow = (fabric: FabricCatalog) => ({
   'ID': fabric.id,
@@ -58,6 +66,9 @@ const toExportRow = (fabric: FabricCatalog) => ({
   'Yarn/Count': fabric.yarnCountName || getLookupName(fabric.yarnCount),
   'Construction': fabric.construction || '',
   'Weave': fabric.weave || '',
+  'Design': fabric.design || '',
+  'Wash': fabric.wash || '',
+  'Finish': fabric.finish || '',
   'GLM': fabric.glm ?? '',
   'GLM Measurement': fabric.glmMeasurementName || getLookupName(fabric.glmMeasurement),
   'Finished Width': fabric.finishedWidth ?? '',
@@ -189,6 +200,9 @@ const FabricMasterPage = () => {
           'Yarn/Count': "60's Compact+2/100 Cotton",
           'Construction': '92x80',
           'Weave': 'Plain',
+          'Design': 'Plain',
+          'Wash': 'Yes',
+          'Finish': 'NA',
           'GLM': 60,
           'GLM Measurement': 'GSM',
           'Finished Width': 44,
@@ -272,6 +286,9 @@ const FabricMasterPage = () => {
                 yarnCount: resolveByName(yarnCountsData.results, (row['Yarn/Count'] || '').toString()),
                 construction: (row['Construction'] || '').toString().trim(),
                 weave: (row['Weave'] || '').toString().trim(),
+                design: normalizeFabricDesign((row['Design'] || '').toString()),
+                wash: normalizeFabricWash((row['Wash'] || '').toString()),
+                finish: normalizeFabricFinish((row['Finish'] || '').toString()),
                 glm: parseNumber(row['GLM']),
                 glmMeasurement: resolveByName(measurementsData.results, (row['GLM Measurement'] || '').toString()),
                 finishedWidth: parseNumber(row['Finished Width']),
@@ -362,7 +379,7 @@ const FabricMasterPage = () => {
                     <div>
                       <h4 className="font-semibold text-lg mb-2">What is this page?</h4>
                       <p className="text-gray-700">
-                        Manage handkerchief fabric catalog — type, color, quality, GLM, finished width, rate, HSN/GST, and remarks.
+                        Manage handkerchief fabric catalog — type, color, quality, design, wash, finish, GLM, finished width, rate, HSN/GST, and remarks.
                       </p>
                     </div>
                     <div>
@@ -492,6 +509,9 @@ const FabricMasterPage = () => {
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Type</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Color</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Quality</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Design</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Wash</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Finish</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">GLM</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Rate</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Status</th>
@@ -516,6 +536,9 @@ const FabricMasterPage = () => {
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.fabricTypeName || getLookupName(fabric.fabricType) || '—'}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.colourName || getLookupName(fabric.color) || '—'}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.qualityName || getLookupName(fabric.quality) || '—'}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.design || '—'}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.wash || '—'}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.finish || '—'}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.glm ?? '—'}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.rate ?? '—'}</td>
                     <td className="px-1.5 py-2.5 border border-gray-200">

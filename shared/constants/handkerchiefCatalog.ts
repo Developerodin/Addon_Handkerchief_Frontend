@@ -74,3 +74,55 @@ export function getFabricWeaveSelectOptions(currentValue?: string) {
   }
   return [...FABRIC_WEAVE_OPTIONS, { value: trimmed, label: trimmed }];
 }
+
+export const FABRIC_DESIGN_OPTIONS = [
+  { value: '', label: 'Select Design' },
+  { value: 'Plain', label: 'Plain' },
+  { value: 'Print', label: 'Print' },
+] as const;
+
+export const FABRIC_WASH_OPTIONS = [
+  { value: '', label: 'Select Wash' },
+  { value: 'Yes', label: 'Yes' },
+  { value: 'No', label: 'No' },
+] as const;
+
+export const FABRIC_FINISH_OPTIONS = [
+  { value: '', label: 'Select Finish' },
+  { value: 'NA', label: 'NA' },
+  { value: 'N9', label: 'N9' },
+  { value: 'Silverdor', label: 'Silverdor' },
+  { value: 'Anti Micobacterial', label: 'Anti Micobacterial' },
+] as const;
+
+export type FabricDesignValue = (typeof FABRIC_DESIGN_OPTIONS)[number]['value'];
+export type FabricWashValue = (typeof FABRIC_WASH_OPTIONS)[number]['value'];
+export type FabricFinishValue = (typeof FABRIC_FINISH_OPTIONS)[number]['value'];
+
+function normalizeEnumValue(
+  value: string | undefined,
+  allowed: readonly { value: string; label: string }[],
+  fieldLabel: string
+): string {
+  const trimmed = value?.toString().trim() ?? '';
+  if (!trimmed) return '';
+  const match = allowed.find(
+    (option) => option.value && option.value.toLowerCase() === trimmed.toLowerCase()
+  );
+  if (!match?.value) {
+    throw new Error(`Invalid ${fieldLabel}: "${trimmed}"`);
+  }
+  return match.value;
+}
+
+export function normalizeFabricDesign(value?: string): string {
+  return normalizeEnumValue(value, FABRIC_DESIGN_OPTIONS, 'Design');
+}
+
+export function normalizeFabricWash(value?: string): string {
+  return normalizeEnumValue(value, FABRIC_WASH_OPTIONS, 'Wash');
+}
+
+export function normalizeFabricFinish(value?: string): string {
+  return normalizeEnumValue(value, FABRIC_FINISH_OPTIONS, 'Finish');
+}
