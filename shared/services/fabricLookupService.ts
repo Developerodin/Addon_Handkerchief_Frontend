@@ -129,6 +129,18 @@ export interface FabricQualityLookup {
   status: FabricLookupStatus;
 }
 
+export interface FabricYarnLookup {
+  id: string;
+  name: string;
+  status: FabricLookupStatus;
+}
+
+export interface FabricCountLookup {
+  id: string;
+  name: string;
+  status: FabricLookupStatus;
+}
+
 export interface FabricYarnCountLookup {
   id: string;
   name: string;
@@ -158,6 +170,8 @@ export function formatFabricQualityLabel(quality: Pick<FabricQualityLookup, 'nam
   return name || '—';
 }
 
+export const fabricYarnApi = createFabricLookupApi<FabricYarnLookup>('/fabric-yarns', 'fabric yarn');
+export const fabricCountApi = createFabricLookupApi<FabricCountLookup>('/fabric-counts', 'fabric count');
 export const fabricYarnCountApi = createFabricLookupApi<FabricYarnCountLookup>(
   '/fabric-yarn-counts',
   'fabric yarn/count'

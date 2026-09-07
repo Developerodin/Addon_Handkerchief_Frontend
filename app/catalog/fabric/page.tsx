@@ -20,7 +20,8 @@ import {
   fabricTypeApi,
   fabricColorApi,
   fabricQualityApi,
-  fabricYarnCountApi,
+  fabricYarnApi,
+  fabricCountApi,
   fabricMeasurementApi,
 } from '@/shared/services/fabricLookupService';
 import {
@@ -33,10 +34,13 @@ interface ExcelRow {
   'ID'?: string;
   'Name'?: string;
   'Fabric Sort No.'?: string;
+  'Mill Old Fabric Sort No.'?: string;
+  'Mill New Fabric Sort No.'?: string;
   'Fabric Type'?: string;
   'Color'?: string;
   'Quality'?: string;
-  'Yarn/Count'?: string;
+  'Yarn'?: string;
+  'Count'?: string;
   'Construction'?: string;
   'Weave'?: string;
   'Design'?: string;
@@ -54,16 +58,19 @@ interface ExcelRow {
   'Remarks'?: string;
 }
 
-const excelColWidths = Array.from({ length: 22 }, () => ({ wch: 16 }));
+const excelColWidths = Array.from({ length: 25 }, () => ({ wch: 16 }));
 
 const toExportRow = (fabric: FabricCatalog) => ({
   'ID': fabric.id,
   'Name': fabric.name,
   'Fabric Sort No.': fabric.fabricSortNo || '',
+  'Mill Old Fabric Sort No.': fabric.millOldFabricSortNo || '',
+  'Mill New Fabric Sort No.': fabric.millNewFabricSortNo || '',
   'Fabric Type': fabric.fabricTypeName || getLookupName(fabric.fabricType),
   'Color': fabric.colourName || getLookupName(fabric.color),
   'Quality': fabric.qualityName || getLookupName(fabric.quality),
-  'Yarn/Count': fabric.yarnCountName || getLookupName(fabric.yarnCount),
+  'Yarn': fabric.yarnName || getLookupName(fabric.yarn),
+  'Count': fabric.countName || getLookupName(fabric.count),
   'Construction': fabric.construction || '',
   'Weave': fabric.weave || '',
   'Design': fabric.design || '',
@@ -194,10 +201,13 @@ const FabricMasterPage = () => {
         {
           'Name': 'White Cotton Voile',
           'Fabric Sort No.': 'FC-VOILE-01',
+          'Mill Old Fabric Sort No.': '17223',
+          'Mill New Fabric Sort No.': 'AW0017223AB0586',
           'Fabric Type': 'Voile',
           'Color': 'White',
           'Quality': 'Premium',
-          'Yarn/Count': "60's Compact+2/100 Cotton",
+          'Yarn': "60's",
+          'Count': '60COMPX60COMP',
           'Construction': '92x80',
           'Weave': 'Plain',
           'Design': 'Plain',
@@ -258,13 +268,14 @@ const FabricMasterPage = () => {
           let successCount = 0;
           let errorCount = 0;
 
-          const [allData, typesData, colorsData, qualitiesData, yarnCountsData, measurementsData] =
+          const [allData, typesData, colorsData, qualitiesData, yarnsData, countsData, measurementsData] =
             await Promise.all([
             listFabricCatalogs({ page: 1, limit: 100000 }),
             fabricTypeApi.list({ page: 1, limit: 1000, status: 'active' }),
             fabricColorApi.list({ page: 1, limit: 1000, status: 'active' }),
             fabricQualityApi.list({ page: 1, limit: 1000, status: 'active' }),
-            fabricYarnCountApi.list({ page: 1, limit: 1000, status: 'active' }),
+            fabricYarnApi.list({ page: 1, limit: 1000, status: 'active' }),
+            fabricCountApi.list({ page: 1, limit: 1000, status: 'active' }),
             fabricMeasurementApi.list({ page: 1, limit: 1000, status: 'active' }),
           ]);
           const allFabrics = allData.results;
@@ -280,10 +291,13 @@ const FabricMasterPage = () => {
               const payload = {
                 name,
                 fabricSortNo: (row['Fabric Sort No.'] || '').toString().trim(),
+                millOldFabricSortNo: (row['Mill Old Fabric Sort No.'] || '').toString().trim(),
+                millNewFabricSortNo: (row['Mill New Fabric Sort No.'] || '').toString().trim(),
                 fabricType: resolveByName(typesData.results, (row['Fabric Type'] || '').toString()),
                 color: resolveByName(colorsData.results, (row['Color'] || '').toString()),
                 quality: resolveByName(qualitiesData.results, (row['Quality'] || '').toString()),
-                yarnCount: resolveByName(yarnCountsData.results, (row['Yarn/Count'] || '').toString()),
+                yarn: resolveByName(yarnsData.results, (row['Yarn'] || '').toString()),
+                count: resolveByName(countsData.results, (row['Count'] || '').toString()),
                 construction: (row['Construction'] || '').toString().trim(),
                 weave: (row['Weave'] || '').toString().trim(),
                 design: normalizeFabricDesign((row['Design'] || '').toString()),
@@ -379,7 +393,7 @@ const FabricMasterPage = () => {
                     <div>
                       <h4 className="font-semibold text-lg mb-2">What is this page?</h4>
                       <p className="text-gray-700">
-                        Manage handkerchief fabric catalog — type, color, quality, design, wash, finish, GLM, finished width, rate, HSN/GST, and remarks.
+                        Manage handkerchief fabric catalog — mill sort numbers, type, color, quality, yarn, count, design, wash, finish, GLM, finished width, rate, HSN/GST, and remarks.
                       </p>
                     </div>
                     <div>
@@ -506,9 +520,13 @@ const FabricMasterPage = () => {
                   </th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Name</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Sort No</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Mill Old</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Mill New</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Type</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Color</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Quality</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Yarn</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Count</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Design</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Wash</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Finish</th>
@@ -533,9 +551,13 @@ const FabricMasterPage = () => {
                     </td>
                     <td className="px-1.5 py-2.5 text-[12px] font-bold text-gray-900 border border-gray-200">{fabric.name}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.fabricSortNo || '—'}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.millOldFabricSortNo || '—'}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.millNewFabricSortNo || '—'}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.fabricTypeName || getLookupName(fabric.fabricType) || '—'}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.colourName || getLookupName(fabric.color) || '—'}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.qualityName || getLookupName(fabric.quality) || '—'}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.yarnName || getLookupName(fabric.yarn) || '—'}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.countName || getLookupName(fabric.count) || '—'}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.design || '—'}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.wash || '—'}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{fabric.finish || '—'}</td>

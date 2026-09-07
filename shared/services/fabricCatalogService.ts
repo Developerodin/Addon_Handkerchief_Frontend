@@ -4,21 +4,26 @@ import {
   FabricMeasurementLookup,
   FabricQualityLookup,
   FabricTypeLookup,
-  FabricYarnCountLookup,
+  FabricYarnLookup,
+  FabricCountLookup,
 } from '@/shared/services/fabricLookupService';
 
 export interface FabricCatalog {
   id: string;
   name: string;
   fabricSortNo?: string;
+  millOldFabricSortNo?: string;
+  millNewFabricSortNo?: string;
   fabricType?: string | FabricTypeLookup | null;
   fabricTypeName?: string;
   color?: string | FabricColorLookup | null;
   colourName?: string;
   quality?: string | FabricQualityLookup | null;
   qualityName?: string;
-  yarnCount?: string | FabricYarnCountLookup | null;
-  yarnCountName?: string;
+  yarn?: string | FabricYarnLookup | null;
+  yarnName?: string;
+  count?: string | FabricCountLookup | null;
+  countName?: string;
   construction?: string;
   weave?: string;
   design?: '' | 'Plain' | 'Print';

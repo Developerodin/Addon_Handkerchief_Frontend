@@ -1,9 +1,10 @@
 import {
   FabricColorLookup,
+  FabricCountLookup,
   FabricMeasurementLookup,
   FabricQualityLookup,
   FabricTypeLookup,
-  FabricYarnCountLookup,
+  FabricYarnLookup,
   formatFabricQualityLabel,
 } from '@/shared/services/fabricLookupService';
 import { CatalogLookupColumn } from '@/shared/components/catalog/CatalogLookupSelectModal';
@@ -73,13 +74,21 @@ export const fabricCatalogLookupFields = {
       );
     },
   },
-  yarnCount: {
-    modalTitle: 'Select Yarn/Count',
-    searchPlaceholder: 'Search yarn/count...',
-    columns: nameColumn<FabricYarnCountLookup>(),
-    getItemId: (item: FabricYarnCountLookup) => item.id,
-    getItemLabel: (item: FabricYarnCountLookup) => item.name,
-    filterItem: nameFilter<FabricYarnCountLookup>,
+  yarn: {
+    modalTitle: 'Select Yarn',
+    searchPlaceholder: 'Search yarn...',
+    columns: nameColumn<FabricYarnLookup>(),
+    getItemId: (item: FabricYarnLookup) => item.id,
+    getItemLabel: (item: FabricYarnLookup) => item.name,
+    filterItem: nameFilter<FabricYarnLookup>,
+  },
+  count: {
+    modalTitle: 'Select Count',
+    searchPlaceholder: 'Search count...',
+    columns: nameColumn<FabricCountLookup>(),
+    getItemId: (item: FabricCountLookup) => item.id,
+    getItemLabel: (item: FabricCountLookup) => item.name,
+    filterItem: nameFilter<FabricCountLookup>,
   },
   measurement: {
     modalTitle: 'Select Measurement',

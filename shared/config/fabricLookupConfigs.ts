@@ -2,7 +2,8 @@ import {
   fabricTypeApi,
   fabricColorApi,
   fabricQualityApi,
-  fabricYarnCountApi,
+  fabricYarnApi,
+  fabricCountApi,
   fabricMeasurementApi,
   FabricColorLookup,
   FabricMeasurementLookup,
@@ -249,29 +250,50 @@ export const fabricQualityFormConfig: FabricLookupFormConfig<FabricQualityForm> 
   }),
 };
 
-export const fabricYarnCountListConfig = {
+export const fabricYarnListConfig = {
   ...fabricTypeListConfig,
-  segment: 'fabric-yarn-count' as const,
-  title: 'Fabric Yarn/Count',
-  description: 'Manage yarn/count options for fabric master (e.g. 60\'s Compact+2/100 Cotton).',
-  basePath: '/catalog/fabric-yarn-count',
-  api: fabricYarnCountApi,
-  importTemplateRow: { Name: "60's Compact+2/100 Cotton", Status: 'active' },
-  importTemplateRows: [
-    { Name: "60's Compact+2/100 Cotton", Status: 'active' },
-    { Name: '40s Ring Cotton', Status: 'active' },
+  segment: 'fabric-yarn' as const,
+  title: 'Fabric Yarn',
+  description: 'Manage yarn options for fabric master (e.g. 60\'s).',
+  basePath: '/catalog/fabric-yarn',
+  api: fabricYarnApi,
+  importTemplateRow: { Name: "60's", Status: 'active' },
+  importTemplateRows: [{ Name: "60's", Status: 'active' }, { Name: "40's", Status: 'active' }],
+};
+
+export const fabricYarnFormConfig: FabricLookupFormConfig<SimpleLookupForm> = {
+  ...fabricTypeFormConfig,
+  segment: 'fabric-yarn',
+  permissionPath: 'Catalog.Fabric Yarn',
+  title: 'Fabric Yarn',
+  listPath: '/catalog/fabric-yarn',
+  api: fabricYarnApi,
+  fields: [
+    { name: 'name', label: 'Name', required: true, placeholder: "e.g. 60's" },
+    statusField,
   ],
 };
 
-export const fabricYarnCountFormConfig: FabricLookupFormConfig<SimpleLookupForm> = {
+export const fabricCountListConfig = {
+  ...fabricTypeListConfig,
+  segment: 'fabric-count' as const,
+  title: 'Fabric Count',
+  description: 'Manage count options for fabric master (e.g. 60COMPX60COMP).',
+  basePath: '/catalog/fabric-count',
+  api: fabricCountApi,
+  importTemplateRow: { Name: '60COMPX60COMP', Status: 'active' },
+  importTemplateRows: [{ Name: '60COMPX60COMP', Status: 'active' }, { Name: '40COMPX40COMP', Status: 'active' }],
+};
+
+export const fabricCountFormConfig: FabricLookupFormConfig<SimpleLookupForm> = {
   ...fabricTypeFormConfig,
-  segment: 'fabric-yarn-count',
-  permissionPath: 'Catalog.Fabric Yarn/Count',
-  title: 'Fabric Yarn/Count',
-  listPath: '/catalog/fabric-yarn-count',
-  api: fabricYarnCountApi,
+  segment: 'fabric-count',
+  permissionPath: 'Catalog.Fabric Count',
+  title: 'Fabric Count',
+  listPath: '/catalog/fabric-count',
+  api: fabricCountApi,
   fields: [
-    { name: 'name', label: 'Name', required: true, placeholder: "e.g. 60's Compact+2/100 Cotton" },
+    { name: 'name', label: 'Name', required: true, placeholder: 'e.g. 60COMPX60COMP' },
     statusField,
   ],
 };

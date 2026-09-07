@@ -10,7 +10,8 @@ const modules = [
   { title: 'Fabric Type', description: 'Manage fabric types', path: '/catalog/fabric-type', permissionPath: '/catalog/fabric-type' },
   { title: 'Fabric Color', description: 'Manage fabric colors', path: '/catalog/fabric-color', permissionPath: '/catalog/fabric-color' },
   { title: 'Fabric Quality', description: 'Fiber composition and quality grades (e.g. 100% Cotton)', path: '/catalog/fabric-quality', permissionPath: '/catalog/fabric-quality' },
-  { title: 'Yarn/Count', description: 'Yarn/count options (e.g. 60\'s Compact+2/100 Cotton)', path: '/catalog/fabric-yarn-count', permissionPath: '/catalog/fabric-yarn-count' },
+  { title: 'Yarn', description: 'Yarn options (e.g. 60\'s)', path: '/catalog/fabric-yarn', permissionPath: '/catalog/fabric-yarn' },
+  { title: 'Count', description: 'Count options (e.g. 60COMPX60COMP)', path: '/catalog/fabric-count', permissionPath: '/catalog/fabric-count' },
   { title: 'Measurement', description: 'Manage measurement units', path: '/catalog/fabric-measurement', permissionPath: '/catalog/fabric-measurement' },
 ];
 

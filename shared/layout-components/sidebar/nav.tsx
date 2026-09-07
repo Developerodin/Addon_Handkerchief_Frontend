@@ -109,11 +109,19 @@ const BaseMenuItems: any = [
           },
           {
             icon: FabricIcon,
-            path: "/catalog/fabric-yarn-count",
+            path: "/catalog/fabric-yarn",
             type: "link",
             active: false,
             selected: false,
-            title: "Yarn/Count",
+            title: "Yarn",
+          },
+          {
+            icon: FabricIcon,
+            path: "/catalog/fabric-count",
+            type: "link",
+            active: false,
+            selected: false,
+            title: "Count",
           },
           {
             icon: FabricIcon,

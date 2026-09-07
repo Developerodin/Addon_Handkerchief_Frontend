@@ -19,13 +19,15 @@ import {
   fabricTypeApi,
   fabricColorApi,
   fabricQualityApi,
-  fabricYarnCountApi,
+  fabricYarnApi,
+  fabricCountApi,
   fabricMeasurementApi,
   FabricColorLookup,
+  FabricCountLookup,
   FabricMeasurementLookup,
   FabricQualityLookup,
   FabricTypeLookup,
-  FabricYarnCountLookup,
+  FabricYarnLookup,
 } from '@/shared/services/fabricLookupService';
 
 function EditFabricPage({ params }: { params: { id: string } }) {
@@ -35,15 +37,19 @@ function EditFabricPage({ params }: { params: { id: string } }) {
   const [fabricTypes, setFabricTypes] = useState<FabricTypeLookup[]>([]);
   const [colors, setColors] = useState<FabricColorLookup[]>([]);
   const [qualities, setQualities] = useState<FabricQualityLookup[]>([]);
-  const [yarnCounts, setYarnCounts] = useState<FabricYarnCountLookup[]>([]);
+  const [yarns, setYarns] = useState<FabricYarnLookup[]>([]);
+  const [counts, setCounts] = useState<FabricCountLookup[]>([]);
   const [measurements, setMeasurements] = useState<FabricMeasurementLookup[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     fabricSortNo: '',
+    millOldFabricSortNo: '',
+    millNewFabricSortNo: '',
     fabricType: '',
     color: '',
     quality: '',
-    yarnCount: '',
+    yarn: '',
+    count: '',
     construction: '',
     weave: '',
     design: '',
@@ -64,18 +70,20 @@ function EditFabricPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     const loadLookups = async () => {
       try {
-        const [typesData, colorsData, qualitiesData, yarnCountsData, measurementsData] =
+        const [typesData, colorsData, qualitiesData, yarnsData, countsData, measurementsData] =
           await Promise.all([
             fabricTypeApi.list({ page: 1, limit: 1000, status: 'active' }),
             fabricColorApi.list({ page: 1, limit: 1000, status: 'active' }),
             fabricQualityApi.list({ page: 1, limit: 1000, status: 'active' }),
-            fabricYarnCountApi.list({ page: 1, limit: 1000, status: 'active' }),
+            fabricYarnApi.list({ page: 1, limit: 1000, status: 'active' }),
+            fabricCountApi.list({ page: 1, limit: 1000, status: 'active' }),
             fabricMeasurementApi.list({ page: 1, limit: 1000, status: 'active' }),
           ]);
         setFabricTypes(typesData.results);
         setColors(colorsData.results);
         setQualities(qualitiesData.results);
-        setYarnCounts(yarnCountsData.results);
+        setYarns(yarnsData.results);
+        setCounts(countsData.results);
         setMeasurements(measurementsData.results);
       } catch {
         // Non-critical
@@ -91,10 +99,13 @@ function EditFabricPage({ params }: { params: { id: string } }) {
         setFormData({
           name: data.name || '',
           fabricSortNo: data.fabricSortNo || '',
+          millOldFabricSortNo: data.millOldFabricSortNo || '',
+          millNewFabricSortNo: data.millNewFabricSortNo || '',
           fabricType: getLookupId(data.fabricType),
           color: getLookupId(data.color),
           quality: getLookupId(data.quality),
-          yarnCount: getLookupId(data.yarnCount),
+          yarn: getLookupId(data.yarn),
+          count: getLookupId(data.count),
           construction: data.construction || '',
           weave: data.weave || '',
           design: data.design || '',
@@ -139,10 +150,13 @@ function EditFabricPage({ params }: { params: { id: string } }) {
   const buildPayload = () => ({
     name: formData.name.trim(),
     fabricSortNo: formData.fabricSortNo.trim(),
+    millOldFabricSortNo: formData.millOldFabricSortNo.trim(),
+    millNewFabricSortNo: formData.millNewFabricSortNo.trim(),
     fabricType: formData.fabricType || null,
     color: formData.color || null,
     quality: formData.quality || null,
-    yarnCount: formData.yarnCount || null,
+    yarn: formData.yarn || null,
+    count: formData.count || null,
     construction: formData.construction.trim(),
     weave: formData.weave.trim(),
     design: formData.design,
@@ -205,10 +219,13 @@ function EditFabricPage({ params }: { params: { id: string } }) {
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div><label className="form-label">Name *</label><input name="name" className="form-control" value={formData.name} onChange={handleInputChange} required /></div>
             <div><label className="form-label">Fabric Sort No.</label><input name="fabricSortNo" className="form-control" value={formData.fabricSortNo} onChange={handleInputChange} /></div>
+            <div><label className="form-label">Mill Old Fabric Sort No.</label><input name="millOldFabricSortNo" className="form-control" value={formData.millOldFabricSortNo} onChange={handleInputChange} placeholder="e.g. 17223" /></div>
+            <div><label className="form-label">Mill New Fabric Sort No.</label><input name="millNewFabricSortNo" className="form-control" value={formData.millNewFabricSortNo} onChange={handleInputChange} placeholder="e.g. AW0017223AB0586" /></div>
             <CatalogLookupField label="Fabric Type" value={formData.fabricType} items={fabricTypes} onChange={(id) => setFormData((prev) => ({ ...prev, fabricType: id }))} {...fabricCatalogLookupFields.fabricType} />
             <CatalogLookupField label="Color" value={formData.color} items={colors} onChange={(id) => setFormData((prev) => ({ ...prev, color: id }))} {...fabricCatalogLookupFields.color} />
             <CatalogLookupField label="Quality" value={formData.quality} items={qualities} onChange={(id) => setFormData((prev) => ({ ...prev, quality: id }))} {...fabricCatalogLookupFields.quality} />
-            <CatalogLookupField label="Yarn/Count" value={formData.yarnCount} items={yarnCounts} onChange={(id) => setFormData((prev) => ({ ...prev, yarnCount: id }))} {...fabricCatalogLookupFields.yarnCount} />
+            <CatalogLookupField label="Yarn" value={formData.yarn} items={yarns} onChange={(id) => setFormData((prev) => ({ ...prev, yarn: id }))} {...fabricCatalogLookupFields.yarn} />
+            <CatalogLookupField label="Count" value={formData.count} items={counts} onChange={(id) => setFormData((prev) => ({ ...prev, count: id }))} {...fabricCatalogLookupFields.count} />
             <div><label className="form-label">Construction</label><input name="construction" className="form-control" value={formData.construction} onChange={handleInputChange} /></div>
             <CatalogLookupField
               label="Weave"
