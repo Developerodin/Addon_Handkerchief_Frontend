@@ -1,6 +1,6 @@
 "use client";
 
-import Link from 'next/link';
+import { UiIconButton } from '@/shared/components/ui/UiIconButton';
 import { useCatalogCrud, CatalogSegment } from '@/shared/hooks/useCatalogCrud';
 
 interface CatalogRowActionsProps {
@@ -29,35 +29,27 @@ export default function CatalogRowActions({
   return (
     <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
       {canUpdate && (
-        <Link
-          href={editHref}
-          className="w-7 h-7 flex items-center justify-center bg-emerald-50 text-emerald-400 border border-emerald-100 rounded hover:bg-emerald-100 transition-colors"
-          title="Edit"
-        >
-          <i className="ri-pencil-line text-xs" />
-        </Link>
+        <UiIconButton href={editHref} icon="ri-pencil-line" tone="edit" title="Edit" aria-label="Edit" />
       )}
       {canCreate && onReplicate && (
-        <button
-          type="button"
-          className="w-7 h-7 flex items-center justify-center bg-blue-50 text-blue-500 border border-blue-100 rounded hover:bg-blue-100 transition-colors disabled:opacity-50"
-          onClick={onReplicate}
+        <UiIconButton
+          icon="ri-file-copy-line"
+          tone="copy"
           title="Replicate"
+          aria-label="Replicate"
+          onClick={onReplicate}
           disabled={replicateLoading}
-        >
-          <i className="ri-file-copy-line text-xs" />
-        </button>
+        />
       )}
       {canDelete && (
-        <button
-          type="button"
-          className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-400 border border-red-100 rounded hover:bg-red-100 transition-colors disabled:opacity-50"
-          onClick={onDelete}
+        <UiIconButton
+          icon="ri-delete-bin-line"
+          tone="delete"
           title="Delete"
+          aria-label="Delete"
+          onClick={onDelete}
           disabled={deleteDisabled || deleteLoading}
-        >
-          <i className="ri-delete-bin-line text-xs" />
-        </button>
+        />
       )}
     </div>
   );

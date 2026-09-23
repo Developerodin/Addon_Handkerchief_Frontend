@@ -15,6 +15,8 @@ import { styleCodeService } from '@/shared/services/styleCodeService';
 import productService, { ProductBulkRow } from '@/shared/services/productService';
 import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud';
 import CatalogPageSizeSelect from '@/shared/components/catalog/CatalogPageSizeSelect';
+import CatalogRowActions from '@/shared/components/catalog/CatalogRowActions';
+import { UiButton, UiIconButton, UiSearchInput, UiPagination, UiListLoading, UiListEmpty } from '@/shared/components/ui';
 
 interface StyleCode {
   styleCode?: string;
@@ -2459,22 +2461,6 @@ const ProductListPage = () => {
     }
   };
 
-  function getPagination(currentPage: number, totalPages: number) {
-    const pages = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-      pages.push(1);
-      if (currentPage > 4) pages.push('...');
-      for (let i = Math.max(2, currentPage - 2); i <= Math.min(totalPages - 1, currentPage + 2); i++) {
-        pages.push(i);
-      }
-      if (currentPage < totalPages - 3) pages.push('...');
-      pages.push(totalPages);
-    }
-    return pages;
-  }
-
   return (
     <div className="main-content !p-[10px]">
       <Seo title="Products"/>
@@ -2484,11 +2470,9 @@ const ProductListPage = () => {
           {/* Header Section */}
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-2">
-              <div className="w-[3px] h-5 bg-purple-600 rounded-full"></div>
-              <h1 className="text-sm font-bold text-gray-800">Products</h1>
-              <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm">
-                {totalResults}
-              </span>
+              <div className="ui-page-accent"></div>
+              <h1 className="ui-page-title">Products</h1>
+              <span className="ui-page-count">{totalResults}</span>
                 <HelpIcon
                   title="Products Management"
                   content={
@@ -2575,16 +2559,12 @@ const ProductListPage = () => {
                 ) : null}
               </div>
 
-              {/* Search */}
               <div className="relative">
-                <input
-                  type="text"
-                  className="bg-white border border-gray-200 pl-8 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 w-48 min-w-[120px] placeholder:text-gray-400 transition-all font-medium"
+                <UiSearchInput
                   placeholder="Search..."
                   value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
-                <i className="ri-search-line absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
               </div>
 
               <CatalogPageSizeSelect
@@ -2595,15 +2575,9 @@ const ProductListPage = () => {
                 }}
               />
 
-              <button
-                type="button"
-                onClick={handleDownloadTemplate}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 text-[#495057] text-[11px] font-bold rounded hover:bg-gray-50 transition-colors shadow-sm"
-                disabled={isLoading}
-              >
-                <i className="ri-file-download-line text-xs"></i>
+              <UiButton variant="secondary" icon="ri-file-download-line" onClick={handleDownloadTemplate} disabled={isLoading}>
                 Template
-              </button>
+              </UiButton>
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -2647,117 +2621,82 @@ const ProductListPage = () => {
                   onChange={handleProcessExcelImport}
                 />
               {canImport && (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-[11px] font-bold rounded hover:bg-emerald-700 transition-colors shadow-sm"
-                disabled={isLoading}
-              >
-                <i className="ri-file-excel-2-line text-xs"></i>
+              <UiButton variant="success" icon="ri-file-excel-2-line" onClick={() => fileInputRef.current?.click()} disabled={isLoading}>
                 Import
-              </button>
+              </UiButton>
               )}
               {importProgress !== null && (
-                <div className="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden flex items-center">
-                  <div className="bg-primary h-full transition-all duration-200" style={{ width: `${importProgress}%` }}></div>
-                  <span className="ml-1.5 text-[10px] text-gray-600 font-medium">{importProgress}%</span>
+                <div className="ui-import-progress">
+                  <div className="ui-import-progress__bar" style={{ width: `${importProgress}%` }}></div>
+                  <span className="ui-import-progress__label">{importProgress}%</span>
                 </div>
               )}
-              <button
-                type="button"
-                onClick={handleExport}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm"
-                disabled={isLoading}
-              >
-                <i className="ri-download-2-line text-xs"></i>
+              <UiButton variant="primary" icon="ri-download-2-line" onClick={handleExport} disabled={isLoading}>
                 Export
-              </button>
+              </UiButton>
               {exportProgress !== null && (
-                <div className="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden flex items-center">
-                  <div className="bg-primary h-full transition-all duration-200" style={{ width: `${exportProgress}%` }}></div>
-                  <span className="ml-1.5 text-[10px] text-gray-600 font-medium">{exportProgress}%</span>
+                <div className="ui-import-progress">
+                  <div className="ui-import-progress__bar" style={{ width: `${exportProgress}%` }}></div>
+                  <span className="ui-import-progress__label">{exportProgress}%</span>
                 </div>
               )}
               {canDelete && selectedProducts.length > 0 && (
-                <button
-                  type="button"
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded border transition-colors bg-red-50 text-red-600 border-red-100 hover:bg-red-100 shadow-sm"
-                  onClick={handleBulkDelete}
-                  disabled={isLoading}
-                >
-                  <i className="ri-delete-bin-line text-xs"></i>
+                <UiButton variant="danger" icon="ri-delete-bin-line" onClick={handleBulkDelete} disabled={isLoading}>
                   Delete ({selectedProducts.length})
-                </button>
+                </UiButton>
               )}
               {canCreate && (
-              <Link
-                href="/catalog/items/add"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm"
-              >
-                <i className="ri-add-line text-xs"></i>
+              <UiButton variant="primary" href="/catalog/items/add" icon="ri-add-line">
                 Add Product
-              </Link>
+              </UiButton>
               )}
-              <button
-                type="button"
-                onClick={() => setShowMoreExports(!showMoreExports)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 text-[#495057] text-[11px] font-bold rounded hover:bg-gray-50 transition-colors"
-                disabled={isLoading}
-              >
-                <i className="ri-more-line text-xs"></i>
+              <UiButton variant="secondary" icon="ri-more-line" onClick={() => setShowMoreExports(!showMoreExports)} disabled={isLoading}>
                 {showMoreExports ? 'Less' : 'More'}
-              </button>
+              </UiButton>
               {showMoreExports && (
                 <div className="flex flex-wrap gap-2 mt-2 w-full">
-                  <button type="button" onClick={handleExportAll} className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-600 border border-purple-200 text-[11px] font-bold rounded hover:bg-purple-100" disabled={isLoading}>
-                    <i className="ri-download-2-line text-xs"></i> Export All
-                  </button>
-                  {/* <span className="text-[11px] font-bold text-gray-500 self-center mr-1">Process Excel:</span>
-                  <button type="button" onClick={handleProcessExcelExport} className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-bold rounded hover:bg-amber-100" disabled={isLoading}>
-                    <i className="ri-download-2-line text-xs"></i> Process Excel Export
-                  </button>
-                  <button type="button" onClick={() => processExcelFileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-bold rounded hover:bg-amber-100" disabled={isLoading}>
-                    <i className="ri-file-excel-2-line text-xs"></i> Process Excel Import
-                  </button> */}
-                  <button type="button" onClick={handleExportByAttributes} className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 text-sky-600 border border-sky-100 text-[11px] font-bold rounded hover:bg-sky-100" disabled={isLoading}>
-                    <i className="ri-download-2-line text-xs"></i> Export by Attributes
-                  </button>
+                  <UiButton variant="secondary" icon="ri-download-2-line" onClick={handleExportAll} disabled={isLoading}>
+                    Export All
+                  </UiButton>
+                  <UiButton variant="secondary" icon="ri-download-2-line" onClick={handleExportByAttributes} disabled={isLoading}>
+                    Export by Attributes
+                  </UiButton>
                   {!isDesign && !isFinal && (
                     <>
-                      <button type="button" onClick={handleExportByBOM} className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 text-sky-600 border border-sky-100 text-[11px] font-bold rounded hover:bg-sky-100" disabled={isLoading}>
-                        <i className="ri-download-2-line text-xs"></i> Export by BOM
-                      </button>
-                      <button type="button" onClick={handleExportByProcesses} className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 text-sky-600 border border-sky-100 text-[11px] font-bold rounded hover:bg-sky-100" disabled={isLoading}>
-                        <i className="ri-download-2-line text-xs"></i> Export by Processes
-                      </button>
+                      <UiButton variant="secondary" icon="ri-download-2-line" onClick={handleExportByBOM} disabled={isLoading}>
+                        Export by BOM
+                      </UiButton>
+                      <UiButton variant="secondary" icon="ri-download-2-line" onClick={handleExportByProcesses} disabled={isLoading}>
+                        Export by Processes
+                      </UiButton>
                     </>
                   )}
                   {canImport && (
-                  <button type="button" onClick={() => attributesFileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-100 text-[11px] font-bold rounded hover:bg-emerald-100" disabled={isLoading}>
-                    <i className="ri-file-excel-2-line text-xs"></i> Import by Attributes
-                  </button>
+                    <UiButton variant="success" icon="ri-file-excel-2-line" onClick={() => attributesFileInputRef.current?.click()} disabled={isLoading}>
+                      Import by Attributes
+                    </UiButton>
                   )}
                   {!isDesign && !isFinal && (
                     <>
-                      <button type="button" onClick={() => bomFileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-100 text-[11px] font-bold rounded hover:bg-emerald-100" disabled={isLoading}>
-                        <i className="ri-file-excel-2-line text-xs"></i> Import by BOM
-                      </button>
-                      <button type="button" onClick={() => processesFileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-100 text-[11px] font-bold rounded hover:bg-emerald-100" disabled={isLoading}>
-                        <i className="ri-file-excel-2-line text-xs"></i> Import by Processes
-                      </button>
+                      <UiButton variant="success" icon="ri-file-excel-2-line" onClick={() => bomFileInputRef.current?.click()} disabled={isLoading}>
+                        Import by BOM
+                      </UiButton>
+                      <UiButton variant="success" icon="ri-file-excel-2-line" onClick={() => processesFileInputRef.current?.click()} disabled={isLoading}>
+                        Import by Processes
+                      </UiButton>
                     </>
                   )}
-                  <button type="button" onClick={handleDownloadAttributesTemplate} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-600 border border-gray-200 text-[11px] font-bold rounded hover:bg-gray-100" disabled={isLoading}>
-                    <i className="ri-file-download-line text-xs"></i> Attributes Template
-                  </button>
+                  <UiButton variant="secondary" icon="ri-file-download-line" onClick={handleDownloadAttributesTemplate} disabled={isLoading}>
+                    Attributes Template
+                  </UiButton>
                   {!isDesign && !isFinal && (
                     <>
-                      <button type="button" onClick={handleDownloadBOMTemplate} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-600 border border-gray-200 text-[11px] font-bold rounded hover:bg-gray-100" disabled={isLoading}>
-                        <i className="ri-file-download-line text-xs"></i> BOM Template
-                      </button>
-                      <button type="button" onClick={handleDownloadProcessesTemplate} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-600 border border-gray-200 text-[11px] font-bold rounded hover:bg-gray-100" disabled={isLoading}>
-                        <i className="ri-file-download-line text-xs"></i> Processes Template
-                      </button>
+                      <UiButton variant="secondary" icon="ri-file-download-line" onClick={handleDownloadBOMTemplate} disabled={isLoading}>
+                        BOM Template
+                      </UiButton>
+                      <UiButton variant="secondary" icon="ri-file-download-line" onClick={handleDownloadProcessesTemplate} disabled={isLoading}>
+                        Processes Template
+                      </UiButton>
                     </>
                   )}
                 </div>
@@ -2769,19 +2708,16 @@ const ProductListPage = () => {
         {/* Table Container */}
         <div className="overflow-x-auto min-h-[300px]">
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mb-4 opacity-50"></div>
-              <p className="text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase">Loading Data</p>
-            </div>
+            <UiListLoading />
           ) : products.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                <i className="ri-inbox-line text-xl text-gray-200"></i>
-              </div>
-              <h3 className="text-xs font-bold text-gray-400 mb-1">DATA EMPTY</h3>
-            </div>
+            <UiListEmpty
+              icon="ri-inbox-line"
+              canCreate={canCreate}
+              addHref="/catalog/items/add"
+              addLabel="Add Product"
+            />
           ) : (
-            <table className="w-full border-collapse border border-gray-200">
+            <table className="ui-table w-full border-collapse border border-gray-200">
               <thead>
                 <tr className="bg-gray-50/30">
                   <th className="pl-[10px] pr-1 py-3 text-left w-10 border border-gray-200">
@@ -2813,9 +2749,13 @@ const ProductListPage = () => {
                     {(!isDesign && !isProduction) || isFinal ? (
                       <td className="px-1.5 py-2.5 border border-gray-200">
                         {product.styleCodes && product.styleCodes.length > 0 ? (
-                          <button onClick={() => handleViewStyleCodes(product)} className="w-7 h-7 flex items-center justify-center bg-blue-50 text-blue-400 border border-blue-100 rounded hover:bg-blue-100 transition-colors" title={`View ${product.styleCodes.length} Style Code${product.styleCodes.length > 1 ? 's' : ''}`}>
-                            <i className="ri-eye-line text-xs"></i>
-                          </button>
+                          <UiIconButton
+                            icon="ri-eye-line"
+                            tone="view"
+                            title={`View ${product.styleCodes.length} Style Code${product.styleCodes.length > 1 ? 's' : ''}`}
+                            aria-label="View style codes"
+                            onClick={() => handleViewStyleCodes(product)}
+                          />
                         ) : (
                           <span className="text-[12px] text-gray-400">-</span>
                         )}
@@ -2828,18 +2768,11 @@ const ProductListPage = () => {
                     {isFinal && <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-400 max-w-xs truncate border border-gray-200" title={product.description || ''}>{product.description || ''}</td>}
                     {(canUpdate || canDelete) && (
                     <td className="px-1.5 py-2.5 text-right pr-[10px] border border-gray-200">
-                      <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                        {canUpdate && (
-                        <Link href={`/catalog/items/${product.id}/edit`} className="w-7 h-7 flex items-center justify-center bg-emerald-50 text-emerald-400 border border-emerald-100 rounded hover:bg-emerald-100 transition-colors" title="Edit">
-                          <i className="ri-pencil-line text-xs"></i>
-                        </Link>
-                        )}
-                        {canDelete && (
-                        <button type="button" className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-400 border border-red-100 rounded hover:bg-red-100 transition-colors" onClick={() => handleDelete(product.id)} title="Delete">
-                          <i className="ri-delete-bin-line text-xs"></i>
-                        </button>
-                        )}
-                      </div>
+                      <CatalogRowActions
+                        segment="items"
+                        editHref={`/catalog/items/${product.id}/edit`}
+                        onDelete={() => handleDelete(product.id)}
+                      />
                     </td>
                     )}
                   </tr>
@@ -2849,27 +2782,14 @@ const ProductListPage = () => {
           )}
         </div>
 
-        {/* Pagination */}
-        <div className="p-[10px] pt-4 flex flex-wrap items-center justify-between gap-4 border-t border-gray-100 bg-white">
-          <div className="text-[11px] font-medium text-[#495057] tracking-tight">
-            Showing <span>{totalResults === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to {totalResults === 0 ? 0 : Math.min(currentPage * itemsPerPage, totalResults)}</span> of <span>{totalResults}</span> entries <span className="ml-1 opacity-50">→</span>
-          </div>
-          <div className="flex items-center">
-            <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">Prev</button>
-            <div className="flex items-center gap-1 mx-2">
-              {getPagination(currentPage, totalPages).map((page, idx) =>
-                page === '...' ? (
-                  <span key={`ellipsis-${idx}`} className="text-gray-300 text-[10px]">...</span>
-                ) : (
-                  <button key={page} onClick={() => setCurrentPage(Number(page))} className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold rounded transition-all ${currentPage === page ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'}`}>
-                    {page}
-                  </button>
-                )
-              )}
-            </div>
-            <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">Next</button>
-          </div>
-        </div>
+        <UiPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalResults={totalResults}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          className="p-[10px] pt-4 border-t border-gray-100 bg-white"
+        />
       </div>
 
       {/* Style Codes Modal */}
@@ -2907,9 +2827,9 @@ const ProductListPage = () => {
               )}
             </div>
             <div className="flex justify-end p-[10px] border-t border-gray-200">
-              <button onClick={handleCloseStyleCodesModal} className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm">
+              <UiButton variant="primary" onClick={handleCloseStyleCodesModal}>
                 Close
-              </button>
+              </UiButton>
             </div>
           </div>
         </div>

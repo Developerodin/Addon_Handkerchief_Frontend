@@ -9,6 +9,7 @@ import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { filterDigitsOnly } from '@/shared/utils/formInputFilters';
 import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
+import { UiFormFooter, UiFormSection } from '@/shared/components/ui';
 
 interface ProcessStep {
   stepTitle: string;
@@ -274,9 +275,8 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
         listHref="/catalog/processes"
         listLabel="Process Master"
         currentLabel="Edit Process"
+        singleColumn
       >
-          <div className="box">
-            <div className="box-body">
               <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 gap-6">
                   <div className="grid grid-cols-12 gap-4">
@@ -544,9 +544,8 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h6 className="text-base font-semibold">Process Steps</h6>
+                  <UiFormSection title="Process Steps">
+                    <div className="flex justify-end mb-4">
                       <button
                         type="button"
                         className="ti-btn ti-btn-primary"
@@ -557,6 +556,7 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
                       </button>
                     </div>
 
+                    <div className="space-y-4">
                     {formData.steps.map((step, index) => (
                       <div key={index} className="grid grid-cols-12 gap-4 p-4 border rounded-lg relative">
                         <div className="col-span-12 md:col-span-4">
@@ -614,36 +614,16 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
                         )}
                       </div>
                     ))}
-                  </div>
+                    </div>
+                  </UiFormSection>
 
-                  <div className="flex justify-end space-x-4 mt-6">
-                    <button
-                      type="button"
-                      className="ti-btn ti-btn-secondary"
-                      onClick={() => router.push('/catalog/processes')}
-                      disabled={isSubmitting}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="ti-btn ti-btn-primary"
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <span className="animate-spin inline-block h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"></span>
-                          Updating...
-                        </>
-                      ) : (
-                        'Update Process'
-                      )}
-                    </button>
-                  </div>
+                  <UiFormFooter
+                    submitLabel="Update Process"
+                    isLoading={isSubmitting}
+                    onCancel={() => router.push('/catalog/processes')}
+                  />
                 </div>
               </form>
-            </div>
-          </div>
       </CatalogMasterFormPage>
     </>
   );

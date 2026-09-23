@@ -1,9 +1,10 @@
 "use client"
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Seo from '@/shared/layout-components/seo/seo';
 import { toast, Toaster } from 'react-hot-toast';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
+import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
+import { UiFormFooter } from '@/shared/components/ui';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import {
@@ -20,6 +21,7 @@ interface Category extends CategoryRecord {}
 function EditCategoryPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [formData, setFormData] = useState<Category>({
     id: '',
@@ -112,6 +114,7 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
     const loadingToast = toast.loading('Updating category...');
 
     try {
+      setIsSaving(true);
       const imageUrl = await uploadOptionalImage(imageFile);
 
       const requestBody = {
@@ -146,6 +149,8 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
       console.error('Error updating category:', error);
       toast.dismiss(loadingToast);
       alert(error instanceof Error ? error.message : 'Failed to update category');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -160,22 +165,19 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
   }
 
   return (
-    <div className="main-content catalog-master-form">
+    <>
       <Toaster position="top-right" />
-      <Seo title="Edit Category" />
-      
-      <div className="box !bg-transparent border-0 shadow-none mb-4">
-        <div className="box-header">
-          <h1 className="box-title text-2xl font-semibold">Edit Category</h1>
-        </div>
-      </div>
-
-      <div className="box">
-        <div className="box-body">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="form-label">Category Name</label>
+      <CatalogMasterFormPage
+        seoTitle="Edit Category"
+        title="Edit Category"
+        listHref="/catalog/categories"
+        listLabel="Categories"
+        currentLabel="Edit"
+      >
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="form-label required">Category Name</label>
                 <input
                   type="text"
                   name="name"
@@ -216,8 +218,8 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
                 </p>
               </div>
 
-              <div>
-                <label className="form-label">Sort Order</label>
+            <div>
+              <label className="form-label required">Sort Order</label>
                 <input
                   type="number"
                   name="sortOrder"
@@ -270,24 +272,16 @@ function EditCategoryPage({ params }: { params: { id: string } }) {
                   </div>
                 )}
               </div>
-            </div>
+          </div>
 
-            <div className="flex justify-end space-x-4">
-              <button
-                type="button"
-                className="ti-btn ti-btn-secondary"
-                onClick={() => router.push('/catalog/categories')}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="ti-btn ti-btn-primary">
-                Update Category
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+          <UiFormFooter
+            submitLabel="Update Category"
+            isLoading={isSaving}
+            onCancel={() => router.push('/catalog/categories')}
+          />
+        </form>
+      </CatalogMasterFormPage>
+    </>
   );
 }
 

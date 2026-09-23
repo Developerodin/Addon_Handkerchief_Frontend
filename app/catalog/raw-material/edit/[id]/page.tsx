@@ -1,12 +1,13 @@
 "use client"
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Seo from '@/shared/layout-components/seo/seo';
 import { toast, Toaster } from 'react-hot-toast';
 import Image from 'next/image';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
+import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
+import { UiFormFooter } from '@/shared/components/ui';
 import { filterDecimalInput } from '@/shared/utils/formInputFilters';
 
 const PACKAGING_TYPES = [
@@ -228,17 +229,17 @@ function EditPackagingMaterial({ params }: { params: { id: string } }) {
   }
 
   return (
-    <div className="main-content catalog-master-form">
+    <>
       <Toaster position="top-right" />
-      <Seo title="Edit Packaging material" />
-
-      <div className="box">
-        <div className="box-header">
-          <h1 className="box-title text-2xl font-semibold">Edit Packaging material</h1>
-        </div>
-        <div className="box-body">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <CatalogMasterFormPage
+        seoTitle="Edit Packaging material"
+        title="Edit Packaging material"
+        listHref="/catalog/raw-material"
+        listLabel="Packaging materials"
+        currentLabel="Edit"
+      >
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700">Image (Optional)</label>
                 <div className="mt-1 flex items-center space-x-4">
@@ -266,7 +267,7 @@ function EditPackagingMaterial({ params }: { params: { id: string } }) {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Name <span className="text-red-500">*</span></label>
+                <label className="form-label required">Name</label>
                 <input
                   type="text"
                   name="name"
@@ -278,7 +279,7 @@ function EditPackagingMaterial({ params }: { params: { id: string } }) {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Type <span className="text-red-500">*</span></label>
+                <label className="form-label required">Type</label>
                 <select
                   name="type"
                   value={material.type}
@@ -309,7 +310,7 @@ function EditPackagingMaterial({ params }: { params: { id: string } }) {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Unit <span className="text-red-500">*</span></label>
+                <label className="form-label required">Unit</label>
                 <select
                   name="unit"
                   value={material.unit}
@@ -435,28 +436,16 @@ function EditPackagingMaterial({ params }: { params: { id: string } }) {
                   rows={3}
                 ></textarea>
               </div>
-            </div>
+          </div>
 
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                className="ti-btn ti-btn-secondary"
-                onClick={() => router.push('/catalog/raw-material')}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="ti-btn ti-btn-primary"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Updating...' : 'Update Packaging material'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+          <UiFormFooter
+            submitLabel="Update Packaging material"
+            isLoading={isLoading}
+            onCancel={() => router.push('/catalog/raw-material')}
+          />
+        </form>
+      </CatalogMasterFormPage>
+    </>
   );
 }
 

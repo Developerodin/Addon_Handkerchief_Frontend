@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { UiIconButton } from '@/shared/components/ui/UiIconButton';
 import type { HelpSupportTask, TaskPriority, TaskStatus } from '@/shared/types/helpSupportTasks';
 import { formatHubDateTime, PRIORITY_COLORS, PRIORITY_LABELS } from '../helpSupportConstants';
 import HubFilterSelect from './HubFilterSelect';
@@ -292,17 +293,15 @@ export default function TaskTable({
                     <td className="px-4 py-3.5 text-xs text-gray-600">{formatHubDateTime(task.createdAt)}</td>
                     {isManagement && onEditTask && (
                       <td className="px-4 py-3.5 text-right">
-                        <button
-                          type="button"
+                        <UiIconButton
+                          icon="ri-pencil-line"
+                          tone="edit"
+                          aria-label={`Edit task ${task.taskNumber}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             onEditTask(task);
                           }}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 text-gray-500 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600"
-                          aria-label={`Edit task ${task.taskNumber}`}
-                        >
-                          <i className="ri-pencil-line text-sm" aria-hidden />
-                        </button>
+                        />
                       </td>
                     )}
                   </tr>

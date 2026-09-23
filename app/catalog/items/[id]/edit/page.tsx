@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import axios from 'axios';
-import Seo from '@/shared/layout-components/seo/seo';
+import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
+import { UiFormFooter } from '@/shared/components/ui';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import { styleCodeService, StyleCode } from '@/shared/services/styleCodeService';
 import { StyleCodeSelectModal } from '@/app/catalog/style-codes/components/StyleCodeSelectModal';
@@ -788,47 +789,37 @@ const EditProductPage = () => {
 
   if (isLoading) {
     return (
-      <div className="main-content catalog-master-form">
-        <div className="text-center py-10">
-          <div className="spinner-border text-primary" role="status">
-            <span className="sr-only">Loading...</span>
-          </div>
-        </div>
+      <div className="main-content catalog-master-form flex justify-center py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
+  const tabItems = ['general', 'attributes', ...(isDesign || isFinal ? [] : ['bom', 'processes'])];
+
   return (
-    <div className="main-content catalog-master-form">
-      <Seo title="Edit Product" />
-      
-      <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-12">
-          <div className="box">
-            <div className="box-header">
-              <h3 className="box-title">Edit Product</h3>
-            </div>
-            <div className="box-body">
-              <form onSubmit={handleSubmit}>
-                {/* Tabs */}
-                <div className="border-b border-gray-200 mb-6">
-                  <nav className="-mb-px flex space-x-8">
-                    {['general', 'attributes', ...(isDesign || isFinal ? [] : ['bom', 'processes'])].map((tab) => (
-                      <button
-                        key={tab}
-                        type="button"
-                        onClick={() => setActiveTab(tab)}
-                        className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                          activeTab === tab
-                            ? 'border-primary text-primary'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        }`}
-                      >
-                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                      </button>
-                    ))}
-                  </nav>
-                </div>
+    <>
+      <CatalogMasterFormPage
+        seoTitle="Edit Product"
+        title="Edit Product"
+        listHref="/catalog/items"
+        listLabel="Products"
+        currentLabel="Edit"
+        singleColumn
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="ui-tab-bar">
+            {tabItems.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`ui-tab ${activeTab === tab ? 'ui-tab--active' : ''}`}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
 
                 {/* General Tab */}
                 {activeTab === 'general' && (
@@ -1401,34 +1392,20 @@ const EditProductPage = () => {
                   </div>
                 )}
 
-                <div className="mt-6 flex justify-end space-x-4">
-                  <button
-                    type="button"
-                    onClick={() => router.push('/catalog/items')}
-                    className="ti-btn ti-btn-secondary"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="ti-btn ti-btn-primary"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? 'Saving...' : 'Save Changes'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
+          <UiFormFooter
+            submitLabel="Update Product"
+            isLoading={isLoading}
+            onCancel={() => router.push('/catalog/items')}
+          />
+        </form>
+      </CatalogMasterFormPage>
 
       <StyleCodeSelectModal
         open={styleCodeModalOpen}
         onClose={() => { setStyleCodeModalOpen(false); setStyleCodeModalIndex(null); }}
         onSelect={handleStyleCodeSelectFromModal}
       />
-    </div>
+    </>
   );
 };
 

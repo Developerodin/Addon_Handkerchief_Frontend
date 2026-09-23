@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Seo from '@/shared/layout-components/seo/seo';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
+import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
+import { CatalogLookupField } from '@/shared/components/catalog/CatalogLookupField';
+import { UiFormFooter } from '@/shared/components/ui/UiFormFooter';
+import { UiListLoading } from '@/shared/components/ui/UiListStates';
 import { CatalogSegment } from '@/shared/hooks/useCatalogCrud';
 import { FabricLookupStatus } from '@/shared/services/fabricLookupService';
-import { CatalogLookupField } from '@/shared/components/catalog/CatalogLookupField';
 
 type LookupApi<T> = {
   get: (id: string) => Promise<T>;
@@ -29,6 +30,7 @@ export interface FabricLookupFormConfig<T extends Record<string, unknown>> {
   permissionPath: string;
   title: string;
   listPath: string;
+  listLabel?: string;
   api: LookupApi<T>;
   fields: FabricLookupField[];
   getInitialValues: () => T;
@@ -48,6 +50,8 @@ function FabricLookupForm<T extends Record<string, unknown>>({
   const [isLoading, setIsLoading] = useState(Boolean(entityId));
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<T>(config.getInitialValues());
+  const isEdit = Boolean(entityId);
+  const pageTitle = isEdit ? `Edit ${config.title}` : `Add ${config.title}`;
 
   useEffect(() => {
     if (!entityId) return;
@@ -92,104 +96,105 @@ function FabricLookupForm<T extends Record<string, unknown>>({
 
   if (isLoading) {
     return (
-      <div className="main-content catalog-master-form flex justify-center py-20">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <CatalogMasterFormPage
+        seoTitle={pageTitle}
+        title={pageTitle}
+        listHref={config.listPath}
+        listLabel={config.listLabel || config.title}
+        currentLabel={isEdit ? 'Edit' : 'Add'}
+      >
+        <UiListLoading />
+      </CatalogMasterFormPage>
     );
   }
 
   return (
-    <div className="main-content catalog-master-form">
-      <Seo title={entityId ? `Edit ${config.title}` : `Add ${config.title}`} />
-      <div className="box !bg-transparent border-0 shadow-none mb-4">
-        <div className="box-header flex justify-between items-center">
-          <h1 className="box-title text-2xl font-semibold">{entityId ? `Edit ${config.title}` : `Add ${config.title}`}</h1>
-          <Link href={config.listPath} className="text-sm text-gray-500 hover:text-primary">
-            Back to list
-          </Link>
-        </div>
-      </div>
-      <div className="box">
-        <div className="box-body">
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {config.fields.map((field) => (
-              <div key={field.name} className="form-group">
-                <label htmlFor={field.name} className="form-label">
-                  {field.label}
-                  {field.required ? ' *' : ''}
-                </label>
-                {field.type === 'select' ? (
-                  field.name === 'status' ? (
-                    <select
-                      id={field.name}
-                      name={field.name}
-                      className="form-select"
-                      value={String(formData[field.name] ?? '')}
-                      onChange={handleChange}
-                      required={field.required}
-                    >
-                      <option value="">Select</option>
-                      {field.options?.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <CatalogLookupField
-                      hideLabel
-                      label={field.label}
-                      value={String(formData[field.name] ?? '')}
-                      items={(field.options ?? []).map((opt) => ({ id: opt.value, name: opt.label }))}
-                      getItemId={(item) => item.id}
-                      getItemLabel={(item) => item.name}
-                      modalTitle={`Select ${field.label}`}
-                      searchPlaceholder={`Search ${field.label.toLowerCase()}...`}
-                      columns={[{ key: 'name', label: 'Name', render: (item) => item.name }]}
-                      placeholder={`Select ${field.label}`}
-                      required={field.required}
-                      onChange={(id) => setFormData((prev) => ({ ...prev, [field.name]: id }))}
-                    />
-                  )
-                ) : field.type === 'textarea' ? (
-                  <textarea
-                    id={field.name}
-                    name={field.name}
-                    className="form-control"
-                    rows={3}
-                    value={String(formData[field.name] ?? '')}
-                    onChange={handleChange}
-                    required={field.required}
-                    placeholder={field.placeholder}
-                  />
-                ) : (
-                  <input
-                    type={field.type === 'color' ? 'color' : field.type === 'number' ? 'number' : 'text'}
-                    id={field.name}
-                    name={field.name}
-                    className="form-control"
-                    value={String(formData[field.name] ?? '')}
-                    onChange={handleChange}
-                    required={field.required}
-                    placeholder={field.placeholder}
-                    min={field.type === 'number' ? 0 : undefined}
-                    max={field.type === 'number' ? 100 : undefined}
-                  />
-                )}
-              </div>
-            ))}
-            <div className="md:col-span-2 flex gap-3">
-              <button type="submit" className="ti-btn ti-btn-primary" disabled={isSaving}>
-                {isSaving ? 'Saving...' : 'Save'}
-              </button>
-              <button type="button" className="ti-btn ti-btn-secondary" onClick={() => router.push(config.listPath)}>
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+    <CatalogMasterFormPage
+      seoTitle={pageTitle}
+      title={pageTitle}
+      listHref={config.listPath}
+      listLabel={config.listLabel || config.title}
+      currentLabel={isEdit ? 'Edit' : 'Add'}
+    >
+      <form onSubmit={handleSubmit}>
+        {config.fields.map((field) => (
+          <div
+            key={field.name}
+            className={`form-group${field.type === 'textarea' ? ' md:col-span-2' : ''}`}
+          >
+            <label
+              htmlFor={field.name}
+              className={`form-label${field.required ? ' required' : ''}`}
+            >
+              {field.label}
+            </label>
+            {field.type === 'select' ? (
+              field.name === 'status' ? (
+                <select
+                  id={field.name}
+                  name={field.name}
+                  className="form-select"
+                  value={String(formData[field.name] ?? '')}
+                  onChange={handleChange}
+                  required={field.required}
+                >
+                  <option value="">Select</option>
+                  {field.options?.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <CatalogLookupField
+                  hideLabel
+                  label={field.label}
+                  value={String(formData[field.name] ?? '')}
+                  items={(field.options ?? []).map((opt) => ({ id: opt.value, name: opt.label }))}
+                  getItemId={(item) => item.id}
+                  getItemLabel={(item) => item.name}
+                  modalTitle={`Select ${field.label}`}
+                  searchPlaceholder={`Search ${field.label.toLowerCase()}...`}
+                  columns={[{ key: 'name', label: 'Name', render: (item) => item.name }]}
+                  placeholder={`Select ${field.label}`}
+                  required={field.required}
+                  onChange={(id) => setFormData((prev) => ({ ...prev, [field.name]: id }))}
+                />
+              )
+            ) : field.type === 'textarea' ? (
+              <textarea
+                id={field.name}
+                name={field.name}
+                className="form-control"
+                rows={3}
+                value={String(formData[field.name] ?? '')}
+                onChange={handleChange}
+                required={field.required}
+                placeholder={field.placeholder}
+              />
+            ) : (
+              <input
+                type={field.type === 'color' ? 'color' : field.type === 'number' ? 'number' : 'text'}
+                id={field.name}
+                name={field.name}
+                className="form-control"
+                value={String(formData[field.name] ?? '')}
+                onChange={handleChange}
+                required={field.required}
+                placeholder={field.placeholder}
+                min={field.type === 'number' ? 0 : undefined}
+                max={field.type === 'number' ? 100 : undefined}
+              />
+            )}
+          </div>
+        ))}
+        <UiFormFooter
+          isLoading={isSaving}
+          onCancel={() => router.push(config.listPath)}
+          submitLabel={isEdit ? 'Update' : 'Save'}
+        />
+      </form>
+    </CatalogMasterFormPage>
   );
 }
 

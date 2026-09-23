@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast, Toaster } from 'react-hot-toast';
-import Seo from '@/shared/layout-components/seo/seo';
+import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
+import { UiFormFooter } from '@/shared/components/ui/UiFormFooter';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { filterDecimalInput } from '@/shared/utils/formInputFilters';
 import { createFabricCatalog } from '@/shared/services/fabricCatalogService';
@@ -152,22 +152,18 @@ const AddFabricPage = () => {
   };
 
   return (
-    <div className="main-content catalog-master-form">
+    <>
       <Toaster position="top-right" />
-      <Seo title="Add Fabric" />
-      <div className="box !bg-transparent border-0 shadow-none">
-        <div className="box-header flex justify-between items-center">
-          <h1 className="box-title text-2xl font-semibold">Add Fabric</h1>
-          <Link href="/catalog/fabric" className="text-sm text-gray-500 hover:text-primary">
-            Fabric master
-          </Link>
-        </div>
-      </div>
-      <div className="box">
-        <div className="box-body">
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="form-group">
-              <label className="form-label">Name *</label>
+      <CatalogMasterFormPage
+        seoTitle="Add Fabric"
+        title="Add Fabric"
+        listHref="/catalog/fabric"
+        listLabel="Fabric master"
+        currentLabel="Add Fabric"
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="name" className="form-label required">Name</label>
               <input name="name" className="form-control" value={formData.name} onChange={handleInputChange} required />
             </div>
             <div className="form-group">
@@ -313,18 +309,14 @@ const AddFabricPage = () => {
               <label className="form-label">Remarks</label>
               <textarea name="remark" className="form-control" rows={3} value={formData.remark} onChange={handleInputChange} />
             </div>
-            <div className="md:col-span-2 flex gap-3">
-              <button type="submit" className="ti-btn ti-btn-primary" disabled={isLoading}>
-                {isLoading ? 'Saving...' : 'Save Fabric'}
-              </button>
-              <button type="button" className="ti-btn ti-btn-secondary" onClick={() => router.push('/catalog/fabric')}>
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+          <UiFormFooter
+            submitLabel="Save Fabric"
+            isLoading={isLoading}
+            onCancel={() => router.push('/catalog/fabric')}
+          />
+        </form>
+      </CatalogMasterFormPage>
+    </>
   );
 };
 

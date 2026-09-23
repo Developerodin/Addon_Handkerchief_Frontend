@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import Seo from '@/shared/layout-components/seo/seo';
 import { toast, Toaster } from 'react-hot-toast';
+import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
+import { UiFormFooter } from '@/shared/components/ui/UiFormFooter';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { filterDecimalInput } from '@/shared/utils/formInputFilters';
 import { getFabricCatalog, getLookupId, updateFabricCatalog } from '@/shared/services/fabricCatalogService';
@@ -203,21 +203,17 @@ function EditFabricPage({ params }: { params: { id: string } }) {
   }
 
   return (
-    <div className="main-content catalog-master-form">
+    <>
       <Toaster position="top-right" />
-      <Seo title="Edit Fabric" />
-      <div className="box !bg-transparent border-0 shadow-none mb-4">
-        <div className="box-header flex justify-between items-center">
-          <h1 className="box-title text-2xl font-semibold">Edit Fabric</h1>
-          <Link href="/catalog/fabric" className="text-sm text-gray-500 hover:text-primary">
-            Fabric master
-          </Link>
-        </div>
-      </div>
-      <div className="box">
-        <div className="box-body">
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div><label className="form-label">Name *</label><input name="name" className="form-control" value={formData.name} onChange={handleInputChange} required /></div>
+      <CatalogMasterFormPage
+        seoTitle="Edit Fabric"
+        title="Edit Fabric"
+        listHref="/catalog/fabric"
+        listLabel="Fabric master"
+        currentLabel="Edit Fabric"
+      >
+        <form onSubmit={handleSubmit}>
+          <div><label htmlFor="name" className="form-label required">Name</label><input id="name" name="name" className="form-control" value={formData.name} onChange={handleInputChange} required /></div>
             <div><label className="form-label">Fabric Sort No.</label><input name="fabricSortNo" className="form-control" value={formData.fabricSortNo} onChange={handleInputChange} /></div>
             <div><label className="form-label">Mill Old Fabric Sort No.</label><input name="millOldFabricSortNo" className="form-control" value={formData.millOldFabricSortNo} onChange={handleInputChange} placeholder="e.g. 17223" /></div>
             <div><label className="form-label">Mill New Fabric Sort No.</label><input name="millNewFabricSortNo" className="form-control" value={formData.millNewFabricSortNo} onChange={handleInputChange} placeholder="e.g. AW0017223AB0586" /></div>
@@ -251,14 +247,14 @@ function EditFabricPage({ params }: { params: { id: string } }) {
             <div><label className="form-label">Min Quantity in Kg</label><input name="minQuantity" className="form-control" inputMode="decimal" value={formData.minQuantity} onChange={handleDecimalChange} /></div>
             <div><label className="form-label">Status</label><select name="status" className="form-control" value={formData.status} onChange={handleInputChange}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
             <div className="md:col-span-2"><label className="form-label">Remarks</label><textarea name="remark" className="form-control" rows={3} value={formData.remark} onChange={handleInputChange} /></div>
-            <div className="md:col-span-2 flex justify-end gap-3">
-              <button type="button" className="ti-btn ti-btn-secondary" onClick={() => router.push('/catalog/fabric')} disabled={isSaving}>Cancel</button>
-              <button type="submit" className="ti-btn ti-btn-primary" disabled={isSaving}>{isSaving ? 'Updating...' : 'Update Fabric'}</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+          <UiFormFooter
+            submitLabel="Update Fabric"
+            isLoading={isSaving}
+            onCancel={() => router.push('/catalog/fabric')}
+          />
+        </form>
+      </CatalogMasterFormPage>
+    </>
   );
 }
 

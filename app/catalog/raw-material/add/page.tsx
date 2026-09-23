@@ -2,12 +2,13 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Seo from '@/shared/layout-components/seo/seo';
 import Image from 'next/image';
 import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
+import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
+import { UiFormFooter } from '@/shared/components/ui';
 import { filterDecimalInput } from '@/shared/utils/formInputFilters';
 
 const PACKAGING_TYPES = [
@@ -167,22 +168,17 @@ function AddPackagingMaterial() {
   };
 
   return (
-    <div className="main-content catalog-master-form">
+    <>
       <Toaster position="top-right" />
-      <Seo title="Add Packaging material" />
-
-      <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-12">
-          <div className="box !bg-transparent border-0 shadow-none">
-            <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Add Packaging material</h1>
-            </div>
-          </div>
-
-          <div className="box">
-            <div className="box-body">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <CatalogMasterFormPage
+        seoTitle="Add Packaging material"
+        title="Add Packaging material"
+        listHref="/catalog/raw-material"
+        listLabel="Packaging materials"
+        currentLabel="Add"
+      >
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="form-group col-span-2">
                     <label className="form-label">Image (Optional)</label>
                     <div className="flex items-center space-x-4">
@@ -217,7 +213,7 @@ function AddPackagingMaterial() {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Name <span className="text-red-500">*</span></label>
+            <label className="form-label required">Name</label>
                     <input
                       type="text"
                       name="name"
@@ -229,7 +225,7 @@ function AddPackagingMaterial() {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Type <span className="text-red-500">*</span></label>
+            <label className="form-label required">Type</label>
                     <select
                       name="type"
                       value={formData.type}
@@ -257,7 +253,7 @@ function AddPackagingMaterial() {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Unit <span className="text-red-500">*</span></label>
+            <label className="form-label required">Unit</label>
                     <select
                       name="unit"
                       value={formData.unit}
@@ -375,37 +371,16 @@ function AddPackagingMaterial() {
                       rows={3}
                     ></textarea>
                   </div>
-                </div>
-
-                <div className="flex justify-end space-x-4">
-                  <button
-                    type="button"
-                    onClick={() => router.back()}
-                    className="ti-btn ti-btn-light"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="ti-btn ti-btn-primary"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                        Adding...
-                      </>
-                    ) : (
-                      'Add Packaging material'
-                    )}
-                  </button>
-                </div>
-              </form>
-            </div>
           </div>
-        </div>
-      </div>
-    </div>
+
+          <UiFormFooter
+            submitLabel="Add Packaging material"
+            isLoading={isSubmitting}
+            onCancel={() => router.push('/catalog/raw-material')}
+          />
+        </form>
+      </CatalogMasterFormPage>
+    </>
   );
 }
 

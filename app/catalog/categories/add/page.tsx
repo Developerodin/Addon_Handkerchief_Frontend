@@ -1,8 +1,6 @@
 "use client"
 import React, { useState, useEffect } from 'react';
-import Seo from '@/shared/layout-components/seo/seo';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import { uploadOptionalImage } from '@/shared/utils/imageUpload';
@@ -12,6 +10,8 @@ import {
   getLevelLabel,
 } from '@/shared/utils/categoryHierarchy';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
+import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
+import { UiFormFooter } from '@/shared/components/ui';
 
 interface Category extends CategoryRecord {}
 
@@ -134,174 +134,128 @@ const AddCategoryPage = () => {
   };
 
   return (
-    <div className="main-content catalog-master-form">
+    <>
       <Toaster position="top-right" />
-      <Seo title="Add Category"/>
-      
-      <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-12">
-          {/* Page Header */}
-          <div className="box !bg-transparent border-0 shadow-none">
-            <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Add New Category</h1>
-              <nav className="flex" aria-label="Breadcrumb">
-                <ol className="inline-flex items-center space-x-1 md:space-x-3">
-                  <li className="inline-flex items-center">
-                    <Link href="/catalog/categories" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary">
-                      <i className="ri-home-line mr-2"></i>
-                      Categories
-                    </Link>
-                  </li>
-                  <li>
-                    <div className="flex items-center">
-                      <i className="ri-arrow-right-s-line text-gray-400 mx-2"></i>
-                      <span className="text-sm font-medium text-gray-500">Add New Category</span>
-                    </div>
-                  </li>
-                </ol>
-              </nav>
+      <CatalogMasterFormPage
+        seoTitle="Add Category"
+        title="Add New Category"
+        listHref="/catalog/categories"
+        listLabel="Categories"
+        currentLabel="Add New Category"
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="form-group">
+              <label htmlFor="name" className="form-label required">Category Name</label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                className="form-control"
+                placeholder="Enter category name"
+                value={formData.name}
+                onChange={handleInputChange}
+                required
+              />
             </div>
-          </div>
 
-          {/* Form Box */}
-          <div className="box">
-            <div className="box-body">
-              <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Category Name */}
-                  <div className="form-group">
-                    <label htmlFor="name" className="form-label">Category Name *</label>
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      className="form-control"
-                      placeholder="Enter category name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
+            <div className="form-group">
+              <label htmlFor="parent" className="form-label">Parent Category</label>
+              <select
+                id="parent"
+                name="parent"
+                className="form-select"
+                value={formData.parent}
+                onChange={handleInputChange}
+              >
+                <option value="">None — top-level Category</option>
+                {parentOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label} ({getLevelLabel(option.level + 1)})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Hierarchy: Category → Child → Grandchild (max 3 levels)
+              </p>
+            </div>
 
-                  {/* Parent Category */}
-                  <div className="form-group">
-                    <label htmlFor="parent" className="form-label">Parent Category</label>
-                    <select
-                      id="parent"
-                      name="parent"
-                      className="form-select"
-                      value={formData.parent}
-                      onChange={handleInputChange}
-                    >
-                      <option value="">None — top-level Category</option>
-                      {parentOptions.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label} ({getLevelLabel(option.level + 1)})
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Hierarchy: Category → Child → Grandchild (max 3 levels)
-                    </p>
-                  </div>
+            <div className="form-group col-span-1 md:col-span-2">
+              <label htmlFor="description" className="form-label">Description</label>
+              <textarea
+                id="description"
+                name="description"
+                className="form-control"
+                placeholder="Enter category description"
+                value={formData.description}
+                onChange={handleInputChange}
+                rows={4}
+              />
+            </div>
 
-                  {/* Description */}
-                  <div className="form-group col-span-1 md:col-span-2">
-                    <label htmlFor="description" className="form-label">Description</label>
-                    <textarea
-                      id="description"
-                      name="description"
-                      className="form-control"
-                      placeholder="Enter category description"
-                      value={formData.description}
-                      onChange={handleInputChange}
-                      rows={4}
-                    />
-                  </div>
-
-                  {/* Image Upload */}
-                  <div className="form-group col-span-1 md:col-span-2">
-                    <label className="form-label">Category Image</label>
-                    <div className="mt-2">
-                      <div className="flex items-center space-x-4">
-                        {imagePreview && (
-                          <div className="relative w-32 h-32 border rounded-lg overflow-hidden">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={imagePreview}
-                              alt="Preview"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
-                        <label className="ti-btn ti-btn-primary cursor-pointer">
-                          <span>{imagePreview ? 'Change Image' : 'Upload Image'}</span>
-                          <input
-                            type="file"
-                            className="hidden"
-                            accept="image/*"
-                            onChange={handleImageChange}
-                          />
-                        </label>
-                      </div>
+            <div className="form-group col-span-1 md:col-span-2">
+              <label className="form-label">Category Image</label>
+              <div className="mt-2">
+                <div className="flex items-center space-x-4">
+                  {imagePreview && (
+                    <div className="relative w-32 h-32 border rounded-lg overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
                     </div>
-                  </div>
-
-                  {/* Sort Order */}
-                  <div className="form-group">
-                    <label htmlFor="sortOrder" className="form-label">Sort Order *</label>
+                  )}
+                  <label className="ti-btn ti-btn-primary cursor-pointer">
+                    <span>{imagePreview ? 'Change Image' : 'Upload Image'}</span>
                     <input
-                      type="number"
-                      id="sortOrder"
-                      name="sortOrder"
-                      className="form-control"
-                      placeholder="Enter sort order index..."
-                      value={formData.sortOrder}
-                      onChange={handleInputChange}
-                      min="1"
+                      type="file"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleImageChange}
                     />
-                  </div>
-
-                  {/* Status */}
-                  <div className="form-group">
-                    <label htmlFor="status" className="form-label">Status</label>
-                    <select
-                      id="status"
-                      name="status"
-                      className="form-select"
-                      value={formData.status}
-                      onChange={handleInputChange}
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </div>
-
-                  {/* Form Actions */}
-                  <div className="flex items-center space-x-3 col-span-1 md:col-span-2">
-                    <button
-                      type="submit"
-                      className="ti-btn ti-btn-primary"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? 'Saving...' : 'Save Category'}
-                    </button>
-                    <button
-                      type="button"
-                      className="ti-btn ti-btn-secondary"
-                      onClick={() => router.push('/catalog/categories')}
-                      disabled={isLoading}
-                    >
-                      Cancel
-                    </button>
-                  </div>
+                  </label>
                 </div>
-              </form>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="sortOrder" className="form-label required">Sort Order</label>
+              <input
+                type="number"
+                id="sortOrder"
+                name="sortOrder"
+                className="form-control"
+                placeholder="Enter sort order index..."
+                value={formData.sortOrder}
+                onChange={handleInputChange}
+                min="1"
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="status" className="form-label">Status</label>
+              <select
+                id="status"
+                name="status"
+                className="form-select"
+                value={formData.status}
+                onChange={handleInputChange}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
+          <UiFormFooter
+            submitLabel="Save Category"
+            isLoading={isLoading}
+            onCancel={() => router.push('/catalog/categories')}
+          />
+        </form>
+      </CatalogMasterFormPage>
+    </>
   );
 };
 

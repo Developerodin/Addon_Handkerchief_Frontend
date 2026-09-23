@@ -1,12 +1,13 @@
 "use client"
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Seo from '@/shared/layout-components/seo/seo';
 import { toast, Toaster } from 'react-hot-toast';
 import Image from 'next/image';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
+import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
+import { UiFormFooter } from '@/shared/components/ui';
 import * as XLSX from 'xlsx';
 
 interface AttributeValue {
@@ -287,24 +288,20 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
   }
 
   return (
-    <div className="main-content catalog-master-form">
+    <>
       <Toaster position="top-right" />
-      <Seo title="Edit Attribute" />
-      
-      <div className="box !bg-transparent border-0 shadow-none">
-        <div className="box-header">
-          <h1 className="box-title text-2xl font-semibold">Edit Attribute</h1>
-        </div>
-      </div>
-
-      <div className="box">
-        <div className="box-body">
-          <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 gap-6">
-              {/* Basic Information */}
-              <div className="space-y-4">
-                <div>
-                  <label className="form-label">Name</label>
+      <CatalogMasterFormPage
+        seoTitle="Edit Attribute"
+        title="Edit Attribute"
+        listHref="/catalog/attributes"
+        listLabel="Attributes Master"
+        currentLabel="Edit"
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="grid grid-cols-1 gap-6">
+            <div className="space-y-4">
+              <div>
+                <label className="form-label required">Name</label>
                   <input
                     type="text"
                     name="name"
@@ -347,8 +344,8 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
                   </select>
                 </div>
 
-                <div>
-                  <label className="form-label">Sort Order</label>
+              <div>
+                <label className="form-label required">Sort Order</label>
                   <input
                     type="number"
                     name="sortOrder"
@@ -431,7 +428,7 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
                       className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-4 items-end p-4 border rounded-lg"
                     >
                       <div className="min-w-0">
-                        <label className="form-label">Name</label>
+                        <label className="form-label required">Name</label>
                         <input
                           type="text"
                           className="form-control w-full"
@@ -507,36 +504,15 @@ const EditAttributePage = ({ params }: { params: { id: string } }) => {
               </div>
               )}
 
-              {/* Form Actions */}
-              <div className="flex justify-end space-x-4 mt-6">
-                <button
-                  type="button"
-                  className="ti-btn ti-btn-secondary"
-                  onClick={() => router.push('/catalog/attributes')}
-                  disabled={isSaving}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="ti-btn ti-btn-primary"
-                  disabled={isSaving}
-                >
-                  {isSaving ? (
-                    <>
-                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Changes'
-                  )}
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+          </div>
+          <UiFormFooter
+            submitLabel="Save Changes"
+            isLoading={isSaving}
+            onCancel={() => router.push('/catalog/attributes')}
+          />
+        </form>
+      </CatalogMasterFormPage>
+    </>
   );
 };
 

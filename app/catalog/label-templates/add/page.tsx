@@ -1,11 +1,11 @@
 "use client"
 import React, { useEffect, useState } from 'react';
-import Seo from '@/shared/layout-components/seo/seo';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
+import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
 import { LABEL_TYPE_OPTIONS } from '@/shared/constants/handkerchiefCatalog';
+import { UiFormFooter } from '@/shared/components/ui';
 import {
   createLabelTemplate,
   DeviceRegistry,
@@ -81,161 +81,123 @@ const AddLabelTemplatePage = () => {
   };
 
   return (
-    <div className="main-content catalog-master-form">
+    <>
       <Toaster position="top-right" />
-      <Seo title="Add Label Template" />
-
-      <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-12">
-          <div className="box !bg-transparent border-0 shadow-none">
-            <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Add Label Template</h1>
-              <nav className="flex" aria-label="Breadcrumb">
-                <ol className="inline-flex items-center space-x-1 md:space-x-3">
-                  <li className="inline-flex items-center">
-                    <Link
-                      href="/catalog/label-templates"
-                      className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary"
-                    >
-                      <i className="ri-home-line mr-2"></i>
-                      Label Templates & Device Registry
-                    </Link>
-                  </li>
-                  <li>
-                    <div className="flex items-center">
-                      <i className="ri-arrow-right-s-line text-gray-400 mx-2"></i>
-                      <span className="text-sm font-medium text-gray-500">Add Label Template</span>
-                    </div>
-                  </li>
-                </ol>
-              </nav>
-            </div>
+      <CatalogMasterFormPage
+        seoTitle="Add Label Template"
+        title="Add Label Template"
+        listHref="/catalog/label-templates"
+        listLabel="Label Templates & Device Registry"
+        currentLabel="Add Label Template"
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="name" className="form-label required">Name</label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              className="form-control"
+              placeholder="Template name"
+              value={formData.name}
+              onChange={handleInputChange}
+              required
+            />
           </div>
-
-          <div className="box">
-            <div className="box-body">
-              <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="form-group">
-                    <label htmlFor="name" className="form-label">Name *</label>
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      className="form-control"
-                      placeholder="Template name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="labelType" className="form-label">Label Type *</label>
-                    <select
-                      id="labelType"
-                      name="labelType"
-                      className="form-select"
-                      value={formData.labelType}
-                      onChange={handleInputChange}
-                      required
-                    >
-                      <option value="">Select label type</option>
-                      {LABEL_TYPE_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="size" className="form-label">Size</label>
-                    <input
-                      type="text"
-                      id="size"
-                      name="size"
-                      className="form-control"
-                      placeholder="e.g. 50x30 mm"
-                      value={formData.size}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="barcodeScheme" className="form-label">Barcode Scheme</label>
-                    <input
-                      type="text"
-                      id="barcodeScheme"
-                      name="barcodeScheme"
-                      className="form-control"
-                      placeholder="Barcode scheme"
-                      value={formData.barcodeScheme}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                  <div className="form-group col-span-1 md:col-span-2">
-                    <label htmlFor="encodedFields" className="form-label">Encoded Fields</label>
-                    <input
-                      type="text"
-                      id="encodedFields"
-                      name="encodedFields"
-                      className="form-control"
-                      placeholder="Comma-separated fields, e.g. styleCode, ean, batchNo"
-                      value={formData.encodedFields}
-                      onChange={handleInputChange}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Enter field names separated by commas</p>
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="printerDevice" className="form-label">Printer Device</label>
-                    <select
-                      id="printerDevice"
-                      name="printerDevice"
-                      className="form-select"
-                      value={formData.printerDevice}
-                      onChange={handleInputChange}
-                    >
-                      <option value="">Select printer</option>
-                      {printers.map((printer) => (
-                        <option key={printer.id} value={printer.id}>
-                          {printer.name}
-                          {printer.location ? ` (${printer.location})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="status" className="form-label">Status</label>
-                    <select
-                      id="status"
-                      name="status"
-                      className="form-select"
-                      value={formData.status}
-                      onChange={handleInputChange}
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </div>
-
-                  <div className="flex items-center space-x-3 col-span-1 md:col-span-2">
-                    <button type="submit" className="ti-btn ti-btn-primary" disabled={isLoading}>
-                      {isLoading ? 'Saving...' : 'Save Template'}
-                    </button>
-                    <button
-                      type="button"
-                      className="ti-btn ti-btn-secondary"
-                      onClick={() => router.push('/catalog/label-templates')}
-                      disabled={isLoading}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </div>
+          <div className="form-group">
+            <label htmlFor="labelType" className="form-label required">Label Type</label>
+            <select
+              id="labelType"
+              name="labelType"
+              className="form-select"
+              value={formData.labelType}
+              onChange={handleInputChange}
+              required
+            >
+              <option value="">Select label type</option>
+              {LABEL_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
-      </div>
-    </div>
+          <div className="form-group">
+            <label htmlFor="size" className="form-label">Size</label>
+            <input
+              type="text"
+              id="size"
+              name="size"
+              className="form-control"
+              placeholder="e.g. 50x30 mm"
+              value={formData.size}
+              onChange={handleInputChange}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="barcodeScheme" className="form-label">Barcode Scheme</label>
+            <input
+              type="text"
+              id="barcodeScheme"
+              name="barcodeScheme"
+              className="form-control"
+              placeholder="Barcode scheme"
+              value={formData.barcodeScheme}
+              onChange={handleInputChange}
+            />
+          </div>
+          <div className="form-group md:col-span-2">
+            <label htmlFor="encodedFields" className="form-label">Encoded Fields</label>
+            <input
+              type="text"
+              id="encodedFields"
+              name="encodedFields"
+              className="form-control"
+              placeholder="Comma-separated fields, e.g. styleCode, ean, batchNo"
+              value={formData.encodedFields}
+              onChange={handleInputChange}
+            />
+            <p className="text-xs text-gray-500 mt-1">Enter field names separated by commas</p>
+          </div>
+          <div className="form-group">
+            <label htmlFor="printerDevice" className="form-label">Printer Device</label>
+            <select
+              id="printerDevice"
+              name="printerDevice"
+              className="form-select"
+              value={formData.printerDevice}
+              onChange={handleInputChange}
+            >
+              <option value="">Select printer</option>
+              {printers.map((printer) => (
+                <option key={printer.id} value={printer.id}>
+                  {printer.name}
+                  {printer.location ? ` (${printer.location})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="status" className="form-label">Status</label>
+            <select
+              id="status"
+              name="status"
+              className="form-select"
+              value={formData.status}
+              onChange={handleInputChange}
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+          <UiFormFooter
+            submitLabel="Save Template"
+            isLoading={isLoading}
+            onCancel={() => router.push('/catalog/label-templates')}
+          />
+        </form>
+      </CatalogMasterFormPage>
+    </>
   );
 };
 

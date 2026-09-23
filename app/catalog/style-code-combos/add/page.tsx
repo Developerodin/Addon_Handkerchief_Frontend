@@ -1,13 +1,13 @@
 "use client"
 import React, { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast, Toaster } from 'react-hot-toast'
-import Seo from '@/shared/layout-components/seo/seo'
 import { styleCodeComboService } from '@/shared/services/styleCodeComboService'
 import { styleCodeService, StyleCode } from '@/shared/services/styleCodeService'
 import { API_BASE_URL } from '@/shared/data/utilities/api'
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission'
+import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage'
+import { UiFormFooter } from '@/shared/components/ui'
 
 type Status = 'active' | 'inactive'
 
@@ -137,200 +137,175 @@ const AddStyleCodeComboPage = () => {
   }
 
   return (
-    <div className="main-content catalog-master-form">
-      <Seo title="Add Style Code Combo" />
+    <>
       <Toaster position="top-right" />
-
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-[3px] h-5 bg-purple-600 rounded-full" />
-          <h1 className="text-lg font-semibold text-gray-900">Add Combo</h1>
-        </div>
-        <Link
-          href="/catalog/style-code-combos"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-gray-200 text-[12px] font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100"
-        >
-          <i className="ri-arrow-left-line" />
-          Back
-        </Link>
-      </div>
-
-      <div className="box">
-        <div className="box-header">
-          <h3 className="box-title text-sm font-semibold">Details</h3>
-        </div>
-        <div className="box-body">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="form-label text-[12px]">Combo Code *</label>
-                <input
-                  type="text"
-                  className={`form-control h-9 text-sm ${errors.comboCode ? 'border-red-500' : ''}`}
-                  value={form.comboCode}
-                  onChange={(e) => handleChange('comboCode', e.target.value)}
-                  placeholder="COMBO-001"
-                />
-                {errors.comboCode && <p className="text-xs text-red-500 mt-1">{errors.comboCode}</p>}
-              </div>
-              <div>
-                <label className="form-label text-[12px]">EAN *</label>
-                <input
-                  type="text"
-                  className={`form-control h-9 text-sm ${errors.eanCode ? 'border-red-500' : ''}`}
-                  value={form.eanCode}
-                  onChange={(e) => handleChange('eanCode', e.target.value)}
-                  placeholder="EANCOMBO1"
-                />
-                {errors.eanCode && <p className="text-xs text-red-500 mt-1">{errors.eanCode}</p>}
-              </div>
-              <div>
-                <label className="form-label text-[12px]">MRP *</label>
-                <input
-                  type="number"
-                  min={0}
-                  className={`form-control h-9 text-sm ${errors.mrp ? 'border-red-500' : ''}`}
-                  value={form.mrp}
-                  onChange={(e) => handleChange('mrp', e.target.value ? Number(e.target.value) : '')}
-                  placeholder="399"
-                />
-                {errors.mrp && <p className="text-xs text-red-500 mt-1">{errors.mrp}</p>}
-              </div>
-              <div>
-                <label className="form-label text-[12px]">Brand</label>
-                <select
-                  className="form-select h-9 text-sm"
-                  value={form.brand}
-                  onChange={(e) => handleChange('brand', e.target.value)}
-                >
-                  <option value="">Select brand</option>
-                  {brandOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                  {form.brand && !brandOptions.includes(form.brand) && (
-                    <option value={form.brand}>{form.brand}</option>
-                  )}
-                </select>
-              </div>
-              <div>
-                <label className="form-label text-[12px]">Pack</label>
-                <select
-                  className="form-select h-9 text-sm"
-                  value={form.pack}
-                  onChange={(e) => handleChange('pack', e.target.value)}
-                >
-                  <option value="">Select pack</option>
-                  {packOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                  {form.pack && !packOptions.includes(form.pack) && (
-                    <option value={form.pack}>{form.pack}</option>
-                  )}
-                </select>
-              </div>
-              <div>
-                <label className="form-label text-[12px]">Status</label>
-                <select
-                  className="form-select h-9 text-sm"
-                  value={form.status}
-                  onChange={(e) => handleChange('status', e.target.value)}
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
+      <CatalogMasterFormPage
+        seoTitle="Add Style Code Combo"
+        title="Add Combo"
+        listHref="/catalog/style-code-combos"
+        listLabel="Style Code Combos"
+        currentLabel="Add Combo"
+      >
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="form-label required">Combo Code</label>
+              <input
+                type="text"
+                className={`form-control ${errors.comboCode ? 'border-red-500' : ''}`}
+                value={form.comboCode}
+                onChange={(e) => handleChange('comboCode', e.target.value)}
+                placeholder="COMBO-001"
+              />
+              {errors.comboCode && <p className="text-xs text-red-500 mt-1">{errors.comboCode}</p>}
             </div>
-
-            <div className={errors.components ? 'border border-red-200 rounded p-3' : ''}>
-              <div className="flex items-center justify-between mb-2">
-                <label className="form-label text-[12px] mb-0">Components *</label>
-                <button
-                  type="button"
-                  onClick={addComponentRow}
-                  disabled={submitting}
-                  className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded border border-gray-200 bg-gray-50 hover:bg-gray-100"
-                >
-                  <i className="ri-add-line" />
-                  Add row
-                </button>
-              </div>
-              <div className="space-y-2">
-                {components.map((row, index) => (
-                  <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_120px_40px] gap-2 items-end">
-                    <div>
-                      <label className="form-label text-[11px]">Style code</label>
-                      <select
-                        className="form-select h-9 text-sm"
-                        value={row.styleCodeId}
-                        onChange={(e) => updateComponent(index, 'styleCodeId', e.target.value)}
-                        disabled={submitting}
-                      >
-                        <option value="">Select style code</option>
-                        {styleCodeOptions.map((sc) => (
-                          <option key={sc.id} value={sc.id}>
-                            {sc.styleCode}
-                            {sc.eanCode ? ` (${sc.eanCode})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="form-label text-[11px]">Qty</label>
-                      <input
-                        type="number"
-                        min={1}
-                        className="form-control h-9 text-sm"
-                        value={row.quantity}
-                        onChange={(e) =>
-                          updateComponent(
-                            index,
-                            'quantity',
-                            e.target.value ? Number(e.target.value) : ''
-                          )
-                        }
-                        disabled={submitting}
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeComponentRow(index)}
-                      disabled={submitting || components.length <= 1}
-                      className="h-9 w-9 flex items-center justify-center rounded border border-red-100 bg-red-50 text-red-500 hover:bg-red-100 disabled:opacity-40"
-                      title="Remove"
-                    >
-                      <i className="ri-delete-bin-line text-sm" />
-                    </button>
-                  </div>
+            <div>
+              <label className="form-label required">EAN</label>
+              <input
+                type="text"
+                className={`form-control ${errors.eanCode ? 'border-red-500' : ''}`}
+                value={form.eanCode}
+                onChange={(e) => handleChange('eanCode', e.target.value)}
+                placeholder="EANCOMBO1"
+              />
+              {errors.eanCode && <p className="text-xs text-red-500 mt-1">{errors.eanCode}</p>}
+            </div>
+            <div>
+              <label className="form-label required">MRP</label>
+              <input
+                type="number"
+                min={0}
+                className={`form-control ${errors.mrp ? 'border-red-500' : ''}`}
+                value={form.mrp}
+                onChange={(e) => handleChange('mrp', e.target.value ? Number(e.target.value) : '')}
+                placeholder="399"
+              />
+              {errors.mrp && <p className="text-xs text-red-500 mt-1">{errors.mrp}</p>}
+            </div>
+            <div>
+              <label className="form-label">Brand</label>
+              <select
+                className="form-select"
+                value={form.brand}
+                onChange={(e) => handleChange('brand', e.target.value)}
+              >
+                <option value="">Select brand</option>
+                {brandOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
                 ))}
-              </div>
-              {errors.components && (
-                <p className="text-xs text-red-500 mt-2">{errors.components}</p>
-              )}
+                {form.brand && !brandOptions.includes(form.brand) && (
+                  <option value={form.brand}>{form.brand}</option>
+                )}
+              </select>
             </div>
+            <div>
+              <label className="form-label">Pack</label>
+              <select
+                className="form-select"
+                value={form.pack}
+                onChange={(e) => handleChange('pack', e.target.value)}
+              >
+                <option value="">Select pack</option>
+                {packOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+                {form.pack && !packOptions.includes(form.pack) && (
+                  <option value={form.pack}>{form.pack}</option>
+                )}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Status</label>
+              <select
+                className="form-select"
+                value={form.status}
+                onChange={(e) => handleChange('status', e.target.value)}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
 
-            <div className="flex justify-end gap-2">
-              <Link
-                href="/catalog/style-code-combos"
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded border border-gray-200 text-[12px] font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100"
-              >
-                Cancel
-              </Link>
+          <div className={errors.components ? 'border border-red-200 rounded p-3' : ''}>
+            <div className="flex items-center justify-between mb-2">
+              <label className="form-label required mb-0">Components</label>
               <button
-                type="submit"
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded border border-purple-200 bg-purple-600 text-white text-[12px] font-semibold hover:bg-purple-700"
+                type="button"
+                onClick={addComponentRow}
                 disabled={submitting}
+                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded border border-gray-200 bg-gray-50 hover:bg-gray-100"
               >
-                {submitting ? 'Creating...' : 'Create'}
+                <i className="ri-add-line" />
+                Add row
               </button>
             </div>
-          </form>
-        </div>
-      </div>
-    </div>
+            <div className="space-y-2">
+              {components.map((row, index) => (
+                <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_120px_40px] gap-2 items-end">
+                  <div>
+                    <label className="form-label">Style code</label>
+                    <select
+                      className="form-select"
+                      value={row.styleCodeId}
+                      onChange={(e) => updateComponent(index, 'styleCodeId', e.target.value)}
+                      disabled={submitting}
+                    >
+                      <option value="">Select style code</option>
+                      {styleCodeOptions.map((sc) => (
+                        <option key={sc.id} value={sc.id}>
+                          {sc.styleCode}
+                          {sc.eanCode ? ` (${sc.eanCode})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label">Qty</label>
+                    <input
+                      type="number"
+                      min={1}
+                      className="form-control"
+                      value={row.quantity}
+                      onChange={(e) =>
+                        updateComponent(
+                          index,
+                          'quantity',
+                          e.target.value ? Number(e.target.value) : ''
+                        )
+                      }
+                      disabled={submitting}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeComponentRow(index)}
+                    disabled={submitting || components.length <= 1}
+                    className="h-9 w-9 flex items-center justify-center rounded border border-red-100 bg-red-50 text-red-500 hover:bg-red-100 disabled:opacity-40"
+                    title="Remove"
+                  >
+                    <i className="ri-delete-bin-line text-sm" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            {errors.components && (
+              <p className="text-xs text-red-500 mt-2">{errors.components}</p>
+            )}
+          </div>
+
+          <UiFormFooter
+            submitLabel="Create"
+            isLoading={submitting}
+            onCancel={() => router.push('/catalog/style-code-combos')}
+          />
+        </form>
+      </CatalogMasterFormPage>
+    </>
   )
 }
 

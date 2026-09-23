@@ -8,6 +8,7 @@ import { API_BASE_URL } from '@/shared/data/utilities/api';
 import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
+import { UiFormFooter } from '@/shared/components/ui';
 
 // Types
 interface OptionValue {
@@ -267,10 +268,8 @@ const AddAttributePage = () => {
         listLabel="Attributes Master"
         currentLabel="Add Attribute"
       >
-          <div className="box">
-            <div className="box-body">
-              <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-1 gap-6">
+        <form onSubmit={handleSubmit}>
+          <div className="grid grid-cols-1 gap-6">
                   {/* Option Details */}
                   <div className="grid grid-cols-12 gap-4">
                     <div className="col-span-12 md:col-span-4">
@@ -334,7 +333,7 @@ const AddAttributePage = () => {
 
                     <div className="col-span-12 md:col-span-4">
                       <div className="form-group">
-                        <label htmlFor="sortOrder" className="form-label">Sort Order</label>
+                        <label htmlFor="sortOrder" className="form-label required">Sort Order</label>
                         <input
                           type="text"
                           id="sortOrder"
@@ -510,34 +509,13 @@ const AddAttributePage = () => {
                   </div>
                   )}
 
-                  <div className="flex justify-end space-x-4 mt-6">
-                    <button
-                      type="button"
-                      className="ti-btn ti-btn-secondary"
-                      onClick={() => router.back()}
-                      disabled={isSubmitting}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="ti-btn ti-btn-primary"
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <span className="animate-spin inline-block h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"></span>
-                          Saving...
-                        </>
-                      ) : (
-                        'Save'
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </div>
           </div>
+          <UiFormFooter
+            submitLabel="Save"
+            isLoading={isSubmitting}
+            onCancel={() => router.push('/catalog/attributes')}
+          />
+        </form>
       </CatalogMasterFormPage>
     </>
   );

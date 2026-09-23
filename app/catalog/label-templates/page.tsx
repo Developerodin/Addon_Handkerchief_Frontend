@@ -2,13 +2,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Seo from '@/shared/layout-components/seo/seo';
-import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import HelpIcon from '@/shared/components/HelpIcon';
 import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud';
 import CatalogRowActions from '@/shared/components/catalog/CatalogRowActions';
 import CatalogPageSizeSelect from '@/shared/components/catalog/CatalogPageSizeSelect';
+import { UiButton, UiSearchInput, UiPagination, UiListLoading, UiListError, UiListEmpty, UiStatusBadge } from '@/shared/components/ui';
 import {
   LABEL_TYPE_OPTIONS,
   DEVICE_TYPE_OPTIONS,
@@ -98,20 +98,6 @@ const toDeviceExportRow = (device: DeviceRegistry) => ({
   'Scanner Type': device.scannerType || '',
   'Status': device.status,
 });
-
-function getPagination(page: number, pages: number) {
-  const items: (number | string)[] = [];
-  if (pages <= 7) {
-    for (let i = 1; i <= pages; i++) items.push(i);
-  } else {
-    items.push(1);
-    if (page > 4) items.push('...');
-    for (let i = Math.max(2, page - 2); i <= Math.min(pages - 1, page + 2); i++) items.push(i);
-    if (page < pages - 3) items.push('...');
-    items.push(pages);
-  }
-  return items;
-}
 
 const LabelTemplatesPage = () => {
   const searchParams = useSearchParams();
@@ -590,11 +576,9 @@ const LabelTemplatesPage = () => {
         <div className="p-[10px] catalog-list-toolbar">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-[3px] h-5 bg-purple-600 rounded-full"></div>
-              <h1 className="text-sm font-bold text-gray-800">Label Templates & Device Registry</h1>
-              <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm">
-                {totalResults}
-              </span>
+              <div className="ui-page-accent"></div>
+              <h1 className="ui-page-title">Label Templates & Device Registry</h1>
+              <span className="ui-page-count">{totalResults}</span>
               <HelpIcon
                 title="Label Templates & Device Registry"
                 content={
@@ -619,44 +603,31 @@ const LabelTemplatesPage = () => {
             </div>
           </div>
 
-          <div className="flex gap-1 mb-4 border-b border-gray-100">
+          <div className="ui-tab-bar">
             <button
               type="button"
               onClick={() => setActiveTab('templates')}
-              className={`px-4 py-2 text-[11px] font-bold rounded-t transition-colors ${
-                activeTab === 'templates'
-                  ? 'bg-purple-600 text-white'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
+              className={`ui-tab ${activeTab === 'templates' ? 'ui-tab--active' : ''}`}
             >
               Label Templates
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('devices')}
-              className={`px-4 py-2 text-[11px] font-bold rounded-t transition-colors ${
-                activeTab === 'devices'
-                  ? 'bg-purple-600 text-white'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
+              className={`ui-tab ${activeTab === 'devices' ? 'ui-tab--active' : ''}`}
             >
               Device Registry
             </button>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <div className="relative">
-              <input
-                type="text"
-                className="bg-white border border-gray-200 pl-8 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 w-48 min-w-[120px] placeholder:text-gray-400 transition-all font-medium"
-                placeholder="Search..."
-                value={isTemplatesTab ? labelSearchQuery : deviceSearchQuery}
-                onChange={(e) =>
-                  isTemplatesTab ? setLabelSearchQuery(e.target.value) : setDeviceSearchQuery(e.target.value)
-                }
-              />
-              <i className="ri-search-line absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
-            </div>
+            <UiSearchInput
+              placeholder="Search..."
+              value={isTemplatesTab ? labelSearchQuery : deviceSearchQuery}
+              onChange={(e) =>
+                isTemplatesTab ? setLabelSearchQuery(e.target.value) : setDeviceSearchQuery(e.target.value)
+              }
+            />
 
             <div className="flex flex-wrap items-center gap-2">
               <CatalogPageSizeSelect
@@ -679,60 +650,57 @@ const LabelTemplatesPage = () => {
                 onChange={isTemplatesTab ? handleLabelImport : handleDeviceImport}
               />
               {canImport && (
-                <button
-                  type="button"
+                <UiButton
+                  variant="success"
+                  icon="ri-upload-2-line"
                   onClick={() =>
                     (isTemplatesTab ? labelFileInputRef : deviceFileInputRef).current?.click()
                   }
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-[11px] font-bold rounded hover:bg-emerald-700 transition-colors shadow-sm"
                 >
-                  <i className="ri-upload-2-line text-xs"></i> Import
-                </button>
+                  Import
+                </UiButton>
               )}
               {importProgress !== null && (
-                <div className="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden flex items-center">
-                  <div
-                    className="bg-primary h-full transition-all duration-200"
-                    style={{ width: `${importProgress}%` }}
-                  ></div>
-                  <span className="ml-1.5 text-[10px] text-gray-600 font-medium">{importProgress}%</span>
+                <div className="ui-import-progress">
+                  <div className="ui-import-progress__bar" style={{ width: `${importProgress}%` }}></div>
+                  <span className="ui-import-progress__label">{importProgress}%</span>
                 </div>
               )}
-              <button
-                type="button"
+              <UiButton
+                variant="secondary"
+                icon="ri-file-download-line"
                 onClick={isTemplatesTab ? handleLabelExportTemplate : handleDeviceExportTemplate}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 text-[#495057] text-[11px] font-bold rounded hover:bg-gray-50 transition-colors shadow-sm"
               >
-                <i className="ri-file-download-line text-xs"></i> Template
-              </button>
-              <button
-                type="button"
+                Template
+              </UiButton>
+              <UiButton
+                variant="primary"
+                icon="ri-download-2-line"
                 onClick={isTemplatesTab ? handleLabelExport : handleDeviceExport}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm"
               >
-                <i className="ri-download-2-line text-xs"></i> Export
-              </button>
+                Export
+              </UiButton>
               {canDelete && selectedIds.length > 0 && (
-                <button
-                  type="button"
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded border transition-colors bg-red-50 text-red-600 border-red-100 hover:bg-red-100 shadow-sm"
+                <UiButton
+                  variant="danger"
+                  icon="ri-delete-bin-line"
                   onClick={isTemplatesTab ? handleLabelDeleteSelected : handleDeviceDeleteSelected}
                 >
-                  <i className="ri-delete-bin-line text-xs"></i> Delete ({selectedIds.length})
-                </button>
+                  Delete ({selectedIds.length})
+                </UiButton>
               )}
               {canCreate && (
-                <Link
+                <UiButton
+                  variant="primary"
                   href={
                     isTemplatesTab
                       ? '/catalog/label-templates/add'
                       : '/catalog/label-templates/devices/add'
                   }
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm"
+                  icon="ri-add-line"
                 >
-                  <i className="ri-add-line text-xs"></i>{' '}
                   {isTemplatesTab ? 'Add Template' : 'Add Device'}
-                </Link>
+                </UiButton>
               )}
             </div>
           </div>
@@ -740,35 +708,19 @@ const LabelTemplatesPage = () => {
 
         <div className="overflow-x-auto min-h-[300px]">
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mb-4 opacity-50"></div>
-              <p className="text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase">Loading Data</p>
-            </div>
+            <UiListLoading />
           ) : error ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mb-4">
-                <i className="ri-error-warning-line text-xl text-red-400"></i>
-              </div>
-              <p className="text-[12px] font-medium text-red-600">{error}</p>
-            </div>
+            <UiListError message={error} />
           ) : isTemplatesTab ? (
             labelTemplates.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                  <i className="ri-price-tag-3-line text-xl text-gray-200"></i>
-                </div>
-                <h3 className="text-xs font-bold text-gray-400 mb-1">DATA EMPTY</h3>
-                {canCreate && (
-                  <Link
-                    href="/catalog/label-templates/add"
-                    className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm"
-                  >
-                    <i className="ri-add-line text-xs"></i> Add First Template
-                  </Link>
-                )}
-              </div>
+              <UiListEmpty
+                icon="ri-price-tag-3-line"
+                canCreate={canCreate}
+                addHref="/catalog/label-templates/add"
+                addLabel="Add First Template"
+              />
             ) : (
-              <table className="w-full border-collapse border border-gray-200">
+              <table className="ui-table w-full border-collapse border border-gray-200">
                 <thead>
                   <tr className="bg-gray-50/30">
                     <th className="pl-[10px] pr-1 py-3 text-left w-10 border border-gray-200">
@@ -811,13 +763,7 @@ const LabelTemplatesPage = () => {
                       <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{template.barcodeScheme || '—'}</td>
                       <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{getDeviceDisplay(template.printerDevice)}</td>
                       <td className="px-1.5 py-2.5 border border-gray-200">
-                        <span
-                          className={`inline-flex px-1.5 py-0.5 text-[9px] font-bold rounded uppercase tracking-tight ${
-                            template.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}
-                        >
-                          {template.status}
-                        </span>
+                        <UiStatusBadge status={template.status} />
                       </td>
                       {(canUpdate || canDelete) && (
                         <td className="px-1.5 py-2.5 text-right pr-[10px] border border-gray-200">
@@ -834,22 +780,14 @@ const LabelTemplatesPage = () => {
               </table>
             )
           ) : devices.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                <i className="ri-printer-line text-xl text-gray-200"></i>
-              </div>
-              <h3 className="text-xs font-bold text-gray-400 mb-1">DATA EMPTY</h3>
-              {canCreate && (
-                <Link
-                  href="/catalog/label-templates/devices/add"
-                  className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm"
-                >
-                  <i className="ri-add-line text-xs"></i> Add First Device
-                </Link>
-              )}
-            </div>
+            <UiListEmpty
+              icon="ri-printer-line"
+              canCreate={canCreate}
+              addHref="/catalog/label-templates/devices/add"
+              addLabel="Add First Device"
+            />
           ) : (
-            <table className="w-full border-collapse border border-gray-200">
+            <table className="ui-table w-full border-collapse border border-gray-200">
               <thead>
                 <tr className="bg-gray-50/30">
                   <th className="pl-[10px] pr-1 py-3 text-left w-10 border border-gray-200">
@@ -892,13 +830,7 @@ const LabelTemplatesPage = () => {
                       {device.deviceType === 'scanner' ? getScannerTypeLabel(device.scannerType) : '—'}
                     </td>
                     <td className="px-1.5 py-2.5 border border-gray-200">
-                      <span
-                        className={`inline-flex px-1.5 py-0.5 text-[9px] font-bold rounded uppercase tracking-tight ${
-                          device.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {device.status}
-                      </span>
+                      <UiStatusBadge status={device.status} />
                     </td>
                     {(canUpdate || canDelete) && (
                       <td className="px-1.5 py-2.5 text-right pr-[10px] border border-gray-200">
@@ -917,63 +849,16 @@ const LabelTemplatesPage = () => {
         </div>
 
         {!isLoading && !error && (
-          <div className="p-[10px] pt-4 flex flex-wrap items-center justify-between gap-4 border-t border-gray-100 bg-white">
-            <div className="text-[11px] font-medium text-[#495057] tracking-tight">
-              Showing{' '}
-              <span>
-                {totalResults === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to{' '}
-                {totalResults === 0 ? 0 : Math.min(currentPage * itemsPerPage, totalResults)}
-              </span>{' '}
-              of <span>{totalResults}</span> entries <span className="ml-1 opacity-50">→</span>
-            </div>
-            <div className="flex items-center">
-              <button
-                onClick={() =>
-                  isTemplatesTab
-                    ? setLabelCurrentPage((prev) => Math.max(prev - 1, 1))
-                    : setDeviceCurrentPage((prev) => Math.max(prev - 1, 1))
-                }
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                Prev
-              </button>
-              <div className="flex items-center gap-1 mx-2">
-                {getPagination(currentPage, totalPages).map((page, idx) =>
-                  page === '...' ? (
-                    <span key={`ellipsis-${idx}`} className="text-gray-300 text-[10px]">
-                      ...
-                    </span>
-                  ) : (
-                    <button
-                      key={page}
-                      onClick={() =>
-                        isTemplatesTab
-                          ? setLabelCurrentPage(Number(page))
-                          : setDeviceCurrentPage(Number(page))
-                      }
-                      className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold rounded transition-all ${
-                        currentPage === page ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  )
-                )}
-              </div>
-              <button
-                onClick={() =>
-                  isTemplatesTab
-                    ? setLabelCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                    : setDeviceCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                }
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          <UiPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalResults={totalResults}
+            itemsPerPage={itemsPerPage}
+            onPageChange={(page) =>
+              isTemplatesTab ? setLabelCurrentPage(page) : setDeviceCurrentPage(page)
+            }
+            className="p-[10px] pt-4 border-t border-gray-100 bg-white"
+          />
         )}
       </div>
     </div>

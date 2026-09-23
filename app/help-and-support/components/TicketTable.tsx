@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { UiIconButton } from '@/shared/components/ui/UiIconButton';
 import type { HelpSupportTicket, TicketDisposition, TicketStatus } from '@/shared/types/helpSupport';
 import { humanizeDuration, liveDurationMs } from '@/shared/utils/duration.util';
 import {
@@ -355,40 +356,37 @@ export default function TicketTable({
                     {hasActions && (
                       <td className="px-4 py-3.5 text-right">
                         <div className="inline-flex items-center gap-1">
-                          <Link
+                          <UiIconButton
                             href={ticketHref(ticket.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 text-gray-500 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600"
-                            aria-label={`View ticket ${ticket.ticketNumber}`}
+                            icon="ri-eye-line"
+                            tone="view"
                             title="View ticket"
-                          >
-                            <i className="ri-eye-line text-sm" aria-hidden />
-                          </Link>
+                            aria-label={`View ticket ${ticket.ticketNumber}`}
+                            onClick={(e) => e.stopPropagation()}
+                          />
                           {isAgent && onEditTicket && (
-                            <button
-                              type="button"
+                            <UiIconButton
+                              icon="ri-pencil-line"
+                              tone="edit"
+                              title={`Edit ticket ${ticket.ticketNumber}`}
+                              aria-label={`Edit ticket ${ticket.ticketNumber}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onEditTicket(ticket);
                               }}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 text-gray-500 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600"
-                              aria-label={`Edit ticket ${ticket.ticketNumber}`}
-                            >
-                              <i className="ri-pencil-line text-sm" aria-hidden />
-                            </button>
+                            />
                           )}
                           {canDelete && (
-                            <button
-                              type="button"
+                            <UiIconButton
+                              icon="ri-delete-bin-line"
+                              tone="delete"
+                              title={`Delete ticket ${ticket.ticketNumber}`}
+                              aria-label={`Delete ticket ${ticket.ticketNumber}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onDeleteTicket?.(ticket);
                               }}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 text-gray-500 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600"
-                              aria-label={`Delete ticket ${ticket.ticketNumber}`}
-                            >
-                              <i className="ri-delete-bin-line text-sm" aria-hidden />
-                            </button>
+                            />
                           )}
                         </div>
                       </td>

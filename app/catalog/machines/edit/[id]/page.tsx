@@ -1,10 +1,10 @@
 "use client"
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import Seo from '@/shared/layout-components/seo/seo';
 import { toast, Toaster } from 'react-hot-toast';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
+import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
+import { UiFormFooter } from '@/shared/components/ui';
 import { PROCESS_DEPARTMENTS, MACHINE_TYPE_OPTIONS } from '@/shared/constants/handkerchiefCatalog';
 import { userService, type User } from '@/shared/services/userService';
 import { getMachine, updateMachine } from '@/shared/services/phase3CatalogService';
@@ -156,134 +156,101 @@ function EditMachinePage({ params }: { params: { id: string } }) {
   }
 
   return (
-    <div className="main-content catalog-master-form">
+    <>
       <Toaster position="top-right" />
-      <Seo title="Edit Machine" />
-
-      <div className="box !bg-transparent border-0 shadow-none mb-4">
-        <div className="box-header flex justify-between items-center">
-          <h1 className="box-title text-2xl font-semibold">Edit Machine</h1>
-          <nav className="flex" aria-label="Breadcrumb">
-            <ol className="inline-flex items-center space-x-1 md:space-x-3">
-              <li className="inline-flex items-center">
-                <Link
-                  href="/catalog/machines"
-                  className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary"
-                >
-                  <i className="ri-home-line mr-2"></i>
-                  Machines
-                </Link>
-              </li>
-              <li>
-                <div className="flex items-center">
-                  <i className="ri-arrow-right-s-line text-gray-400 mx-2"></i>
-                  <span className="text-sm font-medium text-gray-500">Edit Machine</span>
-                </div>
-              </li>
-            </ol>
-          </nav>
-        </div>
-      </div>
-
-      <div className="box">
-        <div className="box-body">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="form-label">Name *</label>
-                <input type="text" name="name" className="form-control" value={formData.name} onChange={handleInputChange} required />
-              </div>
-              <div>
-                <label className="form-label">Code</label>
-                <input type="text" name="code" className="form-control" value={formData.code} onChange={handleInputChange} />
-              </div>
-              <div>
-                <label className="form-label">Machine Type</label>
-                <select name="machineType" className="form-control" value={formData.machineType} onChange={handleInputChange}>
-                  {MACHINE_TYPE_OPTIONS.map((opt) => (
-                    <option key={opt.value || 'empty'} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">Make / Model</label>
-                <input type="text" name="makeModel" className="form-control" value={formData.makeModel} onChange={handleInputChange} />
-              </div>
-              <div>
-                <label className="form-label">Department</label>
-                <select name="department" className="form-control" value={formData.department} onChange={handleInputChange}>
-                  {PROCESS_DEPARTMENTS.map((opt) => (
-                    <option key={opt.value || 'empty'} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">Floor</label>
-                <input type="text" name="floor" className="form-control" value={formData.floor} onChange={handleInputChange} />
-              </div>
-              <div>
-                <label className="form-label">Capacity Per Shift</label>
-                <input type="number" name="capacityPerShift" className="form-control" min="0" value={formData.capacityPerShift} onChange={handleInputChange} />
-              </div>
-              <div>
-                <label className="form-label">Maintenance Interval (Months)</label>
-                <input type="number" name="maintenanceIntervalMonths" className="form-control" min="0" value={formData.maintenanceIntervalMonths} onChange={handleInputChange} />
-              </div>
-              <div>
-                <label className="form-label">Last Maintenance Date</label>
-                <input type="date" name="lastMaintenanceDate" className="form-control" value={formData.lastMaintenanceDate} onChange={handleInputChange} />
-              </div>
-              <div>
-                <label className="form-label">Next Maintenance Date</label>
-                <input type="date" name="nextMaintenanceDate" className="form-control" value={formData.nextMaintenanceDate} onChange={handleInputChange} />
-              </div>
-              <div className="md:col-span-2">
-                <label className="form-label">Maintenance Notes</label>
-                <textarea name="maintenanceNotes" className="form-control" value={formData.maintenanceNotes} onChange={handleInputChange} rows={3} />
-              </div>
-              <div>
-                <label className="form-label">Assigned Supervisor</label>
-                <select
-                  name="assignedSupervisor"
-                  className="form-control"
-                  value={formData.assignedSupervisor}
-                  onChange={handleInputChange}
-                  disabled={loadingUsers}
-                >
-                  <option value="">Select Supervisor</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.name || user.email}{user.email ? ` (${user.email})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">Status</label>
-                <select name="status" className="form-control" value={formData.status} onChange={handleInputChange}>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-4">
-              <button
-                type="button"
-                className="ti-btn ti-btn-secondary"
-                onClick={() => router.push('/catalog/machines')}
-                disabled={isSaving}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="ti-btn ti-btn-primary" disabled={isSaving}>
-                {isSaving ? 'Updating...' : 'Update Machine'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+      <CatalogMasterFormPage
+        seoTitle="Edit Machine"
+        title="Edit Machine"
+        listHref="/catalog/machines"
+        listLabel="Machines"
+        currentLabel="Edit"
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="name" className="form-label required">Name</label>
+            <input type="text" id="name" name="name" className="form-control" value={formData.name} onChange={handleInputChange} required />
+          </div>
+          <div className="form-group">
+            <label htmlFor="code" className="form-label">Code</label>
+            <input type="text" id="code" name="code" className="form-control" value={formData.code} onChange={handleInputChange} />
+          </div>
+          <div className="form-group">
+            <label htmlFor="machineType" className="form-label">Machine Type</label>
+            <select id="machineType" name="machineType" className="form-select" value={formData.machineType} onChange={handleInputChange}>
+              {MACHINE_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value || 'empty'} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="makeModel" className="form-label">Make / Model</label>
+            <input type="text" id="makeModel" name="makeModel" className="form-control" value={formData.makeModel} onChange={handleInputChange} />
+          </div>
+          <div className="form-group">
+            <label htmlFor="department" className="form-label">Department</label>
+            <select id="department" name="department" className="form-select" value={formData.department} onChange={handleInputChange}>
+              {PROCESS_DEPARTMENTS.map((opt) => (
+                <option key={opt.value || 'empty'} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="floor" className="form-label">Floor</label>
+            <input type="text" id="floor" name="floor" className="form-control" value={formData.floor} onChange={handleInputChange} />
+          </div>
+          <div className="form-group">
+            <label htmlFor="capacityPerShift" className="form-label">Capacity Per Shift</label>
+            <input type="number" id="capacityPerShift" name="capacityPerShift" className="form-control" min="0" value={formData.capacityPerShift} onChange={handleInputChange} />
+          </div>
+          <div className="form-group">
+            <label htmlFor="maintenanceIntervalMonths" className="form-label">Maintenance Interval (Months)</label>
+            <input type="number" id="maintenanceIntervalMonths" name="maintenanceIntervalMonths" className="form-control" min="0" value={formData.maintenanceIntervalMonths} onChange={handleInputChange} />
+          </div>
+          <div className="form-group">
+            <label htmlFor="lastMaintenanceDate" className="form-label">Last Maintenance Date</label>
+            <input type="date" id="lastMaintenanceDate" name="lastMaintenanceDate" className="form-control" value={formData.lastMaintenanceDate} onChange={handleInputChange} />
+          </div>
+          <div className="form-group">
+            <label htmlFor="nextMaintenanceDate" className="form-label">Next Maintenance Date</label>
+            <input type="date" id="nextMaintenanceDate" name="nextMaintenanceDate" className="form-control" value={formData.nextMaintenanceDate} onChange={handleInputChange} />
+          </div>
+          <div className="form-group md:col-span-2">
+            <label htmlFor="maintenanceNotes" className="form-label">Maintenance Notes</label>
+            <textarea id="maintenanceNotes" name="maintenanceNotes" className="form-control" value={formData.maintenanceNotes} onChange={handleInputChange} rows={3} />
+          </div>
+          <div className="form-group">
+            <label htmlFor="assignedSupervisor" className="form-label">Assigned Supervisor</label>
+            <select
+              id="assignedSupervisor"
+              name="assignedSupervisor"
+              className="form-select"
+              value={formData.assignedSupervisor}
+              onChange={handleInputChange}
+              disabled={loadingUsers}
+            >
+              <option value="">Select Supervisor</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name || user.email}{user.email ? ` (${user.email})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="status" className="form-label">Status</label>
+            <select id="status" name="status" className="form-select" value={formData.status} onChange={handleInputChange}>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+          <UiFormFooter
+            submitLabel="Update Machine"
+            isLoading={isSaving}
+            onCancel={() => router.push('/catalog/machines')}
+          />
+        </form>
+      </CatalogMasterFormPage>
+    </>
   );
 }
 

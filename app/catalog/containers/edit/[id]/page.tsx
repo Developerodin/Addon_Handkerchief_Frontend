@@ -1,10 +1,10 @@
 "use client"
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import Seo from '@/shared/layout-components/seo/seo';
 import { toast, Toaster } from 'react-hot-toast';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
+import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
+import { UiFormFooter } from '@/shared/components/ui';
 import { PROCESS_DEPARTMENTS, CONTAINER_TYPE_OPTIONS } from '@/shared/constants/handkerchiefCatalog';
 import {
   getContainer,
@@ -116,113 +116,79 @@ function EditContainerPage({ params }: { params: { id: string } }) {
   }
 
   return (
-    <div className="main-content catalog-master-form">
+    <>
       <Toaster position="top-right" />
-      <Seo title="Edit Container" />
-
-      <div className="box !bg-transparent border-0 shadow-none mb-4">
-        <div className="box-header flex justify-between items-center">
-          <h1 className="box-title text-2xl font-semibold">Edit Container</h1>
-          <nav className="flex" aria-label="Breadcrumb">
-            <ol className="inline-flex items-center space-x-1 md:space-x-3">
-              <li className="inline-flex items-center">
-                <Link
-                  href="/catalog/containers"
-                  className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary"
-                >
-                  <i className="ri-home-line mr-2"></i>
-                  Containers
-                </Link>
-              </li>
-              <li>
-                <div className="flex items-center">
-                  <i className="ri-arrow-right-s-line text-gray-400 mx-2"></i>
-                  <span className="text-sm font-medium text-gray-500">Edit Container</span>
-                </div>
-              </li>
-            </ol>
-          </nav>
-        </div>
-      </div>
-
-      <div className="box">
-        <div className="box-body">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="form-label">Code *</label>
-                <input type="text" name="code" className="form-control" value={formData.code} onChange={handleInputChange} required />
-              </div>
-              <div>
-                <label className="form-label">Name *</label>
-                <input type="text" name="name" className="form-control" value={formData.name} onChange={handleInputChange} required />
-              </div>
-              <div>
-                <label className="form-label">Type</label>
-                <select name="type" className="form-control" value={formData.type} onChange={handleInputChange}>
-                  <option value="">Select Type</option>
-                  {CONTAINER_TYPE_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">Capacity</label>
-                <input type="number" name="capacity" className="form-control" min="0" value={formData.capacity} onChange={handleInputChange} />
-              </div>
-              <div>
-                <label className="form-label">Barcode</label>
-                <input type="text" name="barcode" className="form-control" value={formData.barcode} onChange={handleInputChange} />
-              </div>
-              <div>
-                <label className="form-label">Department</label>
-                <select name="department" className="form-control" value={formData.department} onChange={handleInputChange}>
-                  {PROCESS_DEPARTMENTS.map((opt) => (
-                    <option key={opt.value || 'empty'} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">Floor</label>
-                <input type="text" name="floor" className="form-control" value={formData.floor} onChange={handleInputChange} />
-              </div>
-              <div>
-                <label className="form-label">Status</label>
-                <select name="status" className="form-control" value={formData.status} onChange={handleInputChange}>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-2 md:col-span-2">
-                <input
-                  type="checkbox"
-                  id="reusable"
-                  name="reusable"
-                  className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
-                  checked={formData.reusable}
-                  onChange={handleInputChange}
-                />
-                <label htmlFor="reusable" className="form-label mb-0">Reusable</label>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-4">
-              <button
-                type="button"
-                className="ti-btn ti-btn-secondary"
-                onClick={() => router.push('/catalog/containers')}
-                disabled={isSaving}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="ti-btn ti-btn-primary" disabled={isSaving}>
-                {isSaving ? 'Updating...' : 'Update Container'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+      <CatalogMasterFormPage
+        seoTitle="Edit Container"
+        title="Edit Container"
+        listHref="/catalog/containers"
+        listLabel="Containers"
+        currentLabel="Edit"
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="code" className="form-label required">Code</label>
+            <input type="text" id="code" name="code" className="form-control" value={formData.code} onChange={handleInputChange} required />
+          </div>
+          <div className="form-group">
+            <label htmlFor="name" className="form-label required">Name</label>
+            <input type="text" id="name" name="name" className="form-control" value={formData.name} onChange={handleInputChange} required />
+          </div>
+          <div className="form-group">
+            <label htmlFor="type" className="form-label">Type</label>
+            <select id="type" name="type" className="form-select" value={formData.type} onChange={handleInputChange}>
+              <option value="">Select Type</option>
+              {CONTAINER_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="capacity" className="form-label">Capacity</label>
+            <input type="number" id="capacity" name="capacity" className="form-control" min="0" value={formData.capacity} onChange={handleInputChange} />
+          </div>
+          <div className="form-group">
+            <label htmlFor="barcode" className="form-label">Barcode</label>
+            <input type="text" id="barcode" name="barcode" className="form-control" value={formData.barcode} onChange={handleInputChange} />
+          </div>
+          <div className="form-group">
+            <label htmlFor="department" className="form-label">Department</label>
+            <select id="department" name="department" className="form-select" value={formData.department} onChange={handleInputChange}>
+              {PROCESS_DEPARTMENTS.map((opt) => (
+                <option key={opt.value || 'empty'} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="floor" className="form-label">Floor</label>
+            <input type="text" id="floor" name="floor" className="form-control" value={formData.floor} onChange={handleInputChange} />
+          </div>
+          <div className="form-group">
+            <label htmlFor="status" className="form-label">Status</label>
+            <select id="status" name="status" className="form-select" value={formData.status} onChange={handleInputChange}>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+          <div className="form-group flex items-center gap-2 md:col-span-2">
+            <input
+              type="checkbox"
+              id="reusable"
+              name="reusable"
+              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
+              checked={formData.reusable}
+              onChange={handleInputChange}
+            />
+            <label htmlFor="reusable" className="form-label mb-0">Reusable</label>
+          </div>
+          <UiFormFooter
+            submitLabel="Update Container"
+            isLoading={isSaving}
+            onCancel={() => router.push('/catalog/containers')}
+          />
+        </form>
+      </CatalogMasterFormPage>
+    </>
   );
 }
 

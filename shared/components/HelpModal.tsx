@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { UiButton } from '@/shared/components/ui/UiButton';
 
 interface HelpModalProps {
   isOpen: boolean;
@@ -61,9 +62,9 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose, title, content }
         <div className="help-modal__body">{content}</div>
 
         <div className="help-modal__footer">
-          <button type="button" onClick={onClose} className="ti-btn ti-btn-primary-full help-modal__action">
+          <UiButton type="button" variant="primary" onClick={onClose} className="help-modal__action">
             Got it!
-          </button>
+          </UiButton>
         </div>
       </div>
     </div>,

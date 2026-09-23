@@ -10,7 +10,7 @@ import {
   FabricMeasurementCategory,
   FabricQualityLookup,
 } from '@/shared/services/fabricLookupService';
-import { FabricLookupListConfig } from '@/shared/components/catalog/FabricLookupListPage';
+import type { CatalogListConfig } from '@/shared/components/catalog/catalogListTypes';
 import {
   FabricLookupFormConfig,
   simpleLookupFields,
@@ -48,7 +48,7 @@ export type FabricQualityForm = {
   status: 'active' | 'inactive';
 };
 
-export const fabricTypeListConfig: FabricLookupListConfig<{ id: string; name: string; status: 'active' | 'inactive' }> = {
+export const fabricTypeListConfig: CatalogListConfig<{ id: string; name: string; status: 'active' | 'inactive' }> = {
   segment: 'fabric-type',
   title: 'Fabric Type',
   description: 'Manage fabric types used in fabric master dropdowns.',
@@ -73,7 +73,7 @@ export const fabricTypeFormConfig: FabricLookupFormConfig<SimpleLookupForm> = {
   mapFromEntity: (entity) => ({ name: entity.name || '', status: entity.status || 'active' }),
 };
 
-export const fabricColorListConfig: FabricLookupListConfig<FabricColorLookup> = {
+export const fabricColorListConfig: CatalogListConfig<FabricColorLookup> = {
   segment: 'fabric-color',
   title: 'Fabric Color',
   description: 'Manage fabric colors for fabric master. Color code can be a hex value or Pantone reference.',
@@ -125,7 +125,7 @@ export const fabricColorFormConfig: FabricLookupFormConfig<{
   }),
 };
 
-export const fabricQualityListConfig: FabricLookupListConfig<FabricQualityLookup> = {
+export const fabricQualityListConfig: CatalogListConfig<FabricQualityLookup> = {
   segment: 'fabric-quality',
   title: 'Fabric Quality',
   description: 'Manage fabric quality and fiber composition (e.g. 100% Cotton, poly-cotton blends).',
@@ -300,7 +300,7 @@ export const fabricCountFormConfig: FabricLookupFormConfig<SimpleLookupForm> = {
 
 const measurementCategories: FabricMeasurementCategory[] = ['length', 'weight', 'quantity', 'area'];
 
-export const fabricMeasurementListConfig: FabricLookupListConfig<FabricMeasurementLookup> = {
+export const fabricMeasurementListConfig: CatalogListConfig<FabricMeasurementLookup> = {
   segment: 'fabric-measurement',
   title: 'Fabric Measurement',
   description: 'Manage measurement units for GLM, finished width, and other fabric fields.',

@@ -17,11 +17,11 @@ const CatalogPageSizeSelect: React.FC<CatalogPageSizeSelectProps> = ({
   options = DEFAULT_OPTIONS,
   className = "",
 }) => (
-  <div className={`relative ${className}`.trim()}>
+  <div className={`catalog-page-size-wrap ${className}`.trim()}>
     <select
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
-      className="catalog-page-size-select bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-gray-300 cursor-pointer w-full"
+      className="catalog-page-size-select"
       aria-label="Rows per page"
     >
       {options.map((option) => (
@@ -31,7 +31,7 @@ const CatalogPageSizeSelect: React.FC<CatalogPageSizeSelectProps> = ({
       ))}
     </select>
     <i
-      className="ri-arrow-down-s-line absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"
+      className="ri-arrow-down-s-line catalog-page-size-select__icon"
       aria-hidden
     />
   </div>

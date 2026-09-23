@@ -1,14 +1,14 @@
-"use client"
-import React, { useState, useEffect, useRef } from 'react';
-import Seo from '@/shared/layout-components/seo/seo';
-import Link from 'next/link';
+"use client";
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast, Toaster } from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
-import HelpIcon from '@/shared/components/HelpIcon';
 import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud';
-import CatalogRowActions from '@/shared/components/catalog/CatalogRowActions';
-import CatalogPageSizeSelect from '@/shared/components/catalog/CatalogPageSizeSelect';
+import { useCatalogListState } from '@/shared/hooks/useCatalogListState';
+import CatalogListShell from '@/shared/components/catalog/CatalogListShell';
+import { buildCatalogTableColumns, catalogHelpBlock } from '@/shared/components/catalog/catalogListHelpers';
+import { UiTableColumn } from '@/shared/components/ui';
 import {
   CategoryRecord,
   buildParentMap,
@@ -37,29 +37,14 @@ interface ExcelRow {
   'Status'?: string;
 }
 
-const CategoriesPage = () => {
+export default function CategoriesPage() {
   const { canCreate, canUpdate, canDelete, canImport, guardDelete } = useCatalogCrud('categories');
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectAll, setSelectAll] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [totalResults, setTotalResults] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [categoryNameMap, setCategoryNameMap] = useState<Record<string, string>>({});
   const [allCategoriesForHierarchy, setAllCategoriesForHierarchy] = useState<Category[]>([]);
-  const [importProgress, setImportProgress] = useState<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  // const [isReplicating, setIsReplicating] = useState(false);
 
-  // Fetch categories from API (with pagination and search)
-  const fetchCategories = async (page = 1, limit = itemsPerPage, search = '') => {
-    try {
-      setIsLoading(true);
-      setError(null);
+  const fetchCategories = useCallback(
+    async ({ page, limit, search }: { page: number; limit: number; search: string }) => {
       const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
       const response = await fetch(`${API_BASE_URL}/categories?page=${page}&limit=${limit}${searchParam}`);
       if (!response.ok) {
@@ -67,23 +52,19 @@ const CategoriesPage = () => {
         throw new Error(errorData.message || 'Failed to fetch categories');
       }
       const data = await response.json();
-      const categoriesArray = Array.isArray(data.results) ? data.results : [];
-      setCategories(categoriesArray);
-      setTotalResults(data.totalResults || 0);
-      setTotalPages(data.totalPages || 1);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch categories');
-      setCategories([]);
-      setTotalPages(1);
-      toast.error('Failed to load categories');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      return {
+        results: Array.isArray(data.results) ? data.results : [],
+        totalResults: data.totalResults || 0,
+        totalPages: data.totalPages || 1,
+      };
+    },
+    []
+  );
 
-  useEffect(() => {
-    fetchCategories(currentPage, itemsPerPage, searchQuery);
-  }, [currentPage, itemsPerPage, searchQuery]);
+  const list = useCatalogListState<Category>({
+    fetchFn: fetchCategories,
+    errorMessage: 'Failed to fetch categories',
+  });
 
   useEffect(() => {
     const fetchCategoryNames = async () => {
@@ -104,114 +85,52 @@ const CategoriesPage = () => {
     fetchCategoryNames();
   }, []);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery]);
-
-  const handleSelectAll = () => {
-    if (selectAll) {
-      setSelectedCategories([]);
-    } else {
-      setSelectedCategories(categories.map(cat => cat.id));
-    }
-    setSelectAll(!selectAll);
-  };
-
-  const handleCategorySelect = (categoryId: string) => {
-    if (selectedCategories.includes(categoryId)) {
-      setSelectedCategories(selectedCategories.filter(id => id !== categoryId));
-    } else {
-      setSelectedCategories([...selectedCategories, categoryId]);
-    }
-  };
+  const hierarchyParentMap = useMemo(
+    () => buildParentMap(allCategoriesForHierarchy),
+    [allCategoriesForHierarchy]
+  );
 
   const handleDelete = async (id: string) => {
     if (!guardDelete()) return;
-    if (window.confirm('Are you sure you want to delete this category?')) {
-      try {
-        const response = await fetch(`${API_BASE_URL}/categories/${id}`, {
-          method: 'DELETE',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to delete category');
-        }
-
-        // Remove the deleted category from the local state
-        setCategories(prevCategories => prevCategories.filter(cat => cat.id !== id));
-        // Remove from selected categories if it was selected
-        setSelectedCategories(prev => prev.filter(selectedId => selectedId !== id));
-        
-        toast.success('Category deleted successfully');
-      } catch (err) {
-        console.error('Error deleting category:', err);
-        toast.error(err instanceof Error ? err.message : 'Failed to delete category');
-      }
-    }
-  };
-
-  // Replicate temporarily disabled — uncomment when needed
-  /*
-  const handleReplicate = async (category: Category) => {
-    if (!canCreate) return;
-    setIsReplicating(true);
-    const loadingToast = toast.loading('Replicating category...');
+    if (!window.confirm('Are you sure you want to delete this category?')) return;
     try {
-      const parentId =
-        typeof category.parent === 'object' && category.parent
-          ? category.parent.id
-          : (category.parent || null);
-      const response = await fetch(`${API_BASE_URL}/categories`, {
-        method: 'POST',
+      const response = await fetch(`${API_BASE_URL}/categories/${id}`, {
+        method: 'DELETE',
         headers: {
-          'Accept': 'application/json',
+          Accept: 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: `${category.name} (Copy)`,
-          description: category.description || '',
-          parent: parentId,
-          sortOrder: category.sortOrder,
-          status: category.status,
-        }),
       });
+
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to replicate category');
+        throw new Error(errorData.message || 'Failed to delete category');
       }
-      toast.success('Category replicated successfully', { id: loadingToast });
-      await fetchCategories(currentPage, itemsPerPage, searchQuery);
+
+      list.setRows((prev) => prev.filter((cat) => cat.id !== id));
+      list.setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id));
+      toast.success('Category deleted successfully');
     } catch (err) {
-      console.error('Error replicating category:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to replicate category', { id: loadingToast });
-    } finally {
-      setIsReplicating(false);
+      console.error('Error deleting category:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to delete category');
     }
   };
-  */
 
   const handleDeleteSelected = async () => {
-    if (!guardDelete()) return;
-    if (selectedCategories.length === 0) return;
-    
-    if (window.confirm(`Are you sure you want to delete ${selectedCategories.length} selected category(s)?`)) {
-      try {
-        let hasError = false;
-        const deletePromises = selectedCategories.map(async (id) => {
+    if (!guardDelete() || list.selectedIds.length === 0) return;
+    if (!window.confirm(`Are you sure you want to delete ${list.selectedIds.length} selected category(s)?`)) return;
+    try {
+      let hasError = false;
+      const results = await Promise.all(
+        list.selectedIds.map(async (id) => {
           try {
             const response = await fetch(`${API_BASE_URL}/categories/${id}`, {
               method: 'DELETE',
               headers: {
-                'Accept': 'application/json',
+                Accept: 'application/json',
                 'Content-Type': 'application/json',
               },
             });
-
             if (!response.ok) {
               const errorData = await response.json();
               throw new Error(errorData.message || `Failed to delete category: ${id}`);
@@ -222,29 +141,16 @@ const CategoriesPage = () => {
             console.error(`Error deleting category ${id}:`, err);
             return null;
           }
-        });
-
-        const results = await Promise.all(deletePromises);
-        const successfulDeletes = results.filter((id): id is string => id !== null);
-
-        // Remove successfully deleted categories from the local state
-        setCategories(prevCategories => 
-          prevCategories.filter(cat => !successfulDeletes.includes(cat.id))
-        );
-        
-        // Clear selected categories
-        setSelectedCategories([]);
-        setSelectAll(false);
-
-        if (hasError) {
-          toast.error('Some categories could not be deleted');
-        } else {
-          toast.success('Selected categories deleted successfully');
-        }
-      } catch (err) {
-        console.error('Error in bulk delete:', err);
-        toast.error('Failed to delete some categories');
-      }
+        })
+      );
+      const successfulDeletes = results.filter((id): id is string => id !== null);
+      list.setRows((prev) => prev.filter((cat) => !successfulDeletes.includes(cat.id)));
+      list.clearSelection();
+      if (hasError) toast.error('Some categories could not be deleted');
+      else toast.success('Selected categories deleted successfully');
+    } catch (err) {
+      console.error('Error in bulk delete:', err);
+      toast.error('Failed to delete some categories');
     }
   };
 
@@ -253,37 +159,35 @@ const CategoriesPage = () => {
       const sampleData = [
         {
           'Category Name': 'Handkerchief',
-          'Description': 'All handkerchief products',
+          Description: 'All handkerchief products',
           'Parent Category': 'None',
           'Sort Order': 1,
-          'Status': 'active',
+          Status: 'active',
         },
         {
           'Category Name': 'Embroidery',
-          'Description': 'Embroidered handkerchief styles',
+          Description: 'Embroidered handkerchief styles',
           'Parent Category': 'Handkerchief',
           'Sort Order': 1,
-          'Status': 'active',
+          Status: 'active',
         },
         {
           'Category Name': 'Plain',
-          'Description': 'Plain handkerchief styles',
+          Description: 'Plain handkerchief styles',
           'Parent Category': 'Handkerchief',
           'Sort Order': 2,
-          'Status': 'active',
+          Status: 'active',
         },
         {
           'Category Name': 'Floral',
-          'Description': 'Floral embroidery grandchild category',
+          Description: 'Floral embroidery grandchild category',
           'Parent Category': 'Embroidery',
           'Sort Order': 1,
-          'Status': 'active',
+          Status: 'active',
         },
       ];
       const ws = XLSX.utils.json_to_sheet(sampleData);
-      ws['!cols'] = [
-        { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 10 }, { wch: 10 },
-      ];
+      ws['!cols'] = [{ wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 10 }, { wch: 10 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Category Template');
       XLSX.writeFile(wb, 'category_import_template.xlsx');
@@ -296,29 +200,26 @@ const CategoriesPage = () => {
 
   const handleExport = async () => {
     try {
-      // Always fetch all categories for export
       const response = await fetch(`${API_BASE_URL}/categories?page=1&limit=100000`);
       if (!response.ok) throw new Error('Failed to fetch all categories for export');
       const data = await response.json();
       const exportSource = Array.isArray(data.results) ? data.results : [];
       const exportData = exportSource.map((category: Category) => ({
-        'ID': category.id,
+        ID: category.id,
         'Category Name': category.name,
-        'Description': category.description || '',
-        'Parent Category': getParentCategoryName(category.parent, categoryNameMap)
-          || exportSource.find((p: Category) => p.id === category.parent)?.name
-          || 'None',
+        Description: category.description || '',
+        'Parent Category':
+          getParentCategoryName(category.parent, categoryNameMap) ||
+          exportSource.find((p: Category) => p.id === category.parent)?.name ||
+          'None',
         'Sort Order': category.sortOrder,
-        'Status': category.status
+        Status: category.status,
       }));
       const ws = XLSX.utils.json_to_sheet(exportData);
-      ws['!cols'] = [
-        { wch: 20 }, { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 10 }, { wch: 10 }
-      ];
+      ws['!cols'] = [{ wch: 20 }, { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 10 }, { wch: 10 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Categories');
-      const fileName = `categories_${new Date().toISOString().split('T')[0]}.xlsx`;
-      XLSX.writeFile(wb, fileName);
+      XLSX.writeFile(wb, `categories_${new Date().toISOString().split('T')[0]}.xlsx`);
       toast.success('Categories exported successfully');
     } catch (error) {
       console.error('Error exporting categories:', error);
@@ -329,20 +230,19 @@ const CategoriesPage = () => {
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setImportProgress(0);
+    list.setImportProgress(0);
     const loadingToast = toast.loading('Importing categories...');
     try {
       const reader = new FileReader();
-      reader.onload = async (e) => {
+      reader.onload = async (ev) => {
         try {
-          const data = e.target?.result;
+          const data = ev.target?.result;
           const workbook = XLSX.read(data, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
           let successCount = 0;
           let errorCount = 0;
-          // Fetch all categories for upsert by name
           const allResponse = await fetch(`${API_BASE_URL}/categories?page=1&limit=100000`);
           const allData = allResponse.ok ? await allResponse.json() : { results: [] };
           const allCategories: Category[] = allData.results || [];
@@ -352,30 +252,27 @@ const CategoriesPage = () => {
               const categoryData = {
                 name: row['Category Name'],
                 description: row['Description'] || '',
-                sortOrder: parseInt(row['Sort Order']?.toString() || '0'),
-                status: (row['Status']?.toString()?.toLowerCase() === 'active') ? 'active' : 'inactive',
-                parent: null as string | null
+                sortOrder: parseInt(row['Sort Order']?.toString() || '0', 10),
+                status: row['Status']?.toString()?.toLowerCase() === 'active' ? 'active' : 'inactive',
+                parent: null as string | null,
               };
-              // Find parent category ID by name if provided
               const parentName = row['Parent Category'];
               if (parentName && parentName !== 'None') {
-                const parentCategory = allCategories.find(c => c.name === parentName);
-                if (parentCategory) {
-                  categoryData.parent = parentCategory.id;
-                }
+                const parentCategory = allCategories.find((c) => c.name === parentName);
+                if (parentCategory) categoryData.parent = parentCategory.id;
               }
               let categoryId = row['ID'];
               if (!categoryId) {
-                // Try to find by name (case-insensitive)
-                const found = allCategories.find(c => c.name.trim().toLowerCase() === categoryData.name.trim().toLowerCase());
+                const found = allCategories.find(
+                  (c) => c.name.trim().toLowerCase() === categoryData.name.trim().toLowerCase()
+                );
                 if (found) categoryId = found.id;
               }
               if (categoryId) {
-                // Update existing
                 const patchResponse = await fetch(`${API_BASE_URL}/categories/${categoryId}`, {
                   method: 'PATCH',
                   headers: {
-                    'Accept': 'application/json',
+                    Accept: 'application/json',
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify(categoryData),
@@ -383,11 +280,10 @@ const CategoriesPage = () => {
                 if (!patchResponse.ok) throw new Error();
                 successCount++;
               } else {
-                // Create new
                 const postResponse = await fetch(`${API_BASE_URL}/categories`, {
                   method: 'POST',
                   headers: {
-                    'Accept': 'application/json',
+                    Accept: 'application/json',
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify(categoryData),
@@ -395,282 +291,160 @@ const CategoriesPage = () => {
                 if (!postResponse.ok) throw new Error();
                 successCount++;
               }
-            } catch (error) {
+            } catch {
               errorCount++;
             }
-            setImportProgress(Math.round(((i + 1) / jsonData.length) * 100));
+            list.setImportProgress(Math.round(((i + 1) / jsonData.length) * 100));
           }
           if (fileInputRef.current) fileInputRef.current.value = '';
-          setImportProgress(null);
+          list.setImportProgress(null);
           toast.dismiss(loadingToast);
           if (successCount > 0) toast.success(`Successfully imported/updated ${successCount} categories`);
           if (errorCount > 0) toast.error(`Failed to import/update ${errorCount} categories`);
-          fetchCategories();
-        } catch (error) {
-          setImportProgress(null);
+          list.refresh();
+        } catch {
+          list.setImportProgress(null);
           toast.error('Failed to process import file', { id: loadingToast });
         }
       };
       reader.readAsArrayBuffer(file);
-    } catch (error) {
-      setImportProgress(null);
+    } catch {
+      list.setImportProgress(null);
       toast.error('Failed to import categories', { id: loadingToast });
     }
   };
 
-  const hierarchyParentMap = buildParentMap(allCategoriesForHierarchy);
+  const dataColumns: UiTableColumn<Category>[] = useMemo(
+    () => [
+      {
+        key: 'name',
+        label: 'Category Name',
+        render: (row) => <span className="font-bold text-gray-900">{row.name}</span>,
+      },
+      {
+        key: 'level',
+        label: 'Level',
+        render: (row) => {
+          const level = getCategoryLevel(row.id, hierarchyParentMap);
+          return (
+            <span className="inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded uppercase tracking-tight bg-purple-50 text-purple-700">
+              {getLevelLabel(level)}
+            </span>
+          );
+        },
+      },
+      {
+        key: 'path',
+        label: 'Path',
+        render: (row) => {
+          const path = getCategoryPath(row.id, allCategoriesForHierarchy).join(' › ');
+          return path || row.name;
+        },
+      },
+      {
+        key: 'parent',
+        label: 'Parent Category',
+        render: (row) => {
+          const parentName = getParentCategoryName(row.parent, categoryNameMap);
+          if (parentName) {
+            return (
+              <span className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-100 text-gray-700">
+                {parentName}
+              </span>
+            );
+          }
+          if (row.parent) {
+            return (
+              <span className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-100 text-gray-400">
+                —
+              </span>
+            );
+          }
+          return (
+            <span className="inline-flex px-1.5 py-0.5 text-[9px] font-bold rounded uppercase tracking-tight bg-gray-100 text-gray-500">
+              Root
+            </span>
+          );
+        },
+      },
+      {
+        key: 'sortOrder',
+        label: 'Sort Order',
+        render: (row) => row.sortOrder,
+      },
+    ],
+    [categoryNameMap, hierarchyParentMap, allCategoriesForHierarchy]
+  );
 
-  // Condensed pagination helper
-  function getPagination(currentPage: number, totalPages: number) {
-    const pages = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-      pages.push(1);
-      if (currentPage > 4) pages.push('...');
-      for (let i = Math.max(2, currentPage - 2); i <= Math.min(totalPages - 1, currentPage + 2); i++) {
-        pages.push(i);
-      }
-      if (currentPage < totalPages - 3) pages.push('...');
-      pages.push(totalPages);
-    }
-    return pages;
-  }
+  const columns = buildCatalogTableColumns<Category>({
+    dataColumns,
+    segment: 'categories',
+    basePath: '/catalog/categories',
+    canUpdate,
+    canDelete,
+    onDelete: handleDelete,
+  });
 
   return (
-    <div className="main-content !p-[10px]">
+    <>
       <Toaster position="top-right" />
-      <Seo title="Categories"/>
-
-      <div className="bg-white shadow-sm border border-gray-100 mx-0 catalog-list-card">
-        <div className="p-[10px] catalog-list-toolbar">
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-2">
-              <div className="w-[3px] h-5 bg-purple-600 rounded-full"></div>
-              <h1 className="text-sm font-bold text-gray-800">Categories</h1>
-              <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm">
-                {totalResults}
-              </span>
-              <HelpIcon
-                title="Categories Management"
-                content={
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="font-semibold text-lg mb-2">What is this page?</h4>
-                      <p className="text-gray-700">
-                        Manage handkerchief product categories in a 3-level hierarchy: Category → Child → Grandchild.
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-lg mb-2">What can you do here?</h4>
-                      <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li><strong>View Categories:</strong> Browse all product categories with pagination and search</li>
-                        <li><strong>Add / Edit:</strong> Create or modify categories at any level</li>
-                        <li><strong>Delete Categories:</strong> Remove individual or selected categories</li>
-                        <li><strong>Import/Export:</strong> Bulk load from Excel using the handkerchief template</li>
-                      </ul>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-lg mb-2">Tips:</h4>
-                      <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li>Use parent-child relationships: Handkerchief → Embroidery → Floral</li>
-                        <li>Grandchild is the deepest level allowed (max 3 levels)</li>
-                        <li>Export before making bulk changes</li>
-                      </ul>
-                    </div>
-                  </div>
-                }
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
-                <input
-                  type="text"
-                  className="bg-white border border-gray-200 pl-8 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 w-48 min-w-[120px] placeholder:text-gray-400 transition-all font-medium"
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <i className="ri-search-line absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
-              </div>
-              <CatalogPageSizeSelect
-                value={itemsPerPage}
-                onChange={(value) => {
-                  setItemsPerPage(value);
-                  setCurrentPage(1);
-                }}
-              />
-              <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls" onChange={handleImport} />
-              {canImport && (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-[11px] font-bold rounded hover:bg-emerald-700 transition-colors shadow-sm"
-              >
-                <i className="ri-upload-2-line text-xs"></i> Import
-              </button>
-              )}
-              {importProgress !== null && (
-                <div className="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden flex items-center">
-                  <div className="bg-primary h-full transition-all duration-200" style={{ width: `${importProgress}%` }}></div>
-                  <span className="ml-1.5 text-[10px] text-gray-600 font-medium">{importProgress}%</span>
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={handleExportTemplate}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 text-[#495057] text-[11px] font-bold rounded hover:bg-gray-50 transition-colors shadow-sm"
-              >
-                <i className="ri-file-download-line text-xs"></i> Template
-              </button>
-              <button
-                type="button"
-                onClick={handleExport}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm"
-              >
-                <i className="ri-download-2-line text-xs"></i> Export
-              </button>
-              {canDelete && selectedCategories.length > 0 && (
-                <button
-                  type="button"
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded border transition-colors bg-red-50 text-red-600 border-red-100 hover:bg-red-100 shadow-sm"
-                  onClick={handleDeleteSelected}
-                >
-                  <i className="ri-delete-bin-line text-xs"></i> Delete ({selectedCategories.length})
-                </button>
-              )}
-              {canCreate && (
-              <Link
-                href="/catalog/categories/add"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm"
-              >
-                <i className="ri-add-line text-xs"></i> Add Category
-              </Link>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto min-h-[300px]">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mb-4 opacity-50"></div>
-              <p className="text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase">Loading Data</p>
-            </div>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mb-4">
-                <i className="ri-error-warning-line text-xl text-red-400"></i>
-              </div>
-              <p className="text-[12px] font-medium text-red-600">{error}</p>
-            </div>
-          ) : categories.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                <i className="ri-folder-line text-xl text-gray-200"></i>
-              </div>
-              <h3 className="text-xs font-bold text-gray-400 mb-1">DATA EMPTY</h3>
-              {canCreate && (
-              <Link href="/catalog/categories/add" className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm">
-                <i className="ri-add-line text-xs"></i> Add First Category
-              </Link>
-              )}
-            </div>
-          ) : (
-            <table className="w-full border-collapse border border-gray-200">
-              <thead>
-                <tr className="bg-gray-50/30">
-                  <th className="pl-[10px] pr-1 py-3 text-left w-10 border border-gray-200">
-                    <input type="checkbox" checked={selectAll} onChange={handleSelectAll} className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" />
-                  </th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Category Name</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Level</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Path</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Parent Category</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Sort Order</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Status</th>
-                  {(canUpdate || canDelete || canCreate) && (
-                  <th className="px-1.5 py-3 text-right pr-[10px] text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {categories.map((category: Category) => {
-                  const parentName = getParentCategoryName(category.parent, categoryNameMap);
-                  const level = getCategoryLevel(category.id, hierarchyParentMap);
-                  const path = getCategoryPath(category.id, allCategoriesForHierarchy).join(' › ');
-                  return (
-                  <tr key={category.id} className="hover:bg-gray-50/50 transition-colors group">
-                    <td className="pl-[10px] pr-1 py-2.5 border border-gray-200">
-                      <input type="checkbox" checked={selectedCategories.includes(category.id)} onChange={() => handleCategorySelect(category.id)} className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" />
-                    </td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-bold text-gray-900 border border-gray-200">{category.name}</td>
-                    <td className="px-1.5 py-2.5 border border-gray-200">
-                      <span className="inline-flex px-1.5 py-0.5 text-[10px] font-bold rounded uppercase tracking-tight bg-purple-50 text-purple-700">
-                        {getLevelLabel(level)}
-                      </span>
-                    </td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{path || category.name}</td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">
-                      {parentName ? (
-                        <span className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-100 text-gray-700">
-                          {parentName}
-                        </span>
-                      ) : category.parent ? (
-                        <span className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-100 text-gray-400">—</span>
-                      ) : (
-                        <span className="inline-flex px-1.5 py-0.5 text-[9px] font-bold rounded uppercase tracking-tight bg-gray-100 text-gray-500">Root</span>
-                      )}
-                    </td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{category.sortOrder}</td>
-                    <td className="px-1.5 py-2.5 border border-gray-200">
-                      <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-bold rounded uppercase tracking-tight ${category.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                        {category.status}
-                      </span>
-                    </td>
-                    {(canUpdate || canDelete || canCreate) && (
-                    <td className="px-1.5 py-2.5 text-right pr-[10px] border border-gray-200">
-                      <CatalogRowActions
-                        segment="categories"
-                        editHref={`/catalog/categories/edit/${category.id}`}
-                        onDelete={() => handleDelete(category.id)}
-                      />
-                    </td>
-                    )}
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {!isLoading && !error && (
-          <div className="p-[10px] pt-4 flex flex-wrap items-center justify-between gap-4 border-t border-gray-100 bg-white">
-            <div className="text-[11px] font-medium text-[#495057] tracking-tight">
-              Showing <span>{totalResults === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to {totalResults === 0 ? 0 : Math.min(currentPage * itemsPerPage, totalResults)}</span> of <span>{totalResults}</span> entries <span className="ml-1 opacity-50">→</span>
-            </div>
-            <div className="flex items-center">
-              <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">Prev</button>
-              <div className="flex items-center gap-1 mx-2">
-                {getPagination(currentPage, totalPages).map((page, idx) =>
-                  page === '...' ? (
-                    <span key={`ellipsis-${idx}`} className="text-gray-300 text-[10px]">...</span>
-                  ) : (
-                    <button key={page} onClick={() => setCurrentPage(Number(page))} className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold rounded transition-all ${currentPage === page ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'}`}>
-                      {page}
-                    </button>
-                  )
-                )}
-              </div>
-              <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">Next</button>
-            </div>
-          </div>
+      <CatalogListShell
+        seoTitle="Categories"
+        title="Categories"
+        count={list.totalResults}
+        searchQuery={list.searchQuery}
+        onSearchChange={list.setSearchQuery}
+        itemsPerPage={list.itemsPerPage}
+        onItemsPerPageChange={(value) => {
+          list.setItemsPerPage(value);
+          list.setCurrentPage(1);
+        }}
+        helpContent={catalogHelpBlock(
+          'Categories Management',
+          'Manage handkerchief product categories in a 3-level hierarchy: Category → Child → Grandchild.',
+          [
+            'Browse all product categories with pagination and search',
+            'Add, edit, or delete categories at any level',
+            'Import or export bulk changes via Excel',
+            'Use parent-child relationships: Handkerchief → Embroidery → Floral',
+          ]
         )}
-      </div>
-    </div>
+        canImport={canImport}
+        fileInputRef={fileInputRef}
+        onImportClick={() => fileInputRef.current?.click()}
+        onImportChange={handleImport}
+        importProgress={list.importProgress}
+        onExportTemplate={handleExportTemplate}
+        onExport={handleExport}
+        canCreate={canCreate}
+        addHref="/catalog/categories/add"
+        addLabel="Add Category"
+        canDelete={canDelete}
+        selectedCount={list.selectedIds.length}
+        onBulkDelete={handleDeleteSelected}
+        isLoading={list.isLoading}
+        error={list.error}
+        rows={list.rows}
+        columns={columns}
+        rowKey={(row) => row.id}
+        selectable={
+          canDelete
+            ? {
+                selectedIds: list.selectedIds,
+                selectAll: list.selectAll,
+                onSelectAll: list.handleSelectAll,
+                onSelect: list.handleSelect,
+                getRowId: (row) => row.id,
+              }
+            : undefined
+        }
+        currentPage={list.currentPage}
+        totalPages={list.totalPages}
+        totalResults={list.totalResults}
+        onPageChange={list.setCurrentPage}
+        emptyIcon="ri-folder-line"
+        emptyAddLabel="Add First Category"
+      />
+    </>
   );
-};
-
-export default CategoriesPage; 
+}

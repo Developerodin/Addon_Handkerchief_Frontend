@@ -1,14 +1,14 @@
-"use client"
-import React, { useState, useEffect, useRef } from 'react';
-import Seo from '@/shared/layout-components/seo/seo';
-import Link from 'next/link';
+"use client";
+
+import React, { useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { toast, Toaster } from 'react-hot-toast';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
-import HelpIcon from '@/shared/components/HelpIcon';
 import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud';
-import CatalogRowActions from '@/shared/components/catalog/CatalogRowActions';
-import CatalogPageSizeSelect from '@/shared/components/catalog/CatalogPageSizeSelect';
+import { useCatalogListState } from '@/shared/hooks/useCatalogListState';
+import CatalogListShell from '@/shared/components/catalog/CatalogListShell';
+import { buildCatalogTableColumns, catalogHelpBlock } from '@/shared/components/catalog/catalogListHelpers';
+import { UiTableColumn } from '@/shared/components/ui';
 
 interface FabricSupplier {
   id: string;
@@ -55,72 +55,42 @@ const getSupplierDisplay = (material: PackagingMaterial): string => {
   return material.supplierName || '—';
 };
 
-const PackagingMaterialsPage = () => {
-  const { canCreate, canUpdate, canDelete, canImport, guardDelete } = useCatalogCrud('raw-material');
-  const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
-  const [selectAll, setSelectAll] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [materials, setMaterials] = useState<PackagingMaterial[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [totalResults, setTotalResults] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [importProgress, setImportProgress] = useState<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+const dataColumns: UiTableColumn<PackagingMaterial>[] = [
+  { key: 'name', label: 'Name', render: (row) => <span className="font-bold text-gray-900">{row.name}</span> },
+  { key: 'type', label: 'Type', render: (row) => row.type },
+  { key: 'sizeSpec', label: 'Size/Spec', render: (row) => row.sizeSpec || '—' },
+  { key: 'unit', label: 'Unit', render: (row) => row.unit },
+  { key: 'supplier', label: 'Supplier', render: (row) => getSupplierDisplay(row) },
+  { key: 'rate', label: 'Rate', render: (row) => row.rate ?? '—' },
+  { key: 'hsnCode', label: 'HSN', render: (row) => row.hsnCode || '—' },
+  { key: 'gst', label: 'GST', render: (row) => row.gst || '—' },
+  { key: 'minimumStock', label: 'Min Stock', render: (row) => row.minimumStock ?? '—' },
+];
 
+export default function PackagingMaterialsPage() {
+  const { canCreate, canUpdate, canDelete, canImport, guardDelete } = useCatalogCrud('raw-material');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const REQUIRED_FIELDS = ['name', 'type', 'unit'];
 
-  const fetchMaterials = async (page = 1, limit = itemsPerPage, search = '') => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
-      const response = await fetch(`${API_BASE_URL}/raw-materials?page=${page}&limit=${limit}${searchParam}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch packaging materials');
-      }
-      const data = await response.json();
-      const materialsArray = Array.isArray(data.results) ? data.results : [];
-      setMaterials(materialsArray);
-      setTotalResults(data.totalResults || 0);
-      setTotalPages(data.totalPages || 1);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch packaging materials');
-      setMaterials([]);
-      setTotalPages(1);
-      toast.error('Failed to load packaging materials');
-    } finally {
-      setIsLoading(false);
+  const fetchMaterialsFn = useCallback(async ({ page, limit, search }: { page: number; limit: number; search: string }) => {
+    const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
+    const response = await fetch(`${API_BASE_URL}/raw-materials?page=${page}&limit=${limit}${searchParam}`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to fetch packaging materials');
     }
-  };
+    const data = await response.json();
+    return {
+      results: (Array.isArray(data.results) ? data.results : []) as PackagingMaterial[],
+      totalPages: data.totalPages || 1,
+      totalResults: data.totalResults || 0,
+    };
+  }, []);
 
-  useEffect(() => {
-    fetchMaterials(currentPage, itemsPerPage, searchQuery);
-  }, [currentPage, itemsPerPage, searchQuery]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery]);
-
-  const handleSelectAll = () => {
-    if (selectAll) {
-      setSelectedMaterials([]);
-    } else {
-      setSelectedMaterials(materials.map(mat => mat.id));
-    }
-    setSelectAll(!selectAll);
-  };
-
-  const handleMaterialSelect = (materialId: string) => {
-    if (selectedMaterials.includes(materialId)) {
-      setSelectedMaterials(selectedMaterials.filter(id => id !== materialId));
-    } else {
-      setSelectedMaterials([...selectedMaterials, materialId]);
-    }
-  };
+  const list = useCatalogListState<PackagingMaterial>({
+    fetchFn: fetchMaterialsFn,
+    errorMessage: 'Failed to fetch packaging materials',
+  });
 
   const handleExport = async () => {
     try {
@@ -206,11 +176,11 @@ const PackagingMaterialsPage = () => {
 
   const handleDeleteSelected = async () => {
     if (!guardDelete()) return;
-    if (selectedMaterials.length === 0) return;
+    if (list.selectedIds.length === 0) return;
 
-    if (window.confirm(`Are you sure you want to delete ${selectedMaterials.length} selected material(s)?`)) {
+    if (window.confirm(`Are you sure you want to delete ${list.selectedIds.length} selected material(s)?`)) {
       try {
-        for (const id of selectedMaterials) {
+        for (const id of list.selectedIds) {
           const response = await fetch(`${API_BASE_URL}/raw-materials/${id}`, {
             method: 'DELETE',
             headers: {
@@ -226,8 +196,8 @@ const PackagingMaterialsPage = () => {
         }
 
         toast.success('Selected materials deleted successfully');
-        setSelectedMaterials([]);
-        fetchMaterials(currentPage, itemsPerPage, searchQuery);
+        list.clearSelection();
+        list.refresh();
       } catch (err) {
         console.error('Error deleting materials:', err);
         toast.error(err instanceof Error ? err.message : 'Failed to delete materials');
@@ -253,7 +223,7 @@ const PackagingMaterialsPage = () => {
         }
 
         toast.success('Packaging material deleted successfully');
-        fetchMaterials(currentPage, itemsPerPage, searchQuery);
+        list.refresh();
       } catch (err) {
         console.error('Error deleting material:', err);
         toast.error(err instanceof Error ? err.message : 'Failed to delete packaging material');
@@ -264,7 +234,7 @@ const PackagingMaterialsPage = () => {
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setImportProgress(0);
+    list.    list.setImportProgress(0);
     const loadingToast = toast.loading('Importing packaging materials...');
     try {
       const reader = new FileReader();
@@ -365,262 +335,98 @@ const PackagingMaterialsPage = () => {
               const message = error instanceof Error ? error.message : 'Unknown error';
               if (!firstErrorMsg) firstErrorMsg = `Row ${i + 2}: ${message}`;
             }
-            setImportProgress(Math.round(((i + 1) / jsonData.length) * 100));
+            list.setImportProgress(Math.round(((i + 1) / jsonData.length) * 100));
           }
           if (fileInputRef.current) fileInputRef.current.value = '';
-          setImportProgress(null);
+          list.setImportProgress(null);
           toast.dismiss(loadingToast);
           if (successCount > 0) toast.success(`Successfully imported/updated ${successCount} materials`);
           if (errorCount > 0) toast.error(`Failed to import/update ${errorCount} materials. ${firstErrorMsg}`);
           if (skippedCount > 0) toast.error(`Skipped ${skippedCount} row(s) due to missing required fields. ${firstErrorMsg}`);
-          fetchMaterials(currentPage, itemsPerPage, searchQuery);
+          list.refresh();
         } catch (err: unknown) {
-          setImportProgress(null);
+          list.setImportProgress(null);
           const message = err instanceof Error ? err.message : '';
           toast.error('Failed to process import file: ' + message, { id: loadingToast });
         }
       };
       reader.readAsArrayBuffer(file);
     } catch (err: unknown) {
-      setImportProgress(null);
+      list.setImportProgress(null);
       const message = err instanceof Error ? err.message : '';
       toast.error('Failed to import materials: ' + message, { id: loadingToast });
     }
   };
 
-  function getPagination(currentPage: number, totalPages: number) {
-    const pages = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-      pages.push(1);
-      if (currentPage > 4) pages.push('...');
-      for (let i = Math.max(2, currentPage - 2); i <= Math.min(totalPages - 1, currentPage + 2); i++) {
-        pages.push(i);
-      }
-      if (currentPage < totalPages - 3) pages.push('...');
-      pages.push(totalPages);
-    }
-    return pages;
-  }
+  const columns = buildCatalogTableColumns<PackagingMaterial>({
+    dataColumns,
+    segment: 'raw-material',
+    basePath: '/catalog/raw-material',
+    canUpdate,
+    canDelete,
+    onDelete: handleDelete,
+  });
 
   return (
-    <div className="main-content !p-[10px]">
+    <>
       <Toaster position="top-right" />
-      <Seo title="Packaging materials"/>
-
-      <div className="bg-white shadow-sm border border-gray-100 mx-0 catalog-list-card">
-        <div className="p-[10px] catalog-list-toolbar">
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-2">
-              <div className="w-[3px] h-5 bg-purple-600 rounded-full"></div>
-              <h1 className="text-sm font-bold text-gray-800">Packaging materials</h1>
-              <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm">
-                {totalResults}
-              </span>
-              <HelpIcon
-                title="Packaging materials"
-                content={
-                  <div>
-                    <p className="mb-4">
-                      Catalog packing materials consumed at order packing — polybags, cartons, tags, stickers, threads, and more.
-                    </p>
-                    <h4 className="font-semibold mb-2">What you can do:</h4>
-                    <ul className="list-disc list-inside mb-4 space-y-1">
-                      <li><strong>View:</strong> Browse packaging materials with type, size/spec, supplier, and stock levels</li>
-                      <li><strong>Add / Edit:</strong> Maintain name, type, unit, rate, HSN, GST, and minimum stock</li>
-                      <li><strong>Import / Export:</strong> Bulk load or download Excel with the packaging columns</li>
-                      <li><strong>Search:</strong> Find materials by name, type, size, supplier, or HSN</li>
-                    </ul>
-                    <h4 className="font-semibold mb-2">Fields:</h4>
-                    <ul className="list-disc list-inside space-y-1">
-                      <li><strong>Name, Type, Unit:</strong> Required</li>
-                      <li><strong>Size/Spec:</strong> Dimensions or pack count</li>
-                      <li><strong>Supplier:</strong> Optional linked supplier or free-text name</li>
-                      <li><strong>Rate, HSN, GST, Min Stock:</strong> Costing and reorder tracking</li>
-                    </ul>
-                  </div>
-                }
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
-                <input
-                  type="text"
-                  className="bg-white border border-gray-200 pl-8 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 w-48 min-w-[120px] placeholder:text-gray-400 transition-all font-medium"
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <i className="ri-search-line absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
-              </div>
-              <CatalogPageSizeSelect
-                value={itemsPerPage}
-                onChange={(value) => {
-                  setItemsPerPage(value);
-                  setCurrentPage(1);
-                }}
-              />
-              <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls" onChange={handleImport} />
-              {canImport && (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-[11px] font-bold rounded hover:bg-emerald-700 transition-colors shadow-sm"
-              >
-                <i className="ri-upload-2-line text-xs"></i> Import
-              </button>
-              )}
-              {importProgress !== null && (
-                <div className="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden flex items-center">
-                  <div className="bg-primary h-full transition-all duration-200" style={{ width: `${importProgress}%` }}></div>
-                  <span className="ml-1.5 text-[10px] text-gray-600 font-medium">{importProgress}%</span>
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={handleExportTemplate}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 text-[#495057] text-[11px] font-bold rounded hover:bg-gray-50 transition-colors shadow-sm"
-              >
-                <i className="ri-file-download-line text-xs"></i> Template
-              </button>
-              <button
-                type="button"
-                onClick={handleExport}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm"
-              >
-                <i className="ri-download-2-line text-xs"></i> Export
-              </button>
-              {canDelete && selectedMaterials.length > 0 && (
-                <button
-                  type="button"
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded border transition-colors bg-red-50 text-red-600 border-red-100 hover:bg-red-100 shadow-sm"
-                  onClick={handleDeleteSelected}
-                >
-                  <i className="ri-delete-bin-line text-xs"></i> Delete ({selectedMaterials.length})
-                </button>
-              )}
-              {canCreate && (
-              <Link
-                href="/catalog/raw-material/add"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm"
-              >
-                <i className="ri-add-line text-xs"></i> Add Material
-              </Link>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto min-h-[300px]">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mb-4 opacity-50"></div>
-              <p className="text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase">Loading Data</p>
-            </div>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mb-4">
-                <i className="ri-error-warning-line text-xl text-red-400"></i>
-              </div>
-              <p className="text-[12px] font-medium text-red-600">{error}</p>
-            </div>
-          ) : materials.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                <i className="ri-stack-line text-xl text-gray-200"></i>
-              </div>
-              <h3 className="text-xs font-bold text-gray-400 mb-1">DATA EMPTY</h3>
-              {canCreate && (
-              <Link href="/catalog/raw-material/add" className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-[11px] font-bold rounded hover:bg-purple-700 transition-colors shadow-sm">
-                <i className="ri-add-line text-xs"></i> Add First Material
-              </Link>
-              )}
-            </div>
-          ) : (
-            <table className="w-full border-collapse border border-gray-200">
-              <thead>
-                <tr className="bg-gray-50/30">
-                  <th className="pl-[10px] pr-1 py-3 text-left w-10 border border-gray-200">
-                    <input type="checkbox" checked={selectAll} onChange={handleSelectAll} className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" />
-                  </th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Name</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Type</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Size/Spec</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Unit</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Supplier</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Rate</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">HSN</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">GST</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Min Stock</th>
-                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Status</th>
-                  {(canUpdate || canDelete) && (
-                  <th className="px-1.5 py-3 text-right pr-[10px] text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {materials.map((material) => (
-                  <tr key={material.id} className="hover:bg-gray-50/50 transition-colors group">
-                    <td className="pl-[10px] pr-1 py-2.5 border border-gray-200">
-                      <input type="checkbox" checked={selectedMaterials.includes(material.id)} onChange={() => handleMaterialSelect(material.id)} className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" />
-                    </td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-bold text-gray-900 border border-gray-200">{material.name}</td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{material.type}</td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{material.sizeSpec || '—'}</td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{material.unit}</td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{getSupplierDisplay(material)}</td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{material.rate ?? '—'}</td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{material.hsnCode || '—'}</td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{material.gst || '—'}</td>
-                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{material.minimumStock ?? '—'}</td>
-                    <td className="px-1.5 py-2.5 border border-gray-200">
-                      <span className={`inline-flex px-1.5 py-0.5 text-[9px] font-bold rounded uppercase tracking-tight ${(material.status || 'active') === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                        {material.status || 'active'}
-                      </span>
-                    </td>
-                    {(canUpdate || canDelete) && (
-                    <td className="px-1.5 py-2.5 text-right pr-[10px] border border-gray-200">
-                      <CatalogRowActions
-                        segment="raw-material"
-                        editHref={`/catalog/raw-material/edit/${material.id}`}
-                        onDelete={() => handleDelete(material.id)}
-                      />
-                    </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {!isLoading && !error && (
-          <div className="p-[10px] pt-4 flex flex-wrap items-center justify-between gap-4 border-t border-gray-100 bg-white">
-            <div className="text-[11px] font-medium text-[#495057] tracking-tight">
-              Showing <span>{totalResults === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to {totalResults === 0 ? 0 : Math.min(currentPage * itemsPerPage, totalResults)}</span> of <span>{totalResults}</span> entries <span className="ml-1 opacity-50">→</span>
-            </div>
-            <div className="flex items-center">
-              <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">Prev</button>
-              <div className="flex items-center gap-1 mx-2">
-                {getPagination(currentPage, totalPages).map((page, idx) =>
-                  page === '...' ? (
-                    <span key={`ellipsis-${idx}`} className="text-gray-300 text-[10px]">...</span>
-                  ) : (
-                    <button key={page} onClick={() => setCurrentPage(Number(page))} className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold rounded transition-all ${currentPage === page ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'}`}>
-                      {page}
-                    </button>
-                  )
-                )}
-              </div>
-              <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">Next</button>
-            </div>
-          </div>
+      <CatalogListShell
+        seoTitle="Packaging materials"
+        title="Packaging materials"
+        count={list.totalResults}
+        searchQuery={list.searchQuery}
+        onSearchChange={list.setSearchQuery}
+        itemsPerPage={list.itemsPerPage}
+        onItemsPerPageChange={(value) => {
+          list.setItemsPerPage(value);
+          list.setCurrentPage(1);
+        }}
+        helpContent={catalogHelpBlock(
+          'Packaging materials',
+          'Catalog packing materials consumed at order packing — polybags, cartons, tags, stickers, threads, and more.',
+          [
+            'Browse packaging materials with type, size/spec, supplier, and stock levels',
+            'Maintain name, type, unit, rate, HSN, GST, and minimum stock',
+            'Import or export Excel with packaging columns',
+            'Search by name, type, size, supplier, or HSN',
+          ]
         )}
-      </div>
-    </div>
+        canImport={canImport}
+        fileInputRef={fileInputRef}
+        onImportClick={() => fileInputRef.current?.click()}
+        onImportChange={handleImport}
+        importProgress={list.importProgress}
+        onExportTemplate={handleExportTemplate}
+        onExport={handleExport}
+        canCreate={canCreate}
+        addHref="/catalog/raw-material/add"
+        addLabel="Add Material"
+        canDelete={canDelete}
+        selectedCount={list.selectedIds.length}
+        onBulkDelete={handleDeleteSelected}
+        isLoading={list.isLoading}
+        error={list.error}
+        rows={list.rows}
+        columns={columns}
+        rowKey={(row) => row.id}
+        selectable={
+          canDelete
+            ? {
+                selectedIds: list.selectedIds,
+                selectAll: list.selectAll,
+                onSelectAll: list.handleSelectAll,
+                onSelect: list.handleSelect,
+                getRowId: (row) => row.id,
+              }
+            : undefined
+        }
+        currentPage={list.currentPage}
+        totalPages={list.totalPages}
+        totalResults={list.totalResults}
+        onPageChange={list.setCurrentPage}
+        emptyIcon="ri-stack-line"
+        emptyAddLabel="Add First Material"
+      />
+    </>
   );
-};
-
-export default PackagingMaterialsPage;
+}

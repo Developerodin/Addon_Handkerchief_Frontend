@@ -1,8 +1,9 @@
 "use client"
 import React, { useState, useEffect } from 'react';
-import Seo from '@/shared/layout-components/seo/seo';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
+import { UiFormFooter } from '@/shared/components/ui';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
 import { uploadOptionalImage } from '@/shared/utils/imageUpload';
 import HelpIcon from '@/shared/components/HelpIcon';
@@ -109,6 +110,7 @@ const generateSoftwareCode = () => {
 };
 
 const AddProductPage = () => {
+  const router = useRouter();
   const { user } = useSelector((state: any) => state.auth);
   const isDesign = isDesignUser(user);
   const isProduction = isProductionUser(user);
@@ -567,135 +569,105 @@ const AddProductPage = () => {
   };
 
   return (
-    <div className="main-content catalog-master-form">
-      <Seo title="Add Product"/>
-      
-      <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-12">
-            {/* Page Header */}
-            <div className="box !bg-transparent border-0 shadow-none">
-              <div className="box-header flex justify-between items-center">
-                <div className="flex items-center space-x-3">
-                  <h1 className="box-title text-2xl font-semibold">Add New Product</h1>
-                  <HelpIcon
-                    title="Add New Product"
-                    content={
-                      <div className="space-y-4">
-                        <div>
-                          <h4 className="font-semibold text-lg mb-2">What is this page?</h4>
-                          <p className="text-gray-700">
-                            This is the Add New Product page where you can create and configure new products with detailed specifications, attributes, Bill of Materials (BOM), and manufacturing processes.
-                          </p>
-                        </div>
-                        
-                        <div>
-                          <h4 className="font-semibold text-lg mb-2">What can you do here?</h4>
-                          <ul className="list-disc list-inside space-y-1 text-gray-700">
-                            <li><strong>General Information:</strong> Set basic product details like name, codes, category, and description</li>
-                            <li><strong>Product Attributes:</strong> Define custom attributes and their values for the product</li>
-                            <li><strong>Bill of Materials (BOM):</strong> Specify fabric catalogs, metres per piece, and packaging materials</li>
-                            <li><strong>Manufacturing Processes:</strong> Define the production processes and their sequence</li>
-                            <li><strong>Image Upload:</strong> Add product images for visual reference</li>
-                          </ul>
-                        </div>
-                        
-                        <div>
-                          <h4 className="font-semibold text-lg mb-2">Tab Details:</h4>
-                          <ul className="list-disc list-inside space-y-1 text-gray-700">
-                            <li><strong>General:</strong> Basic product information, codes, category, and description</li>
-                            <li><strong>Attributes:</strong> Custom product attributes with predefined values</li>
-                            <li><strong>BOM:</strong> Fabric catalogues, metres, and packaging needed for production</li>
-                            <li><strong>Processes:</strong> Manufacturing processes and their sequence</li>
-                          </ul>
-                        </div>
-                        
-                        <div>
-                          <h4 className="font-semibold text-lg mb-2">Required Fields:</h4>
-                          <ul className="list-disc list-inside space-y-1 text-gray-700">
-                            <li><strong>Product Name:</strong> Must be unique and descriptive</li>
-                            <li><strong>Style Code:</strong> Required for product identification</li>
-                            <li><strong>Category:</strong> Must select a valid product category</li>
-                          </ul>
-                        </div>
-                        
-                        <div>
-                          <h4 className="font-semibold text-lg mb-2">Tips:</h4>
-                          <ul className="list-disc list-inside space-y-1 text-gray-700">
-                            <li>Software Code is auto-generated, but you can customize it</li>
-                            <li>Use the search functionality in BOM and Processes tabs to find fabric catalogs and processes</li>
-                            <li>Attributes are optional but help in product categorization and filtering</li>
-                            <li>Save your work frequently to avoid losing data</li>
-                          </ul>
-                        </div>
-                      </div>
-                    }
-                  />
+    <>
+      <CatalogMasterFormPage
+        seoTitle="Add Product"
+        title="Add New Product"
+        listHref="/catalog/items"
+        listLabel="Products"
+        currentLabel="Add"
+        singleColumn
+        helpIcon={
+          <HelpIcon
+            title="Add New Product"
+            content={
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-semibold text-lg mb-2">What is this page?</h4>
+                  <p className="text-gray-700">
+                    This is the Add New Product page where you can create and configure new products with detailed specifications, attributes, Bill of Materials (BOM), and manufacturing processes.
+                  </p>
                 </div>
-                <div className="box-tools">
-                  <Link href="/catalog/items" className="ti-btn ti-btn-outline-primary">
-                    <i className="ri-arrow-left-line me-2"></i> Back to List
-                  </Link>
+                
+                <div>
+                  <h4 className="font-semibold text-lg mb-2">What can you do here?</h4>
+                  <ul className="list-disc list-inside space-y-1 text-gray-700">
+                    <li><strong>General Information:</strong> Set basic product details like name, codes, category, and description</li>
+                    <li><strong>Product Attributes:</strong> Define custom attributes and their values for the product</li>
+                    <li><strong>Bill of Materials (BOM):</strong> Specify fabric catalogs, metres per piece, and packaging materials</li>
+                    <li><strong>Manufacturing Processes:</strong> Define the production processes and their sequence</li>
+                    <li><strong>Image Upload:</strong> Add product images for visual reference</li>
+                  </ul>
+                </div>
+                
+                <div>
+                  <h4 className="font-semibold text-lg mb-2">Tab Details:</h4>
+                  <ul className="list-disc list-inside space-y-1 text-gray-700">
+                    <li><strong>General:</strong> Basic product information, codes, category, and description</li>
+                    <li><strong>Attributes:</strong> Custom product attributes with predefined values</li>
+                    <li><strong>BOM:</strong> Fabric catalogues, metres, and packaging needed for production</li>
+                    <li><strong>Processes:</strong> Manufacturing processes and their sequence</li>
+                  </ul>
+                </div>
+                
+                <div>
+                  <h4 className="font-semibold text-lg mb-2">Required Fields:</h4>
+                  <ul className="list-disc list-inside space-y-1 text-gray-700">
+                    <li><strong>Product Name:</strong> Must be unique and descriptive</li>
+                    <li><strong>Style Code:</strong> Required for product identification</li>
+                    <li><strong>Category:</strong> Must select a valid product category</li>
+                  </ul>
+                </div>
+                
+                <div>
+                  <h4 className="font-semibold text-lg mb-2">Tips:</h4>
+                  <ul className="list-disc list-inside space-y-1 text-gray-700">
+                    <li>Software Code is auto-generated, but you can customize it</li>
+                    <li>Use the search functionality in BOM and Processes tabs to find fabric catalogs and processes</li>
+                    <li>Attributes are optional but help in product categorization and filtering</li>
+                    <li>Save your work frequently to avoid losing data</li>
+                  </ul>
                 </div>
               </div>
-            </div>
-
-            {/* Content Box */}
-            <div className="box">
-              <div className="box-body">
-                {/* Tabs */}
-                <div className="border-b border-gray-200 mb-6">
-                  <nav className="flex space-x-4" aria-label="Tabs">
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('general')}
-                      className={`px-3 py-2 text-sm font-medium rounded-md ${
-                        activeTab === 'general'
-                          ? 'bg-primary text-white'
-                          : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      General
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('attributes')}
-                      className={`px-3 py-2 text-sm font-medium rounded-md ${
-                        activeTab === 'attributes'
-                          ? 'bg-primary text-white'
-                          : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      Attributes
-                    </button>
-                    {!isDesign && !isFinal && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setActiveTab('bom')}
-                          className={`px-3 py-2 text-sm font-medium rounded-md ${
-                            activeTab === 'bom'
-                              ? 'bg-primary text-white'
-                              : 'text-gray-500 hover:text-gray-700'
-                          }`}
-                        >
-                          BOM
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setActiveTab('processes')}
-                          className={`px-3 py-2 text-sm font-medium rounded-md ${
-                            activeTab === 'processes'
-                              ? 'bg-primary text-white'
-                              : 'text-gray-500 hover:text-gray-700'
-                          }`}
-                        >
-                          Processes
-                        </button>
-                      </>
-                    )}
-                  </nav>
-                </div>
+            }
+          />
+        }
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="ui-tab-bar">
+            <button
+              type="button"
+              onClick={() => setActiveTab('general')}
+              className={`ui-tab ${activeTab === 'general' ? 'ui-tab--active' : ''}`}
+            >
+              General
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('attributes')}
+              className={`ui-tab ${activeTab === 'attributes' ? 'ui-tab--active' : ''}`}
+            >
+              Attributes
+            </button>
+            {!isDesign && !isFinal && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('bom')}
+                  className={`ui-tab ${activeTab === 'bom' ? 'ui-tab--active' : ''}`}
+                >
+                  BOM
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('processes')}
+                  className={`ui-tab ${activeTab === 'processes' ? 'ui-tab--active' : ''}`}
+                >
+                  Processes
+                </button>
+              </>
+            )}
+          </div>
 
                 {/* General Tab */}
                 {activeTab === 'general' && (
@@ -1209,31 +1181,20 @@ const AddProductPage = () => {
                   </div>
                 )}
 
-                {/* Form Actions */}
-                <div className="flex justify-end space-x-4 mt-6">
-                  <Link href="/catalog/items" className="ti-btn ti-btn-secondary">
-                    Cancel
-                  </Link>
-                  <button 
-                    type="submit" 
-                    className="ti-btn ti-btn-primary"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? 'Saving...' : 'Save Product'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </form>
+          <UiFormFooter
+            submitLabel="Save Product"
+            isLoading={isLoading}
+            onCancel={() => router.push('/catalog/items')}
+          />
+        </form>
+      </CatalogMasterFormPage>
 
       <StyleCodeSelectModal
         open={styleCodeModalOpen}
         onClose={() => { setStyleCodeModalOpen(false); setStyleCodeModalIndex(null); }}
         onSelect={handleStyleCodeSelectFromModal}
       />
-    </div>
+    </>
   );
 };
 
