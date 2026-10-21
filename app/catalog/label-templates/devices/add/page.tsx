@@ -13,7 +13,7 @@ const AddDevicePage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    deviceType: '' as '' | 'printer' | 'scanner',
+    deviceType: '' as '' | 'printer' | 'scanner' | 'scale' | 'rfid-reader' | 'rfid-writer',
     model: '',
     location: '',
     labelSize: '',

@@ -7,6 +7,7 @@ import Seo from '@/shared/layout-components/seo/seo';
 import { useUsers } from '@/shared/hooks/useUsers';
 import NavigationPermissionsEditor from '@/app/users/components/NavigationPermissions';
 import {
+  fillUnsetSuperAdminScreens,
   mergeNavigationWithDefaults,
   NavigationPermissions as NavPerms,
   UserRole,
@@ -43,7 +44,13 @@ export default function EditUserPage() {
           password: '',
           role: user.role,
         });
-        setNavigation(mergeNavigationWithDefaults(user.navigation));
+        setNavigation(
+          fillUnsetSuperAdminScreens(
+            mergeNavigationWithDefaults(user.navigation),
+            user.role,
+            user.navigation
+          )
+        );
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));

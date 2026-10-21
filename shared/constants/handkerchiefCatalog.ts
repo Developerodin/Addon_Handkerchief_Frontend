@@ -24,6 +24,16 @@ export const STOCK_TYPE_OPTIONS = [
   { value: 'fabric', label: 'Fabric' },
   { value: 'wip-bundle', label: 'WIP Bundle' },
   { value: 'finished-carton', label: 'Finished Carton' },
+  { value: 'floor-roll', label: 'Floor Roll' },
+  { value: 'pieces', label: 'Pieces' },
+  { value: 'bundles', label: 'Bundles' },
+  { value: 'waiting-embroidery', label: 'Waiting Embroidery' },
+  { value: 'waiting-sticker', label: 'Waiting Sticker' },
+  { value: 'long-alteration', label: 'Long Alteration' },
+  { value: 'alteration', label: 'Alteration' },
+  { value: 'rejection', label: 'Rejection' },
+  { value: 'packing', label: 'Packing' },
+  { value: 'box', label: 'Box' },
 ];
 
 export const CONTAINER_TYPE_OPTIONS = [
@@ -31,6 +41,7 @@ export const CONTAINER_TYPE_OPTIONS = [
   { value: 'carton', label: 'Carton' },
   { value: 'trolley', label: 'Trolley' },
   { value: 'crate', label: 'Crate' },
+  { value: 'pieces', label: 'Pieces' },
 ];
 
 export const LABEL_TYPE_OPTIONS = [
@@ -38,11 +49,20 @@ export const LABEL_TYPE_OPTIONS = [
   { value: 'bundle-sticker', label: 'Bundle Sticker' },
   { value: 'carton', label: 'Carton' },
   { value: 'style-ean', label: 'Style EAN' },
+  { value: 'piece', label: 'Piece' },
+  { value: 'packing-bundle', label: 'Packing Bundle' },
+  { value: 'box-sticker', label: 'Box Sticker' },
+  { value: 'rack', label: 'Rack' },
+  { value: 'container', label: 'Container' },
+  { value: 'machine', label: 'Machine' },
 ];
 
 export const DEVICE_TYPE_OPTIONS = [
   { value: 'printer', label: 'Printer' },
   { value: 'scanner', label: 'Scanner' },
+  { value: 'scale', label: 'Scale' },
+  { value: 'rfid-reader', label: 'RFID Reader' },
+  { value: 'rfid-writer', label: 'RFID Writer' },
 ];
 
 export const SCANNER_TYPE_OPTIONS = [

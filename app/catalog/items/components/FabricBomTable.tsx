@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { listFabricCatalogs, FabricCatalog, getLookupName } from '@/shared/services/fabricCatalogService';
 import {
   FabricBomItem,
+  newBomLineId,
   BomSectionCard,
   BomSectionHeader,
   BomTableShell,
@@ -103,7 +104,7 @@ export function FabricBomTable({ items, onChange, disabled }: FabricBomTableProp
   };
 
   const addRow = () => {
-    onChange([...items, { fabricCatalogId: '', fabricName: '', quantity: 0, unitCost: 0 }]);
+    onChange([...items, { fabricCatalogId: '', fabricName: '', quantity: 0, unitCost: 0, bomLineId: newBomLineId() }]);
   };
 
   const removeRow = (index: number) => {

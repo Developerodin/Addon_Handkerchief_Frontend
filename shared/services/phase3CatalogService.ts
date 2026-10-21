@@ -116,6 +116,8 @@ export interface Machine {
   nextMaintenanceDate?: string | null;
   maintenanceNotes?: string;
   assignedSupervisor?: string | UserRef | null;
+  assignedOperator?: string | UserRef | null;
+  barcode?: string;
   status?: 'active' | 'inactive';
 }
 
@@ -139,7 +141,20 @@ export interface StorageRack {
   name: string;
   floor?: string;
   zone?: string;
-  stockType?: 'fabric' | 'wip-bundle' | 'finished-carton';
+  stockType?:
+    | 'fabric'
+    | 'wip-bundle'
+    | 'finished-carton'
+    | 'floor-roll'
+    | 'pieces'
+    | 'bundles'
+    | 'waiting-embroidery'
+    | 'waiting-sticker'
+    | 'long-alteration'
+    | 'alteration'
+    | 'rejection'
+    | 'packing'
+    | 'box';
   capacity?: number;
   barcode?: string;
   status?: 'active' | 'inactive';
@@ -149,7 +164,7 @@ export interface Container {
   id: string;
   code: string;
   name: string;
-  type?: 'bundle' | 'carton' | 'trolley' | 'crate';
+  type?: 'bundle' | 'carton' | 'trolley' | 'crate' | 'pieces';
   capacity?: number;
   barcode?: string;
   department?: string;
@@ -161,7 +176,7 @@ export interface Container {
 export interface DeviceRegistry {
   id: string;
   name: string;
-  deviceType: 'printer' | 'scanner';
+  deviceType: 'printer' | 'scanner' | 'scale' | 'rfid-reader' | 'rfid-writer';
   model?: string;
   location?: string;
   labelSize?: string;
@@ -172,7 +187,17 @@ export interface DeviceRegistry {
 export interface LabelTemplate {
   id: string;
   name: string;
-  labelType: 'fabric-roll' | 'bundle-sticker' | 'carton' | 'style-ean';
+  labelType:
+    | 'fabric-roll'
+    | 'bundle-sticker'
+    | 'carton'
+    | 'style-ean'
+    | 'piece'
+    | 'packing-bundle'
+    | 'box-sticker'
+    | 'rack'
+    | 'container'
+    | 'machine';
   size?: string;
   encodedFields?: string[];
   barcodeScheme?: string;

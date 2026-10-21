@@ -16,8 +16,11 @@ import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermissio
 import { useSelector } from 'react-redux';
 import { isDesignUser, isProductionUser, isFinalUser, shouldShowAttribute, shouldShowAttributeForFinal } from '@/shared/utils/userUtils';
 
-const normalizeProductionType = (value?: string): 'normal' | 'embroidery' =>
-  value === 'embroidery' ? 'embroidery' : 'normal';
+const normalizeProductionType = (value?: string): 'normal' | 'embroidery' | 'sticker' => {
+  if (value === 'embroidery') return 'embroidery';
+  if (value === 'sticker') return 'sticker';
+  return 'normal';
+};
 
 interface StyleCodeItem {
   styleCodeId?: string;
@@ -36,6 +39,8 @@ interface Product {
   articleName?: string;
   knittingCode?: string;
   vendorCode: string;
+  vendorName?: string;
+  piecesPerCut?: 3 | 4;
   factoryCode: string;
   hsnCode?: string;
   gst?: string;
@@ -54,8 +59,15 @@ interface Product {
     fabricName: string;
     quantity: number;
     unitCost?: number;
+    bomLineId?: string;
   }>;
-  rawMaterials?: Array<{ rawMaterialId: string; rawMaterialName?: string; quantity: number; unitCost?: number }>;
+  rawMaterials?: Array<{
+    rawMaterialId: string;
+    rawMaterialName?: string;
+    quantity: number;
+    unitCost?: number;
+    materialRole?: 'sewing-thread' | 'embroidery-thread' | 'packing';
+  }>;
   processes: Array<{
     processId: string;
   }>;
@@ -132,6 +144,8 @@ const EditProductPage = () => {
     articleName: '',
     knittingCode: '',
     vendorCode: '',
+    vendorName: '',
+    piecesPerCut: 3,
     factoryCode: '',
     hsnCode: '',
     gst: '',
@@ -345,6 +359,7 @@ const EditProductPage = () => {
                 fabricName: item.fabricName || item.yarnName || item.materialName || (typeof fabricRef === 'object' ? fabricRef.name : '') || '',
                 quantity: item.quantity || 0,
                 unitCost: Number(item.unitCost) || 0,
+                bomLineId: item.bomLineId || '',
               };
             })
           : [];
@@ -362,6 +377,7 @@ const EditProductPage = () => {
                 rawMaterialName: item.rawMaterialName || (typeof rmRef === 'object' ? rmRef.name : '') || '',
                 quantity: Number(item.quantity) || 0,
                 unitCost: Number(item.unitCost) || 0,
+                materialRole: item.materialRole || 'packing',
               };
             })
           : [];
@@ -380,6 +396,8 @@ const EditProductPage = () => {
           articleName: product.articleName || '',
           hsnCode: product.hsnCode || '',
           gst: product.gst || '',
+          vendorName: product.vendorName || '',
+          piecesPerCut: Number(product.piecesPerCut) === 4 ? 4 : 3,
           productionType: normalizeProductionType(product.productionType),
           attributes: normalizedAttributes,
           processes: product.processes,
@@ -427,6 +445,10 @@ const EditProductPage = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    if (name === 'piecesPerCut') {
+      setFormData(prev => ({ ...prev, piecesPerCut: Number(value) === 4 ? 4 : 3 }));
+      return;
+    }
     if (name === 'category') {
       setFormData(prev => ({
         ...prev,
@@ -651,6 +673,8 @@ const EditProductPage = () => {
       // Prepare the base product data
       const productData: any = {};
     productData.productionType = normalizeProductionType(formData.productionType);
+    productData.piecesPerCut = formData.piecesPerCut === 4 ? 4 : 3;
+    productData.vendorName = (formData.vendorName || '').trim();
 
       // Style codes: send only IDs (entries with valid styleCodeId)
       const styleCodeIds = (formData.styleCodes || [])
@@ -754,6 +778,7 @@ const EditProductPage = () => {
           fabricName: item.fabricName,
           quantity: Number(item.quantity),
           unitCost: Number(item.unitCost) || 0,
+          bomLineId: item.bomLineId,
         }));
         productData.rawMaterials = (formData.rawMaterials || [])
           .filter(item => item.rawMaterialId && (item.quantity ?? 0) >= 0)
@@ -761,6 +786,7 @@ const EditProductPage = () => {
             rawMaterialId: item.rawMaterialId,
             quantity: Number(item.quantity) || 0,
             unitCost: Number(item.unitCost) || 0,
+            materialRole: item.materialRole || 'packing',
           }));
         productData.processes = formData.processes.filter(proc => proc.processId).map(proc => ({
           processId: proc.processId
@@ -838,6 +864,7 @@ const EditProductPage = () => {
                           >
                             <option value="normal">Normal</option>
                             <option value="embroidery">Embroidery</option>
+                            <option value="sticker">Sticker</option>
                           </select>
                         </div>
                         <div>
@@ -866,6 +893,7 @@ const EditProductPage = () => {
                           >
                             <option value="normal">Normal</option>
                             <option value="embroidery">Embroidery</option>
+                            <option value="sticker">Sticker</option>
                           </select>
                         </div>
                         <div>
@@ -1039,6 +1067,32 @@ const EditProductPage = () => {
                               />
                             </div>
                             <div>
+                              <label className="form-label" htmlFor="vendorName">Vendor Name</label>
+                              <input
+                                id="vendorName"
+                                type="text"
+                                name="vendorName"
+                                className="form-control"
+                                aria-label="Vendor name"
+                                value={formData.vendorName || ''}
+                                onChange={handleInputChange}
+                              />
+                            </div>
+                            <div>
+                              <label className="form-label" htmlFor="piecesPerCut">Pieces per cut</label>
+                              <select
+                                id="piecesPerCut"
+                                name="piecesPerCut"
+                                className="form-control"
+                                aria-label="Pieces per cut"
+                                value={formData.piecesPerCut ?? 3}
+                                onChange={handleInputChange}
+                              >
+                                <option value={3}>3</option>
+                                <option value={4}>4</option>
+                              </select>
+                            </div>
+                            <div>
                               <label className="form-label">Production Type *</label>
                               <select
                                 name="productionType"
@@ -1049,6 +1103,7 @@ const EditProductPage = () => {
                               >
                                 <option value="normal">Normal</option>
                             <option value="embroidery">Embroidery</option>
+                            <option value="sticker">Sticker</option>
                               </select>
                             </div>
                             <div>
@@ -1229,6 +1284,32 @@ const EditProductPage = () => {
                               />
                             </div>
                             <div>
+                              <label className="form-label" htmlFor="vendorName">Vendor Name</label>
+                              <input
+                                id="vendorName"
+                                type="text"
+                                name="vendorName"
+                                className="form-control"
+                                aria-label="Vendor name"
+                                value={formData.vendorName || ''}
+                                onChange={handleInputChange}
+                              />
+                            </div>
+                            <div>
+                              <label className="form-label" htmlFor="piecesPerCut">Pieces per cut</label>
+                              <select
+                                id="piecesPerCut"
+                                name="piecesPerCut"
+                                className="form-control"
+                                aria-label="Pieces per cut"
+                                value={formData.piecesPerCut ?? 3}
+                                onChange={handleInputChange}
+                              >
+                                <option value={3}>3</option>
+                                <option value={4}>4</option>
+                              </select>
+                            </div>
+                            <div>
                               <label className="form-label">Production Type *</label>
                               <select
                                 name="productionType"
@@ -1239,6 +1320,7 @@ const EditProductPage = () => {
                               >
                                 <option value="normal">Normal</option>
                             <option value="embroidery">Embroidery</option>
+                            <option value="sticker">Sticker</option>
                               </select>
                             </div>
                             <div>

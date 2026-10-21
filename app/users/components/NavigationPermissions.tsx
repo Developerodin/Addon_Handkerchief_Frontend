@@ -6,6 +6,7 @@ import {
   CrudPermissions,
   EMPTY_CRUD,
   FULL_CRUD,
+  type FactoryScreenKey,
   NavigationPermissions as NavType,
   mergeNavigationWithDefaults,
   applyCrudChange,
@@ -32,10 +33,135 @@ const CRUD_ACTIONS = [
   { key: 'delete' as const, label: 'Delete', short: 'D' },
 ];
 
-const MAIN_SECTIONS = [
-  { key: 'Dashboard' as const, label: 'Dashboard', icon: 'ri-dashboard-line' },
-  { key: 'Users' as const, label: 'Users Management', icon: 'ri-user-settings-line' },
+type TopKey = 'Dashboard' | 'Users' | 'Revision review' | FactoryScreenKey;
+
+const PRODUCTION_FLOORS: FactoryScreenKey[] = [
+  'Production / Cut',
+  'Production / Selvage',
+  'Production / Half moon',
+  'Production / Vertical hem',
+  'Production / Bundle',
+  'Production / Horizontal hem',
+  'Production / Thread cut',
+  'Production / Iron',
+  'Production / Route split',
+  'Production / Embroidery',
+  'Production / Sticker',
 ];
+
+const SIDEBAR_SECTIONS: { title: string; icon: string; rows: { key: TopKey; label: string }[] }[] = [
+  {
+    title: 'Main',
+    icon: 'ri-layout-grid-line',
+    rows: [
+      { key: 'Dashboard', label: 'Dashboard' },
+      { key: 'Users', label: 'Users' },
+      { key: 'Sync', label: 'Sync' },
+      { key: 'Reports', label: 'Reports' },
+      { key: 'Revision review', label: 'Revision review' },
+    ],
+  },
+  {
+    title: 'Production',
+    icon: 'ri-settings-3-line',
+    rows: [
+      { key: 'Production / Orders', label: 'Orders' },
+      ...PRODUCTION_FLOORS.map((key) => ({ key, label: key.replace('Production / ', '') })),
+    ],
+  },
+  {
+    title: 'Quality',
+    icon: 'ri-shield-check-line',
+    rows: [
+      { key: 'Quality / Floor checks', label: 'Floor checks' },
+      { key: 'Quality / Grades', label: 'Grades' },
+    ],
+  },
+  {
+    title: 'Warehouse',
+    icon: 'ri-archive-line',
+    rows: [
+      { key: 'Warehouse / Orders', label: 'Client orders' },
+      { key: 'Warehouse / Packing', label: 'Packing' },
+      { key: 'Warehouse / Boxes', label: 'Boxes' },
+      { key: 'Warehouse / Dispatch', label: 'Dispatch' },
+    ],
+  },
+  {
+    title: 'Accounts',
+    icon: 'ri-bill-line',
+    rows: [{ key: 'Accounts / Invoices', label: 'Invoices' }],
+  },
+];
+
+const FABRIC_GROUPS: { title: string; rows: { key: FactoryScreenKey; label: string }[] }[] = [
+  {
+    title: 'Purchase management',
+    rows: [
+      { key: 'Fabric / Purchase orders', label: 'All PO' },
+      { key: 'Fabric / Receipts', label: 'PO received' },
+      { key: 'Fabric / Drafts', label: 'Drafts PO' },
+      { key: 'Fabric / Vendor return', label: 'PO return' },
+      { key: 'Fabric / Return challan', label: 'PO return challan' },
+      { key: 'Fabric / GRN history', label: 'GRN history' },
+      { key: 'Quality / Fabric QC', label: 'Fabric QC' },
+    ],
+  },
+  {
+    title: 'Floor and storage',
+    rows: [
+      { key: 'Fabric / Issue', label: 'Fabric issue' },
+      { key: 'Fabric / Return', label: 'Fabric return' },
+      { key: 'Fabric / Storage', label: 'Fabric storage' },
+    ],
+  },
+  {
+    title: 'Analytics and reports',
+    rows: [
+      { key: 'Fabric / Live inventory', label: 'Live inventory' },
+      { key: 'Fabric / Stock report', label: 'Fabric stock report' },
+      { key: 'Fabric / PO analytics', label: 'PO analytics' },
+      { key: 'Fabric / Fabric analytics', label: 'Fabric analytics' },
+    ],
+  },
+];
+
+const STORE_GROUPS: Record<'Store / Purchase orders' | 'Store / Receipt' | 'Store / Racks and issue', FactoryScreenKey[]> = {
+  'Store / Purchase orders': ['Fabric / Purchase orders', 'Fabric / Drafts'],
+  'Store / Receipt': [
+    'Fabric / Receipts',
+    'Fabric / GRN history',
+    'Fabric / Vendor return',
+    'Fabric / Return challan',
+  ],
+  'Store / Racks and issue': ['Fabric / Issue', 'Fabric / Return', 'Fabric / Storage'],
+};
+
+/** OR the fabric screens that used to share one Store key, so older API checks stay in step. */
+function syncLegacyStoreKeys(nav: NavType): NavType {
+  const next = { ...nav };
+  for (const [legacy, keys] of Object.entries(STORE_GROUPS) as [keyof typeof STORE_GROUPS, FactoryScreenKey[]][]) {
+    next[legacy] = applyCrudDependencies({
+      create: keys.some((key) => next[key].create),
+      read: keys.some((key) => next[key].read),
+      update: keys.some((key) => next[key].update),
+      delete: keys.some((key) => next[key].delete),
+    });
+  }
+  return next;
+}
+
+/** Keep the shared floor flag in step with the individual floor screens. */
+function syncLegacyFloor(nav: NavType): NavType {
+  const next = { ...nav };
+  next['Production / Floor'] = applyCrudDependencies({
+    create: PRODUCTION_FLOORS.some((key) => next[key].create),
+    read: PRODUCTION_FLOORS.some((key) => next[key].read),
+    update: PRODUCTION_FLOORS.some((key) => next[key].update),
+    delete: PRODUCTION_FLOORS.some((key) => next[key].delete),
+  });
+  return next;
+}
 
 const CATALOG_SECTIONS = CATALOG_MODULES.map((key) => ({
   key,
@@ -155,8 +281,11 @@ function PermissionRow({
 export default function NavigationPermissionsEditor({ navigation, onChange, disabled }: Props) {
   const safeNav = mergeNavigationWithDefaults(navigation);
 
-  const updateTopLevel = (key: 'Dashboard' | 'Users', crud: CrudPermissions) => {
-    onChange({ ...safeNav, [key]: applyCrudDependencies(crud) });
+  const updateTopLevel = (key: TopKey, crud: CrudPermissions) => {
+    let next = { ...safeNav, [key]: applyCrudDependencies(crud) };
+    if (String(key).startsWith('Fabric /')) next = syncLegacyStoreKeys(next);
+    if (PRODUCTION_FLOORS.includes(key as FactoryScreenKey)) next = syncLegacyFloor(next);
+    onChange(next);
   };
 
   const updateCatalog = (module: (typeof CATALOG_MODULES)[number], crud: CrudPermissions) => {
@@ -166,14 +295,23 @@ export default function NavigationPermissionsEditor({ navigation, onChange, disa
     });
   };
 
-  const mainAllChecked =
-    isFullCrud(safeNav.Dashboard) && isFullCrud(safeNav.Users);
+  const fabricSectionKeys: FactoryScreenKey[] = FABRIC_GROUPS.flatMap((group) => group.rows.map((row) => row.key));
+  const fabricAllChecked = fabricSectionKeys.every((key) => isFullCrud(safeNav[key]));
 
   const catalogAllChecked = CATALOG_MODULES.every((m) => isFullCrud(safeNav.Catalog[m]));
 
-  const toggleMainAll = (checked: boolean) => {
+  const toggleSection = (rows: { key: TopKey }[], checked: boolean) => {
     const crud = checked ? { ...FULL_CRUD } : { ...EMPTY_CRUD };
-    onChange({ ...safeNav, Dashboard: crud, Users: { ...crud } });
+    let next: NavType = { ...safeNav };
+    for (const row of rows) next = { ...next, [row.key]: { ...crud } };
+    if (rows.some((row) => PRODUCTION_FLOORS.includes(row.key as FactoryScreenKey))) next = syncLegacyFloor(next);
+    onChange(next);
+  };
+
+  const toggleFabricAll = (checked: boolean) => {
+    const crud = checked ? { ...FULL_CRUD } : { ...EMPTY_CRUD };
+    const factory = Object.fromEntries(fabricSectionKeys.map((key) => [key, { ...crud }]));
+    onChange(syncLegacyStoreKeys({ ...safeNav, ...factory }));
   };
 
   const toggleCatalogAll = (checked: boolean) => {
@@ -236,23 +374,52 @@ export default function NavigationPermissionsEditor({ navigation, onChange, disa
         </div>
       </div>
 
-      {/* Main Sections */}
+      {SIDEBAR_SECTIONS.map((section) => (
+        <SectionCard
+          key={section.title}
+          title={section.title}
+          icon={section.icon}
+          allChecked={section.rows.every((row) => isFullCrud(safeNav[row.key]))}
+          onToggleAll={(checked) => toggleSection(section.rows, checked)}
+          disabled={disabled}
+        >
+          {section.rows.map((row) => (
+            <PermissionRow
+              key={row.key}
+              label={row.label}
+              value={safeNav[row.key]}
+              onChange={(crud) => updateTopLevel(row.key, crud)}
+              disabled={disabled}
+              idPrefix={`nav-${row.key}`}
+            />
+          ))}
+        </SectionCard>
+      ))}
+
       <SectionCard
-        title="Main Sections"
-        icon="ri-layout-grid-line"
-        allChecked={mainAllChecked}
-        onToggleAll={toggleMainAll}
+        title="Fabric Management"
+        icon="ri-stack-line"
+        allChecked={fabricAllChecked}
+        onToggleAll={toggleFabricAll}
         disabled={disabled}
       >
-        {MAIN_SECTIONS.map((section) => (
-          <PermissionRow
-            key={section.key}
-            label={section.label}
-            value={safeNav[section.key]}
-            onChange={(crud) => updateTopLevel(section.key, crud)}
-            disabled={disabled}
-            idPrefix={`main-${section.key}`}
-          />
+        {FABRIC_GROUPS.map((group) => (
+          <div key={group.title}>
+            <div className="px-3 py-1.5 bg-gray-50/80">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500">{group.title}</span>
+            </div>
+            {group.rows.map((section) => (
+              <PermissionRow
+                key={section.key}
+                label={section.label}
+                value={safeNav[section.key]}
+                onChange={(crud) => updateTopLevel(section.key, crud)}
+                disabled={disabled}
+                idPrefix={`fabric-${section.key}`}
+                indented
+              />
+            ))}
+          </div>
         ))}
       </SectionCard>
 

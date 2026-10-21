@@ -42,6 +42,7 @@ export const getFirstAvailableRoute = (permissions: NavigationPermissions | null
   }
 
   if (hasRead(permissions.Users)) return '/users';
+  if (hasRead(permissions['Revision review'])) return '/versioning/review';
   if (hasHelpSupportHubAccess(permissions['Help & Support'])) return '/help-and-support';
 
   return '/dashboards/main';

@@ -37,6 +37,8 @@ export interface CatalogListShellProps<T> {
   selectedCount?: number;
   onBulkDelete?: () => void;
   extraToolbarActions?: React.ReactNode;
+  /** Rendered inside the toolbar, under the title row. */
+  toolbarFooter?: React.ReactNode;
   isLoading?: boolean;
   error?: string | null;
   rows: T[];
@@ -45,6 +47,8 @@ export interface CatalogListShellProps<T> {
   selectable?: {
     selectedIds: string[];
     selectAll: boolean;
+    indeterminate?: boolean;
+    selectAllLabel?: string;
     onSelectAll: () => void;
     onSelect: (id: string) => void;
     getRowId: (row: T) => string;
@@ -82,6 +86,7 @@ export function CatalogListShell<T>({
   selectedCount,
   onBulkDelete,
   extraToolbarActions,
+  toolbarFooter,
   isLoading,
   error,
   rows,
@@ -122,6 +127,7 @@ export function CatalogListShell<T>({
           selectedCount={selectedCount}
           onBulkDelete={onBulkDelete}
           extraActions={extraToolbarActions}
+          footer={toolbarFooter}
         />
         {fileInputRef && onImportChange ? (
           <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls" onChange={onImportChange} />

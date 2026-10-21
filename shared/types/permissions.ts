@@ -123,10 +123,127 @@ const normalizeHelpSupportTab = (value: unknown): CrudPermissions => {
   return applyCrudDependencies(normalizeCrud(value));
 };
 
-export interface NavigationPermissions {
+export const FABRIC_SCREEN_KEYS = [
+  'Fabric / Purchase orders',
+  'Fabric / Drafts',
+  'Fabric / Receipts',
+  'Fabric / GRN history',
+  'Fabric / Vendor return',
+  'Fabric / Return challan',
+  'Fabric / Issue',
+  'Fabric / Return',
+  'Fabric / Storage',
+  'Fabric / Live inventory',
+  'Fabric / Stock report',
+  'Fabric / PO analytics',
+  'Fabric / Fabric analytics',
+] as const;
+
+export const FACTORY_SCREEN_KEYS = [
+  'Sync',
+  'Store / Purchase orders',
+  'Store / Receipt',
+  'Store / Racks and issue',
+  'Production / Orders',
+  'Production / Floor',
+  'Production / Cut',
+  'Production / Selvage',
+  'Production / Half moon',
+  'Production / Vertical hem',
+  'Production / Bundle',
+  'Production / Horizontal hem',
+  'Production / Thread cut',
+  'Production / Iron',
+  'Production / Route split',
+  'Production / Embroidery',
+  'Production / Sticker',
+  'Quality / Fabric QC',
+  'Quality / Floor checks',
+  'Quality / Grades',
+  'Warehouse / Packing',
+  'Warehouse / Boxes',
+  'Warehouse / Orders',
+  'Warehouse / Dispatch',
+  'Accounts / Invoices',
+  'Reports',
+  ...FABRIC_SCREEN_KEYS,
+] as const;
+
+export type FactoryScreenKey = (typeof FACTORY_SCREEN_KEYS)[number];
+
+/** Older Store grants fill a Fabric screen the first time that screen has no saved flags. */
+export const FABRIC_FROM_LEGACY: Partial<Record<FactoryScreenKey, FactoryScreenKey>> = {
+  'Fabric / Purchase orders': 'Store / Purchase orders',
+  'Fabric / Drafts': 'Store / Purchase orders',
+  'Fabric / Receipts': 'Store / Receipt',
+  'Fabric / GRN history': 'Store / Receipt',
+  'Fabric / Vendor return': 'Store / Receipt',
+  'Fabric / Return challan': 'Store / Receipt',
+  'Fabric / Issue': 'Store / Racks and issue',
+  'Fabric / Return': 'Store / Racks and issue',
+  'Fabric / Storage': 'Store / Racks and issue',
+  'Production / Cut': 'Production / Floor',
+  'Production / Selvage': 'Production / Floor',
+  'Production / Half moon': 'Production / Floor',
+  'Production / Vertical hem': 'Production / Floor',
+  'Production / Bundle': 'Production / Floor',
+  'Production / Horizontal hem': 'Production / Floor',
+  'Production / Thread cut': 'Production / Floor',
+  'Production / Iron': 'Production / Floor',
+  'Production / Route split': 'Production / Floor',
+  'Production / Embroidery': 'Production / Floor',
+  'Production / Sticker': 'Production / Floor',
+  'Fabric / Live inventory': 'Reports',
+  'Fabric / Stock report': 'Reports',
+  'Fabric / PO analytics': 'Reports',
+  'Fabric / Fabric analytics': 'Reports',
+};
+
+export const FACTORY_ROUTES: Record<string, FactoryScreenKey> = {
+  '/sync': 'Sync',
+  '/store/purchase-orders/drafts': 'Fabric / Drafts',
+  '/store/purchase-orders': 'Fabric / Purchase orders',
+  '/store/po-received': 'Fabric / Receipts',
+  '/store/receipt': 'Fabric / Receipts',
+  '/store/grn': 'Fabric / GRN history',
+  '/store/vendor-returns': 'Fabric / Vendor return',
+  '/store/return-challans': 'Fabric / Return challan',
+  '/store/issue': 'Fabric / Issue',
+  '/store/fabric-return': 'Fabric / Return',
+  '/store/racks': 'Fabric / Storage',
+  '/store/reports/live-inventory': 'Fabric / Live inventory',
+  '/store/reports/stock': 'Fabric / Stock report',
+  '/store/reports/po': 'Fabric / PO analytics',
+  '/store/reports/fabric': 'Fabric / Fabric analytics',
+  '/production/orders': 'Production / Orders',
+  '/production/floor/cut': 'Production / Cut',
+  '/production/floor/selvage': 'Production / Selvage',
+  '/production/floor/half-moon': 'Production / Half moon',
+  '/production/floor/vertical-hem': 'Production / Vertical hem',
+  '/production/floor/bundle': 'Production / Bundle',
+  '/production/floor/horizontal-hem': 'Production / Horizontal hem',
+  '/production/floor/thread-cut': 'Production / Thread cut',
+  '/production/floor/iron': 'Production / Iron',
+  '/production/floor/route-split': 'Production / Route split',
+  '/production/floor/embroidery': 'Production / Embroidery',
+  '/production/floor/sticker': 'Production / Sticker',
+  '/production/floor': 'Production / Floor',
+  '/quality/fabric': 'Quality / Fabric QC',
+  '/quality/floor': 'Quality / Floor checks',
+  '/quality/grades': 'Quality / Grades',
+  '/warehouse/packing': 'Warehouse / Packing',
+  '/warehouse/boxes': 'Warehouse / Boxes',
+  '/warehouse/orders': 'Warehouse / Orders',
+  '/warehouse/dispatch': 'Warehouse / Dispatch',
+  '/accounts/invoices': 'Accounts / Invoices',
+  '/reports': 'Reports',
+};
+
+export interface NavigationPermissions extends Record<FactoryScreenKey, CrudPermissions> {
   Dashboard: CrudPermissions;
   Catalog: Record<CatalogModule, CrudPermissions>;
   Users: CrudPermissions;
+  'Revision review': CrudPermissions;
   'Help & Support': HelpSupportPermissions;
 }
 
@@ -151,11 +268,19 @@ export const buildCatalogDefaults = (): Record<CatalogModule, CrudPermissions> =
     CrudPermissions
   >;
 
+const factoryDefaults = (): Pick<NavigationPermissions, FactoryScreenKey> =>
+  Object.fromEntries(FACTORY_SCREEN_KEYS.map((key) => [key, { ...EMPTY_CRUD }])) as Pick<
+    NavigationPermissions,
+    FactoryScreenKey
+  >;
+
 export const DEFAULT_NAVIGATION: NavigationPermissions = {
   Dashboard: { ...EMPTY_CRUD },
   Catalog: buildCatalogDefaults(),
   Users: { ...EMPTY_CRUD },
+  'Revision review': { ...EMPTY_CRUD },
   'Help & Support': { ...FULL_HELP_SUPPORT },
+  ...factoryDefaults(),
 };
 
 /** Normalize legacy boolean or partial object Help & Support permissions. */
@@ -223,6 +348,24 @@ export const applyCrudChange = (
   return applyCrudDependencies({ ...current, [key]: checked });
 };
 
+/**
+ * Super admin treats a missing factory screen as full access, same as the live menu.
+ * An explicit saved deny stays denied.
+ */
+export const fillUnsetSuperAdminScreens = (
+  navigation: NavigationPermissions,
+  role: UserRole | undefined,
+  raw: Partial<NavigationPermissions> | null | undefined
+): NavigationPermissions => {
+  if (role !== 'super_admin') return navigation;
+  const next = { ...navigation };
+  if (raw?.['Revision review'] == null) next['Revision review'] = { ...FULL_CRUD };
+  for (const key of FACTORY_SCREEN_KEYS) {
+    if (raw?.[key] == null) next[key] = { ...FULL_CRUD };
+  }
+  return next;
+};
+
 export const mergeNavigationWithDefaults = (
   partial?: Partial<NavigationPermissions> & { Catalog?: Record<string, unknown> }
 ): NavigationPermissions => {
@@ -253,11 +396,20 @@ export const mergeNavigationWithDefaults = (
     }
   }
 
+  const factory = factoryDefaults();
+  for (const key of FACTORY_SCREEN_KEYS) {
+    const legacy = FABRIC_FROM_LEGACY[key];
+    const raw = partial?.[key] != null ? partial[key] : legacy ? partial?.[legacy] : undefined;
+    factory[key] = applyCrudDependencies(normalizeCrud(raw));
+  }
+
   return {
     Dashboard: applyCrudDependencies(normalizeCrud(partial.Dashboard)),
     Catalog: catalog,
     Users: applyCrudDependencies(normalizeCrud(partial.Users)),
+    'Revision review': applyCrudDependencies(normalizeCrud(partial['Revision review'])),
     'Help & Support': normalizeHelpSupport(partial['Help & Support']),
+    ...factory,
   };
 };
 

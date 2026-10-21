@@ -2,11 +2,30 @@
 
 import React from 'react';
 
+export type MaterialRole = 'sewing-thread' | 'embroidery-thread' | 'packing';
+
+export const MATERIAL_ROLE_OPTIONS: { value: MaterialRole; label: string }[] = [
+  { value: 'sewing-thread', label: 'Sewing thread' },
+  { value: 'embroidery-thread', label: 'Embroidery thread' },
+  { value: 'packing', label: 'Packing' },
+];
+
+/**
+ * Stable id for a fabric BOM line so later edits do not match by row position.
+ */
+export function newBomLineId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `bom-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 export interface FabricBomItem {
   fabricCatalogId: string;
   fabricName?: string;
   quantity: number;
   unitCost: number;
+  bomLineId?: string;
 }
 
 export interface PackagingBomItem {
@@ -14,6 +33,7 @@ export interface PackagingBomItem {
   rawMaterialName?: string;
   quantity: number;
   unitCost?: number;
+  materialRole?: MaterialRole;
 }
 
 interface ProductBomHeaderProps {

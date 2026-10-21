@@ -15,6 +15,7 @@ export interface StyleCode {
   pack?: string
   bundleQty?: number
   cartonQty?: number
+  packingBundleQty?: number
   /** Product ObjectId — may be string id or populated product */
   linkedItem?: string | { id?: string; _id?: string; name?: string } | null
   status: 'active' | 'inactive'
@@ -51,6 +52,7 @@ export interface BulkImportPayload {
     pack?: string
     bundleQty?: number
     cartonQty?: number
+    packingBundleQty?: number
     status?: 'active' | 'inactive'
   }>
   batchSize?: number

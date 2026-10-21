@@ -14,7 +14,7 @@ function EditDevicePage({ params }: { params: { id: string } }) {
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    deviceType: '' as '' | 'printer' | 'scanner',
+    deviceType: '' as '' | 'printer' | 'scanner' | 'scale' | 'rfid-reader' | 'rfid-writer',
     model: '',
     location: '',
     labelSize: '',

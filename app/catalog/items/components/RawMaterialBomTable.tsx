@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { rawMaterialService, RawMaterial } from '@/shared/services/rawMaterialService';
 import {
   PackagingBomItem,
+  MATERIAL_ROLE_OPTIONS,
   BomSectionCard,
   BomSectionHeader,
   BomTableShell,
@@ -19,6 +20,8 @@ interface RawMaterialBomTableProps {
   items: RawMaterialBomItem[];
   onChange: (items: RawMaterialBomItem[]) => void;
   disabled?: boolean;
+  /** Item BOM stores a thread or packing role. Style-code BOM does not. */
+  showRole?: boolean;
 }
 
 const ITEMS_PER_PAGE = 20;
@@ -33,7 +36,7 @@ function getMaterialName(m: RawMaterial | Record<string, unknown>): string {
   return (row.name as string) ?? '';
 }
 
-export function RawMaterialBomTable({ items, onChange, disabled }: RawMaterialBomTableProps) {
+export function RawMaterialBomTable({ items, onChange, disabled, showRole = true }: RawMaterialBomTableProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const [materials, setMaterials] = useState<RawMaterial[]>([]);
@@ -118,8 +121,20 @@ export function RawMaterialBomTable({ items, onChange, disabled }: RawMaterialBo
     onChange(next);
   };
 
+  /**
+   * Set the thread or packing role on one packaging line.
+   */
+  const updateRole = (index: number, materialRole: RawMaterialBomItem['materialRole']) => {
+    const next = [...items];
+    next[index] = { ...next[index], materialRole };
+    onChange(next);
+  };
+
   const addRow = () => {
-    onChange([...items, { rawMaterialId: '', rawMaterialName: '', quantity: 0, unitCost: 0 }]);
+    onChange([
+      ...items,
+      { rawMaterialId: '', rawMaterialName: '', quantity: 0, unitCost: 0, materialRole: 'packing' },
+    ]);
   };
 
   const removeRow = (index: number) => {
@@ -139,6 +154,7 @@ export function RawMaterialBomTable({ items, onChange, disabled }: RawMaterialBo
         <thead>
           <tr className="bg-gray-50/80">
             <th className={`${BOM_TABLE_HEAD} min-w-[220px]`}>Material</th>
+            {showRole && <th className={`${BOM_TABLE_HEAD} w-44`}>Role</th>}
             <th className={`${BOM_TABLE_HEAD} w-36`}>Quantity</th>
             <th className={`${BOM_TABLE_HEAD} w-16 text-right`}> </th>
           </tr>
@@ -146,7 +162,7 @@ export function RawMaterialBomTable({ items, onChange, disabled }: RawMaterialBo
         <tbody>
           {items.length === 0 ? (
             <tr>
-              <td colSpan={3} className="text-center py-10 px-4">
+              <td colSpan={showRole ? 4 : 3} className="text-center py-10 px-4">
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center">
                     <i className="ri-gift-line text-emerald-500 text-lg" />
@@ -179,6 +195,23 @@ export function RawMaterialBomTable({ items, onChange, disabled }: RawMaterialBo
                       disabled={disabled}
                     />
                   </td>
+                  {showRole && (
+                  <td className="px-3 py-2.5">
+                    <select
+                      aria-label={`Material role ${index + 1}`}
+                      className="form-control"
+                      value={row.materialRole || 'packing'}
+                      onChange={(e) => updateRole(index, e.target.value as RawMaterialBomItem['materialRole'])}
+                      disabled={disabled}
+                    >
+                      {MATERIAL_ROLE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  )}
                   <td className="px-3 py-2.5">
                     <BomNumberInput
                       value={row.quantity}

@@ -28,6 +28,8 @@ export interface UiToolbarProps {
   selectedCount?: number;
   onBulkDelete?: () => void;
   extraActions?: React.ReactNode;
+  /** Extra row inside the same toolbar, under the title and actions. */
+  footer?: React.ReactNode;
   className?: string;
 }
 
@@ -52,11 +54,12 @@ export function UiToolbar({
   selectedCount = 0,
   onBulkDelete,
   extraActions,
+  footer,
   className,
 }: UiToolbarProps) {
   return (
     <div className={cn('p-[10px] catalog-list-toolbar', className)}>
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+      <div className={cn('flex flex-wrap items-center justify-between gap-4', footer ? 'mb-3' : 'mb-6')}>
         <div className="flex items-center gap-2 min-w-0">
           <div className="ui-page-accent" />
           <h1 className="ui-page-title">{title}</h1>
@@ -109,6 +112,7 @@ export function UiToolbar({
           ) : null}
         </div>
       </div>
+      {footer}
     </div>
   );
 }

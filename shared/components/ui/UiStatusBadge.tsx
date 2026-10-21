@@ -8,18 +8,22 @@ export interface UiStatusBadgeProps {
   className?: string;
 }
 
-export function UiStatusBadge({ status, className }: UiStatusBadgeProps) {
-  const normalized = status.toLowerCase();
-  const isActive = normalized === 'active' || normalized === 'open' || normalized === 'completed';
+const GOOD = new Set(['active', 'open', 'completed', 'released', 'approved', 'passed', 'received', 'stored', 'dispatched', 'qc-passed', 'closed']);
+const WAIT = new Set(['draft', 'pending', 'pending-cutoff', 'submitted to vendor', 'in transit', 'amended', 'partially received', 'on-rack', 'issued', 'in-progress']);
 
+/**
+ * Maps a status string onto the shared green, amber, or red badge.
+ */
+function badgeTone(status: string) {
+  const normalized = status.toLowerCase();
+  if (GOOD.has(normalized)) return 'ui-status-badge--active';
+  if (WAIT.has(normalized)) return 'ui-status-badge--pending';
+  return 'ui-status-badge--inactive';
+}
+
+export function UiStatusBadge({ status, className }: UiStatusBadgeProps) {
   return (
-    <span
-      className={cn(
-        'ui-status-badge',
-        isActive ? 'ui-status-badge--active' : 'ui-status-badge--inactive',
-        className
-      )}
-    >
+    <span className={cn('ui-status-badge', badgeTone(status), className)}>
       {status}
     </span>
   );

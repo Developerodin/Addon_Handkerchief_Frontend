@@ -26,13 +26,15 @@ export function cloneMenuTree(items: MenuItem[]): MenuItem[] {
   return items.map((item) => (item.menutitle ? { ...item } : cloneMenuItem(item)));
 }
 
-const isCatalogPath = (path?: string) => Boolean(path && path.startsWith('/catalog/'));
-
-const filterCatalogChildren = (children: MenuItem[], hasPermission: (path: string) => boolean): MenuItem[] =>
+/**
+ * Keep a nested group when any descendant link is allowed.
+ * The group path itself is not a screen, so it is not checked.
+ */
+const filterMenuChildren = (children: MenuItem[], hasPermission: (path: string) => boolean): MenuItem[] =>
   children
     .map((child) => {
       if (child.type === 'sub' && child.children?.length) {
-        const nested = filterCatalogChildren(child.children, hasPermission);
+        const nested = filterMenuChildren(child.children, hasPermission);
         if (nested.length === 0) return null;
         return cloneMenuItem({ ...child, children: nested });
       }
@@ -54,38 +56,16 @@ export const useNavigationMenu = (menuItems: MenuItem[]): MenuItem[] => {
         if (item.menutitle) return true;
         if (item.type === 'link' && item.path) return hasPermission(item.path);
         if (item.type === 'sub' && item.children) {
-          if (item.path === '/catalog') {
-            return filterCatalogChildren(item.children, hasPermission).length > 0;
-          }
-          const visibleChildren = item.children.filter((child) => {
-            if (!child.path) return false;
-            if (isCatalogPath(child.path)) {
-              return hasPermission(child.path);
-            }
-            return hasSubPermission(item.path || '', child.title);
-          });
-          return visibleChildren.length > 0;
+          return filterMenuChildren(item.children, hasPermission).length > 0;
         }
         return false;
       })
       .map((item) => {
         if (item.menutitle) return { ...item };
         if (item.type === 'sub' && item.children) {
-          if (item.path === '/catalog') {
-            return cloneMenuItem({
-              ...item,
-              children: filterCatalogChildren(item.children, hasPermission),
-            });
-          }
           return cloneMenuItem({
             ...item,
-            children: item.children.filter((child) => {
-              if (!child.path) return false;
-              if (isCatalogPath(child.path)) {
-                return hasPermission(child.path);
-              }
-              return hasSubPermission(item.path || '', child.title);
-            }),
+            children: filterMenuChildren(item.children, hasPermission),
           });
         }
         return cloneMenuItem(item);

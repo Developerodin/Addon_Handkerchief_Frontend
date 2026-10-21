@@ -4,6 +4,25 @@ import { Fragment } from "react";
 import { connect } from "react-redux";
 import store from "@/shared/redux/store";
 
+/**
+ * Menu title with the icon sitting beside it, and a subtitle under the label when one is set.
+ * @param {{ title?: string, subtitle?: string, badgetxt?: string, class?: string }} item
+ * @param {boolean} labeled
+ */
+function MenuCaption({ item, labeled }: { item: any; labeled?: boolean }) {
+  return (
+    <span className={`${labeled ? "side-menu__label" : ""} flex flex-col min-w-0 ${item.subtitle ? "!leading-snug" : ""}`}>
+      <span>
+        {item.title}
+        {item.badgetxt ? <span className={item.class}> {item.badgetxt}</span> : null}
+      </span>
+      {item.subtitle ? (
+        <span className="text-[10px] font-normal leading-tight opacity-70 whitespace-normal">{item.subtitle}</span>
+      ) : null}
+    </span>
+  );
+}
+
 function Menuloop({ local_varaiable ,MenuItems, toggleSidemenu, level , HoverToggleInnerMenuFn, setMenuitems}: any) {
 
   const handleClick = (event:any) => {
@@ -58,11 +77,7 @@ function Menuloop({ local_varaiable ,MenuItems, toggleSidemenu, level , HoverTog
          </span>
          {local_varaiable?.dataVerticalStyle != "doublemenu" ? MenuItems.icon :""}
             
-          <span className={`${level == 1 ? "side-menu__label" : ""}`}> {MenuItems.title} {MenuItems.badgetxt ? (<span className={MenuItems.class}> {MenuItems.badgetxt} </span>
-        ) : (
-          ""
-        )}
-        </span>
+          <MenuCaption item={MenuItems} labeled={level == 1} />
         <i className="fe fe-chevron-right side-menu__angle"></i>
       </Link>
       <ul className={`slide-menu child${level}  ${MenuItems.active ? 'double-menu-active' : ''} ${MenuItems?.dirchange ? "force-left" : ""} `} style={MenuItems.active ? { display: "block" } : { display: "none" }} onClick={(e) => { e.stopPropagation(); }}>
@@ -134,12 +149,9 @@ function Menuloop({ local_varaiable ,MenuItems, toggleSidemenu, level , HoverTog
                 } else {
                   console.log('🖥️ Desktop: Menu should stay open');
                 }
-              }}>{firstlevel.icon}
-                <span className=""> {firstlevel.title} {firstlevel.badgetxt ? (<span className={firstlevel.class}> {firstlevel.badgetxt}</span>
-                ) : (
-                  ""
-                )}
-                </span>
+              }}>
+                {firstlevel.icon}
+                <MenuCaption item={firstlevel} labeled />
               </Link>
               : ""}
             {firstlevel.type === "empty" ?

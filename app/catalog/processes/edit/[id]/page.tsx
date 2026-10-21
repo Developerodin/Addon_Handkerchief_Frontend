@@ -28,6 +28,7 @@ interface ProcessFormData {
   machineType: string;
   standardRate: number;
   qcCheckpoint: boolean;
+  threadConsuming: boolean;
   reworkEligible: boolean;
   sortOrder: number;
   image: File | null;
@@ -71,6 +72,7 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
     machineType: '',
     standardRate: 0,
     qcCheckpoint: false,
+    threadConsuming: false,
     reworkEligible: false,
     sortOrder: 0,
     image: null,
@@ -109,6 +111,7 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
           machineType: data.machineType || '',
           standardRate: data.standardRate ?? 0,
           qcCheckpoint: Boolean(data.qcCheckpoint),
+          threadConsuming: Boolean(data.threadConsuming),
           reworkEligible: Boolean(data.reworkEligible),
           sortOrder: data.sortOrder ?? 0,
           image: null,
@@ -225,6 +228,7 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
         machineType: formData.machineType,
         standardRate: formData.standardRate,
         qcCheckpoint: formData.qcCheckpoint,
+        threadConsuming: formData.threadConsuming,
         reworkEligible: formData.reworkEligible,
         sortOrder: formData.sortOrder,
         status: formData.status,
@@ -481,6 +485,22 @@ const EditProcessPage = ({ params }: { params: { id: string } }) => {
                             disabled={isSubmitting}
                           />
                           QC Checkpoint
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-6">
+                      <div className="form-group">
+                        <label className="form-label flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="form-checkbox rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                            checked={formData.threadConsuming}
+                            onChange={(e) => setFormData(prev => ({ ...prev, threadConsuming: e.target.checked }))}
+                            disabled={isSubmitting}
+                            aria-label="Thread consuming"
+                          />
+                          Thread consuming
                         </label>
                       </div>
                     </div>

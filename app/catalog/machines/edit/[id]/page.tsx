@@ -7,7 +7,7 @@ import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMaster
 import { UiFormFooter } from '@/shared/components/ui';
 import { PROCESS_DEPARTMENTS, MACHINE_TYPE_OPTIONS } from '@/shared/constants/handkerchiefCatalog';
 import { userService, type User } from '@/shared/services/userService';
-import { getMachine, updateMachine } from '@/shared/services/phase3CatalogService';
+import { getMachine, listWorkers, updateMachine, type Worker } from '@/shared/services/phase3CatalogService';
 
 const getSupervisorId = (ref?: string | { id?: string } | null): string => {
   if (!ref) return '';
@@ -25,6 +25,7 @@ function EditMachinePage({ params }: { params: { id: string } }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
+  const [workers, setWorkers] = useState<Worker[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
@@ -39,21 +40,27 @@ function EditMachinePage({ params }: { params: { id: string } }) {
     nextMaintenanceDate: '',
     maintenanceNotes: '',
     assignedSupervisor: '',
+    assignedOperator: '',
+    barcode: '',
     status: 'active' as 'active' | 'inactive',
   });
 
   useEffect(() => {
-    const loadUsers = async () => {
+    const loadLookups = async () => {
       try {
-        const res = await userService.getUsers({ limit: 200, sortBy: 'name:asc' });
-        setUsers(res.results || res.users || []);
-      } catch {
-        toast.error('Failed to load supervisors');
+        const [userRes, workerRes] = await Promise.all([
+          userService.getUsers({ limit: 200, sortBy: 'name:asc' }),
+          listWorkers({ limit: 200 }),
+        ]);
+        setUsers(userRes.results || userRes.users || []);
+        setWorkers(workerRes.results || []);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to load machine lookups');
       } finally {
         setLoadingUsers(false);
       }
     };
-    loadUsers();
+    loadLookups();
   }, []);
 
   useEffect(() => {
@@ -73,6 +80,8 @@ function EditMachinePage({ params }: { params: { id: string } }) {
           nextMaintenanceDate: formatDateInput(data.nextMaintenanceDate),
           maintenanceNotes: data.maintenanceNotes || '',
           assignedSupervisor: getSupervisorId(data.assignedSupervisor),
+          assignedOperator: getSupervisorId(data.assignedOperator),
+          barcode: data.barcode || '',
           status: data.status || 'active',
         });
       } catch (error) {
@@ -132,6 +141,8 @@ function EditMachinePage({ params }: { params: { id: string } }) {
         nextMaintenanceDate: formData.nextMaintenanceDate || null,
         maintenanceNotes: formData.maintenanceNotes.trim(),
         assignedSupervisor: formData.assignedSupervisor || null,
+        assignedOperator: formData.assignedOperator || null,
+        barcode: formData.barcode.trim(),
         status: formData.status,
       });
       toast.success('Machine updated successfully', { id: loadingToast });
@@ -219,6 +230,18 @@ function EditMachinePage({ params }: { params: { id: string } }) {
             <textarea id="maintenanceNotes" name="maintenanceNotes" className="form-control" value={formData.maintenanceNotes} onChange={handleInputChange} rows={3} />
           </div>
           <div className="form-group">
+            <label htmlFor="barcode" className="form-label">Barcode</label>
+            <input
+              type="text"
+              id="barcode"
+              name="barcode"
+              className="form-control"
+              aria-label="Machine barcode"
+              value={formData.barcode}
+              onChange={handleInputChange}
+            />
+          </div>
+          <div className="form-group">
             <label htmlFor="assignedSupervisor" className="form-label">Assigned Supervisor</label>
             <select
               id="assignedSupervisor"
@@ -232,6 +255,25 @@ function EditMachinePage({ params }: { params: { id: string } }) {
               {users.map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.name || user.email}{user.email ? ` (${user.email})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="assignedOperator" className="form-label">Assigned Operator</label>
+            <select
+              id="assignedOperator"
+              name="assignedOperator"
+              className="form-select"
+              aria-label="Assigned operator"
+              value={formData.assignedOperator}
+              onChange={handleInputChange}
+              disabled={loadingUsers}
+            >
+              <option value="">Select Operator</option>
+              {workers.map((worker) => (
+                <option key={worker.id} value={worker.id}>
+                  {worker.name}{worker.employeeCode ? ` (${worker.employeeCode})` : ''}
                 </option>
               ))}
             </select>

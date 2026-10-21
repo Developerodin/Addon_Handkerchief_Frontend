@@ -18,8 +18,11 @@ import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermissio
 import { useSelector } from 'react-redux';
 import { isDesignUser, isProductionUser, isFinalUser, shouldShowAttribute, shouldShowAttributeForFinal } from '@/shared/utils/userUtils';
 
-const normalizeProductionType = (value?: string): 'normal' | 'embroidery' =>
-  value === 'embroidery' ? 'embroidery' : 'normal';
+const normalizeProductionType = (value?: string): 'normal' | 'embroidery' | 'sticker' => {
+  if (value === 'embroidery') return 'embroidery';
+  if (value === 'sticker') return 'sticker';
+  return 'normal';
+};
 
 interface AttributeOptionValue {
   _id: string;
@@ -138,10 +141,12 @@ const AddProductPage = () => {
     articleName: '',
     knittingCode: '',
     vendorCode: '',
+    vendorName: '',
+    piecesPerCut: 3 as 3 | 4,
     factoryCode: '',
     hsnCode: '',
     gst: '',
-    productionType: 'normal' as 'normal' | 'embroidery',
+    productionType: 'normal' as 'normal' | 'embroidery' | 'sticker',
     description: '',
     category: '',
   });
@@ -260,7 +265,7 @@ const AddProductPage = () => {
   };
 
   // Handle general form changes
-  const handleGeneralChange = (field: string, value: string) => {
+  const handleGeneralChange = (field: string, value: string | number) => {
     setGeneralForm(prev => ({
       ...prev,
       [field]: value
@@ -429,6 +434,8 @@ const AddProductPage = () => {
       const productData: any = {};
 
       productData.productionType = normalizeProductionType(generalForm.productionType);
+      productData.piecesPerCut = generalForm.piecesPerCut === 4 ? 4 : 3;
+      productData.vendorName = generalForm.vendorName.trim();
 
       // Style codes: send only IDs
       const styleCodeIds = styleCodes
@@ -522,6 +529,7 @@ const AddProductPage = () => {
             fabricName: item.fabricName,
             quantity: item.quantity,
             unitCost: Number(item.unitCost) || 0,
+            bomLineId: item.bomLineId,
           }));
 
         productData.rawMaterials = rawMaterialItems
@@ -530,6 +538,7 @@ const AddProductPage = () => {
             rawMaterialId: item.rawMaterialId,
             quantity: Number(item.quantity) || 0,
             unitCost: Number(item.unitCost) || 0,
+            materialRole: item.materialRole || 'packing',
           }));
 
         productData.processes = processItems
@@ -685,6 +694,7 @@ const AddProductPage = () => {
                           >
                             <option value="normal">Normal</option>
                             <option value="embroidery">Embroidery</option>
+                            <option value="sticker">Sticker</option>
                           </select>
                         </div>
                         <div>
@@ -713,6 +723,7 @@ const AddProductPage = () => {
                               >
                                 <option value="normal">Normal</option>
                                 <option value="embroidery">Embroidery</option>
+                            <option value="sticker">Sticker</option>
                               </select>
                             </div>
                             <div>
@@ -839,6 +850,30 @@ const AddProductPage = () => {
                                     required
                                   />
                                 </div>
+                                <div>
+                                  <label className="form-label" htmlFor="vendorName">Vendor Name</label>
+                                  <input
+                                    id="vendorName"
+                                    type="text"
+                                    className="form-control"
+                                    aria-label="Vendor name"
+                                    value={generalForm.vendorName}
+                                    onChange={(e) => handleGeneralChange('vendorName', e.target.value)}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="form-label" htmlFor="piecesPerCut">Pieces per cut</label>
+                                  <select
+                                    id="piecesPerCut"
+                                    className="form-control"
+                                    aria-label="Pieces per cut"
+                                    value={generalForm.piecesPerCut}
+                                    onChange={(e) => handleGeneralChange('piecesPerCut', Number(e.target.value) === 4 ? 4 : 3)}
+                                  >
+                                    <option value={3}>3</option>
+                                    <option value={4}>4</option>
+                                  </select>
+                                </div>
                                 <div className="grid grid-cols-2 gap-4">
                                   <div>
                                     <label className="form-label">HSN Code</label>
@@ -869,6 +904,7 @@ const AddProductPage = () => {
                                   >
                                     <option value="normal">Normal</option>
                                     <option value="embroidery">Embroidery</option>
+                            <option value="sticker">Sticker</option>
                                   </select>
                                 </div>
                                 <div>
@@ -989,6 +1025,30 @@ const AddProductPage = () => {
                                     onChange={(e) => handleGeneralChange('vendorCode', e.target.value)}
                                     required
                                   />
+                                </div>
+                                <div>
+                                  <label className="form-label" htmlFor="vendorName">Vendor Name</label>
+                                  <input
+                                    id="vendorName"
+                                    type="text"
+                                    className="form-control"
+                                    aria-label="Vendor name"
+                                    value={generalForm.vendorName}
+                                    onChange={(e) => handleGeneralChange('vendorName', e.target.value)}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="form-label" htmlFor="piecesPerCut">Pieces per cut</label>
+                                  <select
+                                    id="piecesPerCut"
+                                    className="form-control"
+                                    aria-label="Pieces per cut"
+                                    value={generalForm.piecesPerCut}
+                                    onChange={(e) => handleGeneralChange('piecesPerCut', Number(e.target.value) === 4 ? 4 : 3)}
+                                  >
+                                    <option value={3}>3</option>
+                                    <option value={4}>4</option>
+                                  </select>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                   <div>

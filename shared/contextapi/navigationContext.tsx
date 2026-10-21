@@ -14,6 +14,9 @@ import {
   type HubTabSlug,
   type HelpSupportPermissions,
   HELP_SUPPORT_TABS,
+  FULL_CRUD,
+  FACTORY_SCREEN_KEYS,
+  FACTORY_ROUTES,
   FULL_HELP_SUPPORT,
   EMPTY_HELP_SUPPORT,
 } from '@/shared/types/permissions';
@@ -27,7 +30,7 @@ interface NavigationContextType {
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
-const CACHE_VERSION = '4';
+const CACHE_VERSION = '7';
 
 interface NavigationProviderProps {
   children: ReactNode;
@@ -49,6 +52,14 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children
     }
 
     const merged = mergeNavigationWithDefaults(user.navigation);
+    if (user.role === 'super_admin' && user.navigation?.['Revision review'] == null) {
+      merged['Revision review'] = { ...FULL_CRUD };
+    }
+    if (user.role === 'super_admin') {
+      for (const key of FACTORY_SCREEN_KEYS) {
+        if (user.navigation?.[key] == null) merged[key] = { ...FULL_CRUD };
+      }
+    }
 
     // Re-merge when cache version changes so Help & Support flag updates apply
     if (typeof window !== 'undefined') {
@@ -82,6 +93,13 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children
     }
     if (path === '/users') {
       return hasCrudPermission('Users', 'read');
+    }
+    if (path === '/versioning/review') {
+      return hasCrudPermission('Revision review', 'read');
+    }
+    const factoryKey = Object.keys(FACTORY_ROUTES).find((route) => path === route || path.startsWith(`${route}/`));
+    if (factoryKey) {
+      return hasCrudPermission(FACTORY_ROUTES[factoryKey], 'read');
     }
     if (path === '/catalog') {
       return Object.values(permissions.Catalog).some((crud) => crud.read);

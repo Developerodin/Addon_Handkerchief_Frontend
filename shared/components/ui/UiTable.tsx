@@ -1,7 +1,40 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { cn } from './cn';
+
+/**
+ * Header checkbox. Supports indeterminate when only some rows are ticked.
+ */
+function SelectAllCheckbox({
+  checked,
+  indeterminate,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: () => void;
+  label: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = Boolean(indeterminate && !checked);
+  }, [indeterminate, checked]);
+
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      onChange={onChange}
+      className="ui-table__checkbox"
+      aria-label={label}
+      title={label}
+    />
+  );
+}
 
 export interface UiTableColumn<T> {
   key: string;
@@ -21,6 +54,8 @@ export interface UiTableProps<T> {
   selectable?: {
     selectedIds: string[];
     selectAll: boolean;
+    indeterminate?: boolean;
+    selectAllLabel?: string;
     onSelectAll: () => void;
     onSelect: (id: string) => void;
     getRowId: (row: T) => string;
@@ -43,12 +78,11 @@ export function UiTable<T>({
           <tr>
             {selectable ? (
               <th className="ui-table__th ui-table__th--checkbox">
-                <input
-                  type="checkbox"
+                <SelectAllCheckbox
                   checked={selectable.selectAll}
+                  indeterminate={selectable.indeterminate}
                   onChange={selectable.onSelectAll}
-                  className="ui-table__checkbox"
-                  aria-label="Select all rows"
+                  label={selectable.selectAllLabel || 'Select all rows'}
                 />
               </th>
             ) : null}
@@ -81,7 +115,7 @@ export function UiTable<T>({
                   <td className="ui-table__td ui-table__td--checkbox" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
-                      checked={selectable.selectedIds.includes(selectable.getRowId(row))}
+                      checked={selectable.selectAll || selectable.selectedIds.includes(selectable.getRowId(row))}
                       onChange={() => selectable.onSelect(selectable.getRowId(row))}
                       className="ui-table__checkbox"
                       aria-label={`Select row ${selectable.getRowId(row)}`}

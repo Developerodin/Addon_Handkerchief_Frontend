@@ -20,6 +20,7 @@ interface FormState {
   pack: string
   bundleQty: number | ''
   cartonQty: number | ''
+  packingBundleQty: number | ''
   linkedItem: string
   status: Status
 }
@@ -46,6 +47,7 @@ const EditStyleCodePage = () => {
     pack: '',
     bundleQty: 60,
     cartonQty: 120,
+    packingBundleQty: 60,
     linkedItem: '',
     status: 'active',
   })
@@ -103,6 +105,7 @@ const EditStyleCodePage = () => {
         pack: data.pack || '',
         bundleQty: data.bundleQty ?? 60,
         cartonQty: data.cartonQty ?? 120,
+        packingBundleQty: data.packingBundleQty ?? 60,
         linkedItem: resolveLinkedItemId(data.linkedItem),
         status: data.status,
       })
@@ -137,6 +140,9 @@ const EditStyleCodePage = () => {
     if (form.mrp === '' || Number(form.mrp) < 0) nextErrors.mrp = 'MRP must be 0 or more'
     if (form.bundleQty === '' || Number(form.bundleQty) < 1) nextErrors.bundleQty = 'Bundle qty must be at least 1'
     if (form.cartonQty === '' || Number(form.cartonQty) < 1) nextErrors.cartonQty = 'Carton qty must be at least 1'
+    if (form.packingBundleQty === '' || Number(form.packingBundleQty) < 60 || Number(form.packingBundleQty) > 120) {
+      nextErrors.packingBundleQty = 'Packing bundle qty must be between 60 and 120'
+    }
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -169,6 +175,7 @@ const EditStyleCodePage = () => {
         pack: form.pack.trim() || undefined,
         bundleQty: Number(form.bundleQty),
         cartonQty: Number(form.cartonQty),
+        packingBundleQty: Number(form.packingBundleQty),
         linkedItem: form.linkedItem.trim() || null,
         status: form.status,
         bom,
@@ -300,6 +307,21 @@ const EditStyleCodePage = () => {
               {errors.cartonQty && <p className="text-xs text-red-500 mt-1">{errors.cartonQty}</p>}
             </div>
             <div>
+              <label className="form-label required" htmlFor="packingBundleQty">Packing Bundle Qty</label>
+              <input
+                id="packingBundleQty"
+                type="number"
+                min={60}
+                max={120}
+                aria-label="Packing bundle quantity"
+                className={`form-control ${errors.packingBundleQty ? 'border-red-500' : ''}`}
+                value={form.packingBundleQty}
+                onChange={(e) => handleChange('packingBundleQty', e.target.value ? Number(e.target.value) : '')}
+                placeholder="60"
+              />
+              {errors.packingBundleQty && <p className="text-xs text-red-500 mt-1">{errors.packingBundleQty}</p>}
+            </div>
+            <div>
               <label className="form-label">Linked Item</label>
               <select
                 className="form-select"
@@ -334,6 +356,7 @@ const EditStyleCodePage = () => {
             items={bomItems}
             onChange={setBomItems}
             disabled={submitting}
+            showRole={false}
           />
 
           <UiFormFooter

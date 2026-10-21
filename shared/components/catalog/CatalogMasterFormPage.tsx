@@ -12,6 +12,7 @@ interface CatalogMasterFormPageProps {
   currentLabel?: string;
   helpIcon?: ReactNode;
   headerActions?: ReactNode;
+  showBreadcrumb?: boolean;
   singleColumn?: boolean;
   children: ReactNode;
 }
@@ -25,6 +26,7 @@ export function CatalogMasterFormPage({
   currentLabel,
   helpIcon,
   headerActions,
+  showBreadcrumb = true,
   singleColumn,
   children,
 }: CatalogMasterFormPageProps) {
@@ -39,13 +41,15 @@ export function CatalogMasterFormPage({
             {helpIcon}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <nav className="catalog-form-breadcrumb" aria-label="Breadcrumb">
-              <Link href={listHref} className="catalog-form-breadcrumb__link">
-                {listLabel}
-              </Link>
-              <i className="ri-arrow-right-s-line text-gray-300 text-xs" aria-hidden />
-              <span className="catalog-form-breadcrumb__current">{currentLabel || title}</span>
-            </nav>
+            {showBreadcrumb ? (
+              <nav className="catalog-form-breadcrumb" aria-label="Breadcrumb">
+                <Link href={listHref} className="catalog-form-breadcrumb__link">
+                  {listLabel}
+                </Link>
+                <i className="ri-arrow-right-s-line text-gray-300 text-xs" aria-hidden />
+                <span className="catalog-form-breadcrumb__current">{currentLabel || title}</span>
+              </nav>
+            ) : null}
             {headerActions}
           </div>
         </div>
