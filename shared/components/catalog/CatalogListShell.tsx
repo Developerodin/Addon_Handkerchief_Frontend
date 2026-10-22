@@ -58,6 +58,8 @@ export interface CatalogListShellProps<T> {
   totalPages: number;
   totalResults: number;
   onPageChange: (page: number) => void;
+  /** Other views render in children and should not show the empty table. */
+  hideTable?: boolean;
   emptyIcon?: string;
   emptyAddLabel?: string;
   children?: React.ReactNode;
@@ -98,6 +100,7 @@ export function CatalogListShell<T>({
   totalPages,
   totalResults,
   onPageChange,
+  hideTable,
   emptyIcon,
   emptyAddLabel,
   children,
@@ -135,7 +138,7 @@ export function CatalogListShell<T>({
 
         {children}
 
-        {isLoading ? (
+        {hideTable ? null : isLoading ? (
           <UiListLoading />
         ) : error ? (
           <UiListError message={error} />
@@ -156,7 +159,7 @@ export function CatalogListShell<T>({
           />
         )}
 
-        {!isLoading && !error && rows.length > 0 && (
+        {!hideTable && !isLoading && !error && rows.length > 0 && (
           <UiPagination
             currentPage={currentPage}
             totalPages={totalPages}

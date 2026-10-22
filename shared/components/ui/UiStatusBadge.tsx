@@ -9,7 +9,7 @@ export interface UiStatusBadgeProps {
 }
 
 const GOOD = new Set(['active', 'open', 'completed', 'released', 'approved', 'passed', 'received', 'stored', 'dispatched', 'qc-passed', 'closed']);
-const WAIT = new Set(['draft', 'pending', 'pending-cutoff', 'submitted to vendor', 'in transit', 'amended', 'partially received', 'on-rack', 'issued', 'in-progress']);
+const WAIT = new Set(['draft', 'pending', 'pending-cutoff', 'submitted to vendor', 'in transit', 'amended', 'partially received', 'on-rack', 'issued', 'in-progress', 'in progress', 'on hold', 'on-hold']);
 
 /**
  * Maps a status string onto the shared green, amber, or red badge.

@@ -6,15 +6,16 @@ import { factoryPage, PageResult } from '@/shared/services/factoryApi';
 /**
  * Loads one paginated factory collection and exposes toolbar state.
  */
-export function useFactoryList<T>(path: string, extra?: Record<string, string>) {
+export function useFactoryList<T>(path: string, extra?: Record<string, string>, initialLimit = 20) {
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  const [limit, setLimit] = useState(initialLimit);
   const [search, setSearch] = useState('');
   const [rows, setRows] = useState<T[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [counts, setCounts] = useState<PageResult<T>['counts']>(undefined);
   const extraKey = JSON.stringify(extra || {});
 
   const reload = useCallback(async () => {
@@ -24,6 +25,7 @@ export function useFactoryList<T>(path: string, extra?: Record<string, string>) 
       setRows(data.results || []);
       setTotal(data.totalResults || 0);
       setTotalPages(data.totalPages || 1);
+      setCounts(data.counts);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Load failed');
@@ -49,6 +51,7 @@ export function useFactoryList<T>(path: string, extra?: Record<string, string>) 
     totalPages,
     loading,
     error,
+    counts,
     reload,
   };
 }

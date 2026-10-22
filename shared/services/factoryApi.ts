@@ -7,6 +7,7 @@ export interface PageResult<T> {
   limit: number;
   totalPages: number;
   totalResults: number;
+  counts?: { pending: number; inProgress: number; completed: number; onHold: number };
 }
 
 export interface PurchaseOrderLine {
@@ -154,6 +155,43 @@ export interface VendorReturnRow {
   issuedAt?: string;
 }
 
+export interface FabricNeed {
+  bomLineId?: string;
+  fabricCatalogId?: string;
+  fabricName: string;
+  metresPerPiece: number;
+  onHandRolls?: number;
+  onHandMetres?: number;
+  inBasement?: boolean;
+  requiredMetres?: number;
+  shortageMetres?: number;
+}
+
+export interface OrderLineRow {
+  id: string;
+  itemId?: string;
+  articleName?: string;
+  factoryCode?: string;
+  productionType: string;
+  piecesPerCut?: number;
+  quantity: number;
+  priority?: string;
+  remarks?: string;
+  revisionId?: string;
+  pinId?: string | null;
+  snapshot?: {
+    fabricBom?: FabricNeed[];
+    threadLines?: { lineId: string; materialRole: string; quantity: number }[];
+    packingLines?: { lineId: string; materialRole: string; quantity: number }[];
+    piecesPerCut?: number;
+    route?: string;
+    currency?: string;
+    calculationPolicy?: string;
+  } | null;
+  floors?: FloorStep[];
+  segments?: { revisionId: string; qty: number; completedQty: number }[];
+}
+
 export interface FloorStep {
   processId?: string;
   name: string;
@@ -166,6 +204,10 @@ export interface FloorStep {
 
 export interface ProductionOrderRow {
   id: string;
+  orderNumber?: string;
+  orderDate?: string;
+  buyer?: string;
+  requiredBy?: string | null;
   itemId?: string;
   productionType: string;
   revisionId: string;
@@ -174,8 +216,44 @@ export interface ProductionOrderRow {
   priority?: string;
   orderNote?: string;
   currentFloor?: string;
+  articleCount?: number;
+  totalQty?: number;
   floors?: FloorStep[];
   segments: { revisionId: string; qty: number; completedQty: number }[];
+  lines?: OrderLineRow[];
+}
+
+export interface ArticleLineRow {
+  id: string;
+  lineId: string;
+  orderId: string;
+  orderNumber: string;
+  orderNote?: string;
+  articleName?: string;
+  factoryCode?: string;
+  quantity: number;
+  status: string;
+  priority?: string;
+  progress: number;
+  revisionId?: string;
+}
+
+export interface FabricEstimateRow {
+  orderId: string;
+  orderNumber: string;
+  lineId: string;
+  factoryCode?: string;
+  articleName?: string;
+  quantity: number;
+  pinned: boolean;
+  fabrics: FabricNeed[];
+}
+
+export interface UpcomingFloorRow {
+  floor: string;
+  name: string;
+  quantity: number;
+  orders: number;
 }
 
 export interface BundleRow {
