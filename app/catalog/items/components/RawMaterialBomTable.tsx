@@ -5,6 +5,7 @@ import { rawMaterialService, RawMaterial } from '@/shared/services/rawMaterialSe
 import {
   PackagingBomItem,
   MATERIAL_ROLE_OPTIONS,
+  newBomLineId,
   BomSectionCard,
   BomSectionHeader,
   BomTableShell,
@@ -104,12 +105,16 @@ export function RawMaterialBomTable({ items, onChange, disabled, showRole = true
     const name = getMaterialName(material);
     if (!id) return;
     const next = [...items];
+    const previous = next[selectedRowIndex];
     const rate = Number((material as RawMaterial).rate ?? 0) || 0;
     next[selectedRowIndex] = {
+      ...previous,
       rawMaterialId: id,
       rawMaterialName: name,
-      quantity: next[selectedRowIndex]?.quantity ?? 0,
-      unitCost: next[selectedRowIndex]?.unitCost || rate,
+      quantity: previous?.quantity ?? 0,
+      unitCost: previous?.unitCost || rate,
+      materialRole: previous?.materialRole || 'packing',
+      bomLineId: previous?.bomLineId || newBomLineId(),
     };
     onChange(next);
     closeModal();
@@ -133,7 +138,14 @@ export function RawMaterialBomTable({ items, onChange, disabled, showRole = true
   const addRow = () => {
     onChange([
       ...items,
-      { rawMaterialId: '', rawMaterialName: '', quantity: 0, unitCost: 0, materialRole: 'packing' },
+      {
+        rawMaterialId: '',
+        rawMaterialName: '',
+        quantity: 0,
+        unitCost: 0,
+        materialRole: 'packing',
+        bomLineId: newBomLineId(),
+      },
     ]);
   };
 

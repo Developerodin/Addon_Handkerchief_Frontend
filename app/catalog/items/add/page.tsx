@@ -83,6 +83,7 @@ interface BomItem {
   fabricName: string;
   quantity: number;
   unitCost: number;
+  bomLineId?: string;
 }
 
 interface ProcessItem {
@@ -465,7 +466,7 @@ const AddProductPage = () => {
         productData.category = generalForm.category;
       } else {
         productData.name = generalForm.name.trim();
-        productData.softwareCode = softwareCode || '';
+        if (softwareCode) productData.softwareCode = softwareCode;
         productData.internalCode = generalForm.internalCode?.trim() ?? '';
         productData.articleName = generalForm.articleName?.trim() ?? '';
         productData.knittingCode = generalForm.knittingCode?.trim() ?? '';
@@ -539,6 +540,7 @@ const AddProductPage = () => {
             quantity: Number(item.quantity) || 0,
             unitCost: Number(item.unitCost) || 0,
             materialRole: item.materialRole || 'packing',
+            bomLineId: item.bomLineId,
           }));
 
         productData.processes = processItems
@@ -571,7 +573,11 @@ const AddProductPage = () => {
       
     } catch (error: any) {
       console.error('Error creating product:', error);
-      alert(error.response?.data?.message || 'Error creating product. Please try again.');
+      alert(
+        error.response?.data?.message ||
+          error.message ||
+          'Could not save the product. Please check the form and try again.'
+      );
     } finally {
       setIsLoading(false);
     }

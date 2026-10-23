@@ -34,6 +34,8 @@ export interface PackagingBomItem {
   quantity: number;
   unitCost?: number;
   materialRole?: MaterialRole;
+  /** Stable id so two packing rows with the same material/role stay distinct on save. */
+  bomLineId?: string;
 }
 
 interface ProductBomHeaderProps {

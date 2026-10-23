@@ -67,6 +67,7 @@ interface Product {
     quantity: number;
     unitCost?: number;
     materialRole?: 'sewing-thread' | 'embroidery-thread' | 'packing';
+    bomLineId?: string;
   }>;
   processes: Array<{
     processId: string;
@@ -378,6 +379,7 @@ const EditProductPage = () => {
                 quantity: Number(item.quantity) || 0,
                 unitCost: Number(item.unitCost) || 0,
                 materialRole: item.materialRole || 'packing',
+                bomLineId: item.bomLineId || '',
               };
             })
           : [];
@@ -787,6 +789,7 @@ const EditProductPage = () => {
             quantity: Number(item.quantity) || 0,
             unitCost: Number(item.unitCost) || 0,
             materialRole: item.materialRole || 'packing',
+            bomLineId: item.bomLineId,
           }));
         productData.processes = formData.processes.filter(proc => proc.processId).map(proc => ({
           processId: proc.processId
@@ -807,7 +810,7 @@ const EditProductPage = () => {
       console.error('Error updating product:', error);
       // Show more detailed error message
       const errorMessage = error.response?.data?.message || error.message || 'Error updating product';
-      alert(`Error: ${errorMessage}`);
+      alert(errorMessage);
     } finally {
       setIsLoading(false);
     }
