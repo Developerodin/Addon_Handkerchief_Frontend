@@ -16,6 +16,9 @@ export interface PurchaseOrderLine {
   fabricName?: string;
   fabricTypeName?: string;
   colourName?: string;
+  fabricSortNo?: string;
+  millOldFabricSortNo?: string;
+  millNewFabricSortNo?: string;
   quantity: number;
   unitId?: string;
   unitName?: string;

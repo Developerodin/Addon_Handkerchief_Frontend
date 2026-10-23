@@ -130,7 +130,7 @@ export default function EditPurchaseOrderPage() {
             suppliers={suppliers}
             units={units}
             saving={saving}
-            seed={formSeedFromOrder(order, suppliers, units)}
+            seed={formSeedFromOrder(order, suppliers, units, fabrics)}
             allowRaise={order.status === 'Draft'}
             onSave={onSave}
             onCancel={() => router.push('/store/purchase-orders')}

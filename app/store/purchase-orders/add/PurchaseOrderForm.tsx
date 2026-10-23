@@ -14,6 +14,7 @@ import { PurchaseOrderItemsTable } from './PurchaseOrderItemsTable';
 import { downloadFabricItemsExcel, downloadFabricItemsTemplate, lineFromImport, parseFabricItemsExcel } from './purchaseOrderExcel';
 import {
   creditDaysFromTerms,
+  defaultMeterUnit,
   emptyLine,
   fabricsForSupplier,
   fabricColorLabel,
@@ -118,7 +119,7 @@ export function PurchaseOrderForm({ fabrics, suppliers, units, saving, seed, all
     setSupplierTerms(row.paymentTerms || '');
     setCreditDays(String(creditDaysFromTerms(row.paymentTerms)));
     setShowSuppliers(false);
-    setLines([emptyLine(estimatedDelivery)]);
+    setLines([emptyLine(estimatedDelivery, units)]);
     setIssues((prev) => ({ ...prev, supplier: '' }));
   };
 
@@ -155,6 +156,9 @@ export function PurchaseOrderForm({ fabrics, suppliers, units, saving, seed, all
           fabricName: exact ? line.fabricName : '',
           fabricTypeName: exact ? line.fabricTypeName : '',
           colourName: exact ? line.colourName : '',
+          fabricSortNo: exact ? line.fabricSortNo : '',
+          millOldFabricSortNo: exact ? line.millOldFabricSortNo : '',
+          millNewFabricSortNo: exact ? line.millNewFabricSortNo : '',
           unmatched: query.trim().length > 0 && matches.length === 0,
         };
       })
@@ -162,22 +166,33 @@ export function PurchaseOrderForm({ fabrics, suppliers, units, saving, seed, all
   };
 
   const onPick = (lineId: string, fabric: FabricCatalog) => {
-    patchLine(lineId, {
-      query: fabric.name,
-      fabricId: fabric.id,
-      fabricName: fabric.name,
-      fabricTypeName: fabricTypeLabel(fabric),
-      colourName: fabricColorLabel(fabric),
-      rate: fabric.rate != null ? String(fabric.rate) : '',
-      gstPercent: gstNumber(fabric.gst),
-      unmatched: false,
-    });
+    setLines((prev) =>
+      prev.map((line) => {
+        if (line.lineId !== lineId) return line;
+        const meter = !line.unitId ? defaultMeterUnit(units) : null;
+        return {
+          ...line,
+          query: fabric.name,
+          fabricId: fabric.id,
+          fabricName: fabric.name,
+          fabricTypeName: fabricTypeLabel(fabric),
+          colourName: fabricColorLabel(fabric),
+          fabricSortNo: fabric.fabricSortNo || '',
+          millOldFabricSortNo: fabric.millOldFabricSortNo || '',
+          millNewFabricSortNo: fabric.millNewFabricSortNo || '',
+          rate: fabric.rate != null ? String(fabric.rate) : '',
+          gstPercent: gstNumber(fabric.gst),
+          unmatched: false,
+          ...(meter ? { unitId: meter.unitId, unitName: meter.unitName } : {}),
+        };
+      })
+    );
     setActiveLineId(null);
   };
 
   const addLine = () => {
     if (!supplierId) return;
-    const line = emptyLine(estimatedDelivery);
+    const line = emptyLine(estimatedDelivery, units);
     setLines((prev) => [...prev, line]);
     setActiveLineId(line.lineId);
   };

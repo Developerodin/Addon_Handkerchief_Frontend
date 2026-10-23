@@ -15,6 +15,7 @@ import {
   FABRIC_FINISH_OPTIONS,
   FABRIC_WASH_OPTIONS,
 } from '@/shared/constants/handkerchiefCatalog';
+import { API_BASE_URL } from '@/shared/data/utilities/api';
 import {
   fabricTypeApi,
   fabricColorApi,
@@ -39,6 +40,7 @@ const AddFabricPage = () => {
   const [yarns, setYarns] = useState<FabricYarnLookup[]>([]);
   const [counts, setCounts] = useState<FabricCountLookup[]>([]);
   const [measurements, setMeasurements] = useState<FabricMeasurementLookup[]>([]);
+  const [stitchTypeOptions, setStitchTypeOptions] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     fabricSortNo: '',
@@ -54,6 +56,7 @@ const AddFabricPage = () => {
     design: '',
     wash: '',
     finish: '',
+    stitchType: '',
     glm: '',
     glmMeasurement: '',
     finishedWidth: '',
@@ -69,7 +72,7 @@ const AddFabricPage = () => {
   useEffect(() => {
     const loadLookups = async () => {
       try {
-        const [typesData, colorsData, qualitiesData, yarnsData, countsData, measurementsData] =
+        const [typesData, colorsData, qualitiesData, yarnsData, countsData, measurementsData, attributesRes] =
           await Promise.all([
             fabricTypeApi.list({ page: 1, limit: 1000, status: 'active' }),
             fabricColorApi.list({ page: 1, limit: 1000, status: 'active' }),
@@ -77,6 +80,7 @@ const AddFabricPage = () => {
             fabricYarnApi.list({ page: 1, limit: 1000, status: 'active' }),
             fabricCountApi.list({ page: 1, limit: 1000, status: 'active' }),
             fabricMeasurementApi.list({ page: 1, limit: 1000, status: 'active' }),
+            fetch(`${API_BASE_URL}/product-attributes?limit=1000`),
           ]);
         setFabricTypes(typesData.results);
         setColors(colorsData.results);
@@ -84,6 +88,16 @@ const AddFabricPage = () => {
         setYarns(yarnsData.results);
         setCounts(countsData.results);
         setMeasurements(measurementsData.results);
+        if (attributesRes.ok) {
+          const attributesData = await attributesRes.json();
+          const attributes = attributesData?.results || [];
+          const options = attributes
+            .filter((attr: { name?: string }) => (attr?.name || '').toLowerCase() === 'stitch type')
+            .flatMap((attr: { optionValues?: { name?: string }[] }) => attr?.optionValues || [])
+            .map((val: { name?: string }) => val?.name)
+            .filter((name: string | undefined): name is string => Boolean(name));
+          setStitchTypeOptions(options);
+        }
       } catch {
         // Non-critical
       }
@@ -121,6 +135,7 @@ const AddFabricPage = () => {
     design: formData.design,
     wash: formData.wash,
     finish: formData.finish,
+    stitchType: formData.stitchType,
     glm: formData.glm === '' ? 0 : Number(formData.glm),
     glmMeasurement: formData.glmMeasurement || null,
     finishedWidth: formData.finishedWidth === '' ? 0 : Number(formData.finishedWidth),
@@ -256,6 +271,20 @@ const AddFabricPage = () => {
                     {option.label}
                   </option>
                 ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Stitch type</label>
+              <select name="stitchType" className="form-select" value={formData.stitchType} onChange={handleInputChange}>
+                <option value="">Select Stitch type</option>
+                {stitchTypeOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+                {formData.stitchType && !stitchTypeOptions.includes(formData.stitchType) && (
+                  <option value={formData.stitchType}>{formData.stitchType}</option>
+                )}
               </select>
             </div>
             <div className="form-group">

@@ -187,7 +187,10 @@ export default function PurchaseOrdersPage() {
                     printStoreNote(row.number, [
                       row.supplierName,
                       row.status,
-                      ...(row.lines || []).map((line) => `${line.fabricName || line.lineId}  ${line.quantity}`),
+                      ...(row.lines || []).map((line) => {
+                        const sort = line.fabricSortNo ? ` [${line.fabricSortNo}]` : '';
+                        return `${line.fabricName || line.lineId}${sort}  ${line.quantity}`;
+                      }),
                     ])
                   }
                 />
@@ -337,6 +340,7 @@ export default function PurchaseOrdersPage() {
                 <thead>
                   <tr>
                     <th>Fabric</th>
+                    <th>Sort No</th>
                     <th>Qty</th>
                     <th>Rate</th>
                     <th>GST</th>
@@ -346,6 +350,7 @@ export default function PurchaseOrdersPage() {
                   {(view.lines || []).map((line) => (
                     <tr key={line.lineId}>
                       <td>{line.fabricName || line.lineId}</td>
+                      <td>{line.fabricSortNo || '—'}</td>
                       <td>{line.quantity}</td>
                       <td>{line.rate ?? 0}</td>
                       <td>{line.gstPercent ?? 0}%</td>

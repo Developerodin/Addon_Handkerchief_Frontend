@@ -28,6 +28,11 @@ import {
   normalizeFabricFinish,
   normalizeFabricWash,
 } from '@/shared/constants/handkerchiefCatalog';
+import { API_BASE_URL } from '@/shared/data/utilities/api';
+import {
+  AttributeOptionValue,
+  resolveAttributeOptionName,
+} from '@/shared/utils/styleCodeFields';
 
 interface ExcelRow {
   'ID'?: string;
@@ -45,6 +50,8 @@ interface ExcelRow {
   'Design'?: string;
   'Wash'?: string;
   'Finish'?: string;
+  'Stitch Type'?: string;
+  'Stitch type'?: string;
   'GLM'?: string | number;
   'GLM Measurement'?: string;
   'Finished Width'?: string | number;
@@ -57,7 +64,23 @@ interface ExcelRow {
   'Remarks'?: string;
 }
 
-const excelColWidths = Array.from({ length: 25 }, () => ({ wch: 16 }));
+const excelColWidths = Array.from({ length: 26 }, () => ({ wch: 16 }));
+
+const normalizeFabricStitchType = (
+  value: string,
+  optionValues: AttributeOptionValue[]
+): string => {
+  const raw = value.trim();
+  if (!raw) return '';
+  const resolved = resolveAttributeOptionName(raw, optionValues);
+  const matched = optionValues.find(
+    (opt) => (opt.name || '').toLowerCase() === resolved.toLowerCase()
+  );
+  if (!matched?.name) {
+    throw new Error(`Invalid Stitch Type: ${raw}`);
+  }
+  return matched.name;
+};
 
 const toExportRow = (fabric: FabricCatalog) => ({
   'ID': fabric.id,
@@ -75,6 +98,7 @@ const toExportRow = (fabric: FabricCatalog) => ({
   'Design': fabric.design || '',
   'Wash': fabric.wash || '',
   'Finish': fabric.finish || '',
+  'Stitch Type': fabric.stitchType || '',
   'GLM': fabric.glm ?? '',
   'GLM Measurement': fabric.glmMeasurementName || getLookupName(fabric.glmMeasurement),
   'Finished Width': fabric.finishedWidth ?? '',
@@ -107,6 +131,7 @@ const fabricDataColumns: UiTableColumn<FabricCatalog>[] = [
   { key: 'design', label: 'Design', render: (row) => row.design || '—' },
   { key: 'wash', label: 'Wash', render: (row) => row.wash || '—' },
   { key: 'finish', label: 'Finish', render: (row) => row.finish || '—' },
+  { key: 'stitchType', label: 'Stitch Type', render: (row) => row.stitchType || '—' },
   { key: 'glm', label: 'GLM', render: (row) => (row.glm ?? '—') },
   { key: 'rate', label: 'Rate', render: (row) => (row.rate ?? '—') },
 ];
@@ -176,6 +201,7 @@ const FabricMasterPage = () => {
           Design: 'Plain',
           Wash: 'Yes',
           Finish: 'NA',
+          'Stitch Type': 'Hem 1',
           GLM: 60,
           'GLM Measurement': 'GSM',
           'Finished Width': 44,
@@ -231,8 +257,16 @@ const FabricMasterPage = () => {
           let successCount = 0;
           let errorCount = 0;
 
-          const [allData, typesData, colorsData, qualitiesData, yarnsData, countsData, measurementsData] =
-            await Promise.all([
+          const [
+            allData,
+            typesData,
+            colorsData,
+            qualitiesData,
+            yarnsData,
+            countsData,
+            measurementsData,
+            attributesRes,
+          ] = await Promise.all([
             listFabricCatalogs({ page: 1, limit: 100000 }),
             fabricTypeApi.list({ page: 1, limit: 1000, status: 'active' }),
             fabricColorApi.list({ page: 1, limit: 1000, status: 'active' }),
@@ -240,10 +274,20 @@ const FabricMasterPage = () => {
             fabricYarnApi.list({ page: 1, limit: 1000, status: 'active' }),
             fabricCountApi.list({ page: 1, limit: 1000, status: 'active' }),
             fabricMeasurementApi.list({ page: 1, limit: 1000, status: 'active' }),
+            fetch(`${API_BASE_URL}/product-attributes?limit=1000`),
           ]);
           const allFabrics = allData.results;
           const resolveByName = <T extends { id: string; name: string }>(items: T[], label?: string) =>
             label ? items.find((item) => item.name.trim().toLowerCase() === label.trim().toLowerCase())?.id || null : null;
+
+          let stitchTypeOptions: AttributeOptionValue[] = [];
+          if (attributesRes.ok) {
+            const attributesData = await attributesRes.json();
+            const attributes = attributesData?.results || [];
+            stitchTypeOptions = attributes
+              .filter((attr: { name?: string }) => (attr?.name || '').toLowerCase() === 'stitch type')
+              .flatMap((attr: { optionValues?: AttributeOptionValue[] }) => attr?.optionValues || []);
+          }
 
           for (let i = 0; i < jsonData.length; i++) {
             const row = jsonData[i];
@@ -266,6 +310,10 @@ const FabricMasterPage = () => {
                 design: normalizeFabricDesign((row['Design'] || '').toString()),
                 wash: normalizeFabricWash((row['Wash'] || '').toString()),
                 finish: normalizeFabricFinish((row['Finish'] || '').toString()),
+                stitchType: normalizeFabricStitchType(
+                  (row['Stitch Type'] || row['Stitch type'] || '').toString(),
+                  stitchTypeOptions
+                ),
                 glm: parseNumber(row['GLM']),
                 glmMeasurement: resolveByName(measurementsData.results, (row['GLM Measurement'] || '').toString()),
                 finishedWidth: parseNumber(row['Finished Width']),
@@ -346,10 +394,10 @@ const FabricMasterPage = () => {
         }}
         helpContent={catalogHelpBlock(
           'Fabric Master Management',
-          'Manage handkerchief fabric catalog — mill sort numbers, type, color, quality, yarn, count, design, wash, finish, GLM, finished width, rate, HSN/GST, and remarks.',
+          'Manage handkerchief fabric catalog — mill sort numbers, type, color, quality, yarn, count, design, wash, finish, stitch type, GLM, finished width, rate, HSN/GST, and remarks.',
           [
             'Search, paginate, and export fabrics',
-            'Import via Excel (upsert by ID or name; resolve lookups by name)',
+            'Import via Excel (upsert by ID or name; resolve lookups and Stitch Type from attributes master)',
             'Add, edit, or delete fabric records',
           ]
         )}

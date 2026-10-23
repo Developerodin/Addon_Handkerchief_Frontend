@@ -15,6 +15,7 @@ import {
   FABRIC_FINISH_OPTIONS,
   FABRIC_WASH_OPTIONS,
 } from '@/shared/constants/handkerchiefCatalog';
+import { API_BASE_URL } from '@/shared/data/utilities/api';
 import {
   fabricTypeApi,
   fabricColorApi,
@@ -40,6 +41,7 @@ function EditFabricPage({ params }: { params: { id: string } }) {
   const [yarns, setYarns] = useState<FabricYarnLookup[]>([]);
   const [counts, setCounts] = useState<FabricCountLookup[]>([]);
   const [measurements, setMeasurements] = useState<FabricMeasurementLookup[]>([]);
+  const [stitchTypeOptions, setStitchTypeOptions] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     fabricSortNo: '',
@@ -55,6 +57,7 @@ function EditFabricPage({ params }: { params: { id: string } }) {
     design: '',
     wash: '',
     finish: '',
+    stitchType: '',
     glm: '',
     glmMeasurement: '',
     finishedWidth: '',
@@ -70,7 +73,7 @@ function EditFabricPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     const loadLookups = async () => {
       try {
-        const [typesData, colorsData, qualitiesData, yarnsData, countsData, measurementsData] =
+        const [typesData, colorsData, qualitiesData, yarnsData, countsData, measurementsData, attributesRes] =
           await Promise.all([
             fabricTypeApi.list({ page: 1, limit: 1000, status: 'active' }),
             fabricColorApi.list({ page: 1, limit: 1000, status: 'active' }),
@@ -78,6 +81,7 @@ function EditFabricPage({ params }: { params: { id: string } }) {
             fabricYarnApi.list({ page: 1, limit: 1000, status: 'active' }),
             fabricCountApi.list({ page: 1, limit: 1000, status: 'active' }),
             fabricMeasurementApi.list({ page: 1, limit: 1000, status: 'active' }),
+            fetch(`${API_BASE_URL}/product-attributes?limit=1000`),
           ]);
         setFabricTypes(typesData.results);
         setColors(colorsData.results);
@@ -85,6 +89,16 @@ function EditFabricPage({ params }: { params: { id: string } }) {
         setYarns(yarnsData.results);
         setCounts(countsData.results);
         setMeasurements(measurementsData.results);
+        if (attributesRes.ok) {
+          const attributesData = await attributesRes.json();
+          const attributes = attributesData?.results || [];
+          const options = attributes
+            .filter((attr: { name?: string }) => (attr?.name || '').toLowerCase() === 'stitch type')
+            .flatMap((attr: { optionValues?: { name?: string }[] }) => attr?.optionValues || [])
+            .map((val: { name?: string }) => val?.name)
+            .filter((name: string | undefined): name is string => Boolean(name));
+          setStitchTypeOptions(options);
+        }
       } catch {
         // Non-critical
       }
@@ -111,6 +125,7 @@ function EditFabricPage({ params }: { params: { id: string } }) {
           design: data.design || '',
           wash: data.wash || '',
           finish: data.finish || '',
+          stitchType: data.stitchType || '',
           glm: data.glm != null ? String(data.glm) : '',
           glmMeasurement: getLookupId(data.glmMeasurement),
           finishedWidth: data.finishedWidth != null ? String(data.finishedWidth) : '',
@@ -162,6 +177,7 @@ function EditFabricPage({ params }: { params: { id: string } }) {
     design: formData.design,
     wash: formData.wash,
     finish: formData.finish,
+    stitchType: formData.stitchType,
     glm: formData.glm === '' ? 0 : Number(formData.glm),
     glmMeasurement: formData.glmMeasurement || null,
     finishedWidth: formData.finishedWidth === '' ? 0 : Number(formData.finishedWidth),
@@ -237,6 +253,18 @@ function EditFabricPage({ params }: { params: { id: string } }) {
             <div><label className="form-label">Design</label><select name="design" className="form-control" value={formData.design} onChange={handleInputChange}>{FABRIC_DESIGN_OPTIONS.map((option) => (<option key={option.value || 'empty'} value={option.value}>{option.label}</option>))}</select></div>
             <div><label className="form-label">Wash</label><select name="wash" className="form-control" value={formData.wash} onChange={handleInputChange}>{FABRIC_WASH_OPTIONS.map((option) => (<option key={option.value || 'empty'} value={option.value}>{option.label}</option>))}</select></div>
             <div><label className="form-label">Finish</label><select name="finish" className="form-control" value={formData.finish} onChange={handleInputChange}>{FABRIC_FINISH_OPTIONS.map((option) => (<option key={option.value || 'empty'} value={option.value}>{option.label}</option>))}</select></div>
+            <div>
+              <label className="form-label">Stitch type</label>
+              <select name="stitchType" className="form-control" value={formData.stitchType} onChange={handleInputChange}>
+                <option value="">Select Stitch type</option>
+                {stitchTypeOptions.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+                {formData.stitchType && !stitchTypeOptions.includes(formData.stitchType) && (
+                  <option value={formData.stitchType}>{formData.stitchType}</option>
+                )}
+              </select>
+            </div>
             <div><label className="form-label">GLM (weight)</label><input name="glm" className="form-control" inputMode="decimal" value={formData.glm} onChange={handleDecimalChange} /></div>
             <CatalogLookupField label="GLM Measurement" value={formData.glmMeasurement} items={weightMeasurements} onChange={(id) => setFormData((prev) => ({ ...prev, glmMeasurement: id }))} {...fabricCatalogLookupFields.measurement} modalTitle="Select GLM Measurement" />
             <div><label className="form-label">Finished Width</label><input name="finishedWidth" className="form-control" inputMode="decimal" value={formData.finishedWidth} onChange={handleDecimalChange} /></div>

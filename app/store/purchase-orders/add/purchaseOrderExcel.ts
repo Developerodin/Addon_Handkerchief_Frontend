@@ -2,6 +2,7 @@ import { FabricCatalog } from '@/shared/services/fabricCatalogService';
 import { newLineId } from '@/shared/services/factoryApi';
 import {
   FabricPoLine,
+  defaultMeterUnit,
   fabricColorLabel,
   fabricTypeLabel,
   gstNumber,
@@ -15,6 +16,9 @@ export interface ParsedFabricRow {
   fabricName: string;
   fabricTypeName: string;
   colourName: string;
+  fabricSortNo: string;
+  millOldFabricSortNo: string;
+  millNewFabricSortNo: string;
   rate: string;
   quantity: string;
   unit: string;
@@ -22,7 +26,19 @@ export interface ParsedFabricRow {
   gstPercent: string;
 }
 
-const HEADERS = ['Fabric Name', 'Fabric Type', 'Color', 'Rate', 'Quantity', 'Unit', 'Est. Delivery', 'GST %'] as const;
+const HEADERS = [
+  'Fabric Name',
+  'Fabric Type',
+  'Color',
+  'Sort No',
+  'Mill Old',
+  'Mill New',
+  'Rate',
+  'Quantity',
+  'Unit',
+  'Est. Delivery',
+  'GST %',
+] as const;
 
 /**
  * Downloads an empty fabric-item template.
@@ -48,6 +64,9 @@ export async function downloadFabricItemsExcel(lines: FabricPoLine[]): Promise<v
     'Fabric Name': line.fabricName || line.query,
     'Fabric Type': line.fabricTypeName,
     Color: line.colourName,
+    'Sort No': line.fabricSortNo,
+    'Mill Old': line.millOldFabricSortNo,
+    'Mill New': line.millNewFabricSortNo,
     Rate: line.rate,
     Quantity: line.quantity,
     Unit: line.unitName,
@@ -89,7 +108,8 @@ export function lineFromImport(
   fallbackDelivery: string
 ): FabricPoLine {
   const match = matchFabric(fabrics, row);
-  const unit = matchMeasurement(units, row.unit);
+  const unit = row.unit.trim() ? matchMeasurement(units, row.unit) : undefined;
+  const meter = !row.unit.trim() ? defaultMeterUnit(units) : null;
   return {
     lineId: newLineId(),
     query: match?.name || row.fabricName,
@@ -97,9 +117,12 @@ export function lineFromImport(
     fabricName: match?.name || '',
     fabricTypeName: match ? fabricTypeLabel(match) : row.fabricTypeName,
     colourName: match ? fabricColorLabel(match) : row.colourName,
+    fabricSortNo: match?.fabricSortNo || row.fabricSortNo || '',
+    millOldFabricSortNo: match?.millOldFabricSortNo || row.millOldFabricSortNo || '',
+    millNewFabricSortNo: match?.millNewFabricSortNo || row.millNewFabricSortNo || '',
     quantity: row.quantity,
-    unitId: unit?.id || '',
-    unitName: unit ? measurementLabel(unit) : '',
+    unitId: unit?.id || meter?.unitId || '',
+    unitName: unit ? measurementLabel(unit) : meter?.unitName || '',
     rate: row.rate || (match?.rate != null ? String(match.rate) : ''),
     gstPercent: row.gstPercent || gstNumber(match?.gst),
     estimatedDelivery: row.estimatedDelivery || fallbackDelivery,
@@ -114,12 +137,29 @@ function parseRecord(record: Record<string, unknown>, excelRow: number): { row?:
   const fabricName = cell(record, 'fabric name');
   const fabricTypeName = cell(record, 'fabric type');
   const colourName = cell(record, 'color') || cell(record, 'colour');
+  const fabricSortNo = cell(record, 'sort no') || cell(record, 'sort no.');
+  const millOldFabricSortNo = cell(record, 'mill old') || cell(record, 'mill old fabric sort no.');
+  const millNewFabricSortNo = cell(record, 'mill new') || cell(record, 'mill new fabric sort no.');
   const rate = cell(record, 'rate');
   const quantity = cell(record, 'quantity');
   const unit = cell(record, 'unit');
   const gstPercent = cell(record, 'gst %') || cell(record, 'gst');
   const estimatedDelivery = dateCell(record['Est. Delivery'] ?? record['est. delivery'] ?? record['Estimated Delivery']);
-  if (![fabricName, fabricTypeName, colourName, rate, quantity, unit, gstPercent, estimatedDelivery].some(Boolean)) {
+  if (
+    ![
+      fabricName,
+      fabricTypeName,
+      colourName,
+      fabricSortNo,
+      millOldFabricSortNo,
+      millNewFabricSortNo,
+      rate,
+      quantity,
+      unit,
+      gstPercent,
+      estimatedDelivery,
+    ].some(Boolean)
+  ) {
     return {};
   }
   if (!fabricName) return { error: `Row ${excelRow}: fabric name is required` };
@@ -128,7 +168,21 @@ function parseRecord(record: Record<string, unknown>, excelRow: number): { row?:
   if (gstPercent && (!isDecimal(gstPercent) || Number(gstPercent) > 100)) {
     return { error: `Row ${excelRow}: GST must be between 0 and 100` };
   }
-  return { row: { fabricName, fabricTypeName, colourName, rate, quantity, unit, estimatedDelivery, gstPercent } };
+  return {
+    row: {
+      fabricName,
+      fabricTypeName,
+      colourName,
+      fabricSortNo,
+      millOldFabricSortNo,
+      millNewFabricSortNo,
+      rate,
+      quantity,
+      unit,
+      estimatedDelivery,
+      gstPercent,
+    },
+  };
 }
 
 /** Case-insensitive cell lookup. */

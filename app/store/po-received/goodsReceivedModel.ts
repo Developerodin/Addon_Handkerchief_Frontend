@@ -83,7 +83,9 @@ export function orderTotal(lines: PurchaseOrderLine[] = []): number {
 
 /** Fabric line shown in the order table and the lot picker. */
 export function fabricLineLabel(line: PurchaseOrderLine): string {
-  return [line.fabricName, line.fabricTypeName, line.colourName].filter(Boolean).join(' · ') || line.lineId;
+  return (
+    [line.fabricName, line.fabricSortNo, line.fabricTypeName, line.colourName].filter(Boolean).join(' · ') || line.lineId
+  );
 }
 
 /**

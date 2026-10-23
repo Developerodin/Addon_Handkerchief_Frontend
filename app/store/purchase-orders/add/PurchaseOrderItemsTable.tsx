@@ -7,7 +7,9 @@ import { FabricMeasurementLookup } from '@/shared/services/fabricLookupService';
 import { decimalInput, FabricPoLine, fabricColorLabel, fabricTypeLabel, measurementLabel } from './purchaseOrderFormModel';
 
 const inputClass =
-  'w-full px-1.5 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-0 focus:border-primary';
+  'w-full min-w-0 px-1 py-0.5 text-[10px] leading-tight border border-gray-200 rounded focus:outline-none focus:ring-0 focus:border-primary';
+
+const cellClass = 'border border-gray-300 px-1 py-0.5 align-middle overflow-hidden';
 
 interface PurchaseOrderItemsTableProps {
   lines: FabricPoLine[];
@@ -25,6 +27,7 @@ interface PurchaseOrderItemsTableProps {
 
 /**
  * Fabric line grid. Type and colour fill in when a catalog fabric is chosen.
+ * Compact layout so all columns fit without horizontal scroll on typical desktops.
  */
 export function PurchaseOrderItemsTable({
   lines,
@@ -40,19 +43,53 @@ export function PurchaseOrderItemsTable({
   onRemove,
 }: PurchaseOrderItemsTableProps) {
   return (
-    <div className="overflow-x-auto overflow-y-visible">
-      <table className="min-w-full border border-gray-300 bg-white">
+    <div className="w-full overflow-y-visible">
+      <table className="w-full table-fixed border-collapse border border-gray-300 bg-white text-[10px]">
+        <colgroup>
+          {showCommercials ? (
+            <>
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '4%' }} />
+            </>
+          ) : (
+            <>
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '6%' }} />
+            </>
+          )}
+        </colgroup>
         <thead className="bg-gray-50">
           <tr>
-            <HeaderCell required className="min-w-[220px]">Fabric name</HeaderCell>
-            <HeaderCell className="min-w-[120px]">Fabric type</HeaderCell>
-            <HeaderCell className="min-w-[120px]">Color</HeaderCell>
-            {showCommercials ? <HeaderCell required className="min-w-[110px]">Rate (₹)</HeaderCell> : null}
-            <HeaderCell required className="min-w-[110px]">Quantity</HeaderCell>
-            <HeaderCell required className="min-w-[140px]">Unit</HeaderCell>
-            <HeaderCell required className="min-w-[160px]">Est. delivery</HeaderCell>
-            {showCommercials ? <HeaderCell required className="min-w-[90px]">GST (%)</HeaderCell> : null}
-            <HeaderCell className="min-w-[70px] text-center">Action</HeaderCell>
+            <HeaderCell required>Fabric</HeaderCell>
+            <HeaderCell>Type</HeaderCell>
+            <HeaderCell>Color</HeaderCell>
+            <HeaderCell>Sort No</HeaderCell>
+            <HeaderCell>Mill Old</HeaderCell>
+            <HeaderCell>Mill New</HeaderCell>
+            {showCommercials ? <HeaderCell required>Rate</HeaderCell> : null}
+            <HeaderCell required>Qty</HeaderCell>
+            <HeaderCell required>Unit</HeaderCell>
+            <HeaderCell required>Est. del.</HeaderCell>
+            {showCommercials ? <HeaderCell required>GST%</HeaderCell> : null}
+            <HeaderCell className="text-center">Act</HeaderCell>
           </tr>
         </thead>
         <tbody>
@@ -80,7 +117,9 @@ export function PurchaseOrderItemsTable({
 
 function HeaderCell({ children, className = '', required = false }: { children: React.ReactNode; className?: string; required?: boolean }) {
   return (
-    <th className={`border border-gray-300 px-2 py-1.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-700 ${className}`}>
+    <th
+      className={`border border-gray-300 px-1 py-1 text-left text-[9px] font-bold uppercase leading-tight tracking-wide text-gray-700 ${className}`}
+    >
       {children}
       {required ? <span className="text-red-500"> *</span> : null}
     </th>
@@ -117,7 +156,7 @@ function FabricLineRow({
   const fabricError = issues[`fabric-${line.lineId}`];
   return (
     <tr className={line.unmatched || fabricError ? 'bg-red-50' : 'hover:bg-gray-50'}>
-      <td className="border border-gray-300 px-2 py-1.5">
+      <td className={cellClass}>
         <FabricNameCell
           line={line}
           open={open}
@@ -129,14 +168,23 @@ function FabricLineRow({
           onPatch={onPatch}
         />
       </td>
-      <td className="border border-gray-300 px-2 py-1.5">
-        <input aria-label="Fabric type" readOnly value={line.fabricTypeName} placeholder="Type" className={`${inputClass} bg-gray-50`} />
+      <td className={cellClass}>
+        <input aria-label="Fabric type" readOnly value={line.fabricTypeName} placeholder="Type" title={line.fabricTypeName} className={`${inputClass} truncate bg-gray-50`} />
       </td>
-      <td className="border border-gray-300 px-2 py-1.5">
-        <input aria-label="Color" readOnly value={line.colourName} placeholder="Color" className={`${inputClass} bg-gray-50`} />
+      <td className={cellClass}>
+        <input aria-label="Color" readOnly value={line.colourName} placeholder="Color" title={line.colourName} className={`${inputClass} truncate bg-gray-50`} />
+      </td>
+      <td className={cellClass}>
+        <input aria-label="Sort No" readOnly value={line.fabricSortNo} placeholder="—" title={line.fabricSortNo} className={`${inputClass} truncate bg-gray-50`} />
+      </td>
+      <td className={cellClass}>
+        <input aria-label="Mill Old" readOnly value={line.millOldFabricSortNo} placeholder="—" title={line.millOldFabricSortNo} className={`${inputClass} truncate bg-gray-50`} />
+      </td>
+      <td className={cellClass}>
+        <input aria-label="Mill New" readOnly value={line.millNewFabricSortNo} placeholder="—" title={line.millNewFabricSortNo} className={`${inputClass} truncate bg-gray-50`} />
       </td>
       {showCommercials ? (
-        <td className="border border-gray-300 px-2 py-1.5">
+        <td className={cellClass}>
           <DecimalCell
             label="Rate"
             value={line.rate}
@@ -145,7 +193,7 @@ function FabricLineRow({
           />
         </td>
       ) : null}
-      <td className="border border-gray-300 px-2 py-1.5">
+      <td className={cellClass}>
         <DecimalCell
           label="Quantity"
           value={line.quantity}
@@ -153,11 +201,12 @@ function FabricLineRow({
           onChange={(value) => onPatch(line.lineId, { quantity: value })}
         />
       </td>
-      <td className="border border-gray-300 px-2 py-1.5">
+      <td className={cellClass}>
         <select
           aria-label="Unit"
           aria-invalid={Boolean(issues[`unit-${line.lineId}`])}
           value={line.unitId}
+          title={line.unitName}
           className={`${inputClass} ${issues[`unit-${line.lineId}`] ? 'border-red-400' : ''}`}
           onChange={(event) => {
             const unit = units.find((row) => row.id === event.target.value);
@@ -180,18 +229,18 @@ function FabricLineRow({
           })}
         </select>
       </td>
-      <td className="border border-gray-300 px-2 py-1.5">
+      <td className={cellClass}>
         <input
           type="date"
           aria-label="Estimated delivery"
           aria-invalid={Boolean(issues[`delivery-${line.lineId}`])}
           value={line.estimatedDelivery}
-          className={`${inputClass} ${issues[`delivery-${line.lineId}`] ? 'border-red-400' : ''}`}
+          className={`max-w-full ${inputClass} ${issues[`delivery-${line.lineId}`] ? 'border-red-400' : ''}`}
           onChange={(event) => onPatch(line.lineId, { estimatedDelivery: event.target.value })}
         />
       </td>
       {showCommercials ? (
-        <td className="border border-gray-300 px-2 py-1.5">
+        <td className={cellClass}>
           <DecimalCell
             label="GST percent"
             value={line.gstPercent}
@@ -201,14 +250,14 @@ function FabricLineRow({
           />
         </td>
       ) : null}
-      <td className="border border-gray-300 px-2 py-1.5 text-center">
+      <td className={`${cellClass} text-center`}>
         <button
           type="button"
           className="rounded p-0.5 text-red-600 hover:bg-red-50 hover:text-red-800"
           aria-label={line.fabricName ? `Remove ${line.fabricName}` : 'Remove fabric line'}
           onClick={() => onRemove(line.lineId)}
         >
-          <i className="ri-delete-bin-line text-sm" aria-hidden />
+          <i className="ri-delete-bin-line text-xs" aria-hidden />
         </button>
       </td>
     </tr>
@@ -234,7 +283,7 @@ function FabricNameCell({ line, open, suggestions, invalid, onQuery, onFocusLine
 
   return (
     <>
-      {line.unmatched || invalid ? <p className="mb-1 text-[10px] font-medium text-red-600">Not matched</p> : null}
+      {line.unmatched || invalid ? <p className="mb-0.5 text-[9px] font-medium text-red-600">Not matched</p> : null}
       <input
         ref={inputRef}
         type="text"
@@ -243,8 +292,9 @@ function FabricNameCell({ line, open, suggestions, invalid, onQuery, onFocusLine
         aria-invalid={invalid}
         aria-expanded={open}
         aria-autocomplete="list"
-        placeholder="Type to search..."
-        className={`${inputClass} ${invalid ? 'border-red-400' : ''}`}
+        placeholder="Search..."
+        title={line.query}
+        className={`${inputClass} truncate ${invalid ? 'border-red-400' : ''}`}
         onChange={(event) => onQuery(line.lineId, event.target.value)}
         onMouseDown={(event) => {
           event.stopPropagation();
@@ -312,9 +362,10 @@ function FabricSuggestMenu({ anchorRef, line, suggestions, onPick }: FabricSugge
               onPick(line.lineId, fabric);
             }}
           >
-            <span className="block text-xs font-medium text-gray-900">{fabric.name}</span>
-            <span className="block text-[10px] text-gray-500">
-              {[fabricTypeLabel(fabric), fabricColorLabel(fabric)].filter(Boolean).join(' · ') || 'No type or colour'}
+            <span className="block text-[10px] font-medium text-gray-900">{fabric.name}</span>
+            <span className="block text-[9px] text-gray-500">
+              {[fabricTypeLabel(fabric), fabricColorLabel(fabric), fabric.fabricSortNo].filter(Boolean).join(' · ') ||
+                'No type or colour'}
             </span>
           </button>
         </li>

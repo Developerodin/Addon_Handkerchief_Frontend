@@ -10,6 +10,9 @@ export interface FabricPoLine {
   fabricName: string;
   fabricTypeName: string;
   colourName: string;
+  fabricSortNo: string;
+  millOldFabricSortNo: string;
+  millNewFabricSortNo: string;
   quantity: string;
   unitId: string;
   unitName: string;
@@ -43,6 +46,9 @@ export interface PoSavePayload {
     fabricName: string;
     fabricTypeName: string;
     colourName: string;
+    fabricSortNo: string;
+    millOldFabricSortNo: string;
+    millNewFabricSortNo: string;
     quantity: number;
     unitId?: string;
     unitName: string;
@@ -88,9 +94,28 @@ export function fabricColorLabel(fabric: FabricCatalog): string {
 }
 
 /**
- * Blank line. Delivery is copied from the order date when that is already set.
+ * Default PO unit: Meter from the fabric measurement master.
  */
-export function emptyLine(estimatedDelivery = ''): FabricPoLine {
+export function defaultMeterUnit(
+  units: FabricMeasurementLookup[]
+): { unitId: string; unitName: string } {
+  const meter =
+    matchMeasurement(units, 'meter') ||
+    matchMeasurement(units, 'metre') ||
+    matchMeasurement(units, 'm');
+  if (!meter) return { unitId: '', unitName: '' };
+  return { unitId: meter.id, unitName: measurementLabel(meter) };
+}
+
+/**
+ * Blank line. Delivery is copied from the order date when that is already set.
+ * Unit defaults to Meter when measurement rows are available.
+ */
+export function emptyLine(
+  estimatedDelivery = '',
+  units: FabricMeasurementLookup[] = []
+): FabricPoLine {
+  const meter = defaultMeterUnit(units);
   return {
     lineId: newLineId(),
     query: '',
@@ -98,9 +123,12 @@ export function emptyLine(estimatedDelivery = ''): FabricPoLine {
     fabricName: '',
     fabricTypeName: '',
     colourName: '',
+    fabricSortNo: '',
+    millOldFabricSortNo: '',
+    millNewFabricSortNo: '',
     quantity: '',
-    unitId: '',
-    unitName: '',
+    unitId: meter.unitId,
+    unitName: meter.unitName,
     rate: '',
     gstPercent: '',
     estimatedDelivery,
@@ -222,6 +250,9 @@ export function toPoPayload(
     fabricName: line.fabricName || line.query.trim(),
     fabricTypeName: line.fabricTypeName,
     colourName: line.colourName,
+    fabricSortNo: line.fabricSortNo,
+    millOldFabricSortNo: line.millOldFabricSortNo,
+    millNewFabricSortNo: line.millNewFabricSortNo,
     quantity: Number(line.quantity || 0),
     unitId: line.unitId || undefined,
     unitName: line.unitName,
@@ -340,6 +371,9 @@ export function formSeedFromOrder(
       fabricName?: string;
       fabricTypeName?: string;
       colourName?: string;
+      fabricSortNo?: string;
+      millOldFabricSortNo?: string;
+      millNewFabricSortNo?: string;
       quantity: number;
       unitId?: string;
       unitName?: string;
@@ -349,7 +383,8 @@ export function formSeedFromOrder(
     }>;
   },
   suppliers: FabricSupplier[],
-  units: FabricMeasurementLookup[]
+  units: FabricMeasurementLookup[],
+  fabrics: FabricCatalog[] = []
 ): PoFormSeed {
   const supplier = suppliers.find((row) => row.name.trim().toLowerCase() === order.supplierName.trim().toLowerCase());
   return {
@@ -363,6 +398,7 @@ export function formSeedFromOrder(
     notes: order.notes || '',
     lines: (order.lines || []).map((line) => {
       const unit = units.find((row) => row.id === line.unitId) || matchMeasurement(units, line.unitName || '');
+      const catalog = line.fabricId ? fabrics.find((fabric) => fabric.id === line.fabricId) : undefined;
       return {
         lineId: line.lineId,
         query: line.fabricName || '',
@@ -370,6 +406,9 @@ export function formSeedFromOrder(
         fabricName: line.fabricName || '',
         fabricTypeName: line.fabricTypeName || '',
         colourName: line.colourName || '',
+        fabricSortNo: line.fabricSortNo || catalog?.fabricSortNo || '',
+        millOldFabricSortNo: line.millOldFabricSortNo || catalog?.millOldFabricSortNo || '',
+        millNewFabricSortNo: line.millNewFabricSortNo || catalog?.millNewFabricSortNo || '',
         quantity: line.quantity != null ? String(line.quantity) : '',
         unitId: unit?.id || line.unitId || '',
         unitName: unit ? measurementLabel(unit) : line.unitName || '',

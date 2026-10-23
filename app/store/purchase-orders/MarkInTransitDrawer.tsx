@@ -274,7 +274,10 @@ async function uploadEntryFiles(files: File[]): Promise<UploadedFile[]> {
 function selectedLineText(line: PurchaseOrderLine): string {
   const qty = Number(line.quantity || 0).toLocaleString('en-IN');
   const measure = [qty, line.unitName].filter(Boolean).join(' ');
-  return [line.fabricName, line.fabricTypeName, line.colourName, measure].filter(Boolean).join(' · ') || line.lineId;
+  return (
+    [line.fabricName, line.fabricSortNo, line.fabricTypeName, line.colourName, measure].filter(Boolean).join(' · ') ||
+    line.lineId
+  );
 }
 
 function PacklistEntry({

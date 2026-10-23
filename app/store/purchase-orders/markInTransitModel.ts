@@ -111,7 +111,10 @@ export function orderAmount(lines: PurchaseOrderLine[] = []): number {
 
 /** Label shown in the PO-line picker. */
 export function lineLabel(line: PurchaseOrderLine): string {
-  return [line.fabricName, line.fabricTypeName, line.colourName, line.unitName].filter(Boolean).join(' · ') || line.lineId;
+  return (
+    [line.fabricName, line.fabricSortNo, line.fabricTypeName, line.colourName, line.unitName].filter(Boolean).join(' · ') ||
+    line.lineId
+  );
 }
 
 /**
