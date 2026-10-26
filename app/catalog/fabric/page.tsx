@@ -9,80 +9,13 @@ import { buildCatalogTableColumns, catalogHelpBlock } from '@/shared/components/
 import { UiTableColumn } from '@/shared/components/ui';
 import {
   FabricCatalog,
-  createFabricCatalog,
   deleteFabricCatalog,
   getLookupName,
   listFabricCatalogs,
-  updateFabricCatalog,
 } from '@/shared/services/fabricCatalogService';
-import {
-  fabricTypeApi,
-  fabricColorApi,
-  fabricQualityApi,
-  fabricYarnApi,
-  fabricCountApi,
-  fabricMeasurementApi,
-} from '@/shared/services/fabricLookupService';
-import {
-  normalizeFabricDesign,
-  normalizeFabricFinish,
-  normalizeFabricWash,
-} from '@/shared/constants/handkerchiefCatalog';
-import { API_BASE_URL } from '@/shared/data/utilities/api';
-import { buildFabricCatalogName } from '@/shared/utils/fabricCatalogName';
-import {
-  AttributeOptionValue,
-  resolveAttributeOptionName,
-} from '@/shared/utils/styleCodeFields';
-
-interface ExcelRow {
-  'ID'?: string;
-  'Fabric Sort No.'?: string;
-  'Mill Old Fabric Sort No.'?: string;
-  'Mill New Fabric Sort No.'?: string;
-  'Fabric Type'?: string;
-  'Color'?: string;
-  'Quality'?: string;
-  'Yarn'?: string;
-  'Count'?: string;
-  'Construction'?: string;
-  'Weave'?: string;
-  'Design'?: string;
-  'Wash'?: string;
-  'Finish'?: string;
-  'Stitch Type'?: string;
-  'Stitch type'?: string;
-  'GSM'?: string | number;
-  'GSM Measurement'?: string;
-  'GLM'?: string | number;
-  'GLM Measurement'?: string;
-  'Finished Width'?: string | number;
-  'Finished Width Measurement'?: string;
-  'Rate'?: string | number;
-  'GST'?: string;
-  'HSN Code'?: string;
-  'Min Quantity in Kg'?: string | number;
-  'Status'?: string;
-  'Remarks'?: string;
-}
+import { importFabricMasterRows, FabricMasterExcelRow } from './importFabricMaster';
 
 const excelColWidths = Array.from({ length: 26 }, () => ({ wch: 16 }));
-
-const normalizeFabricStitchType = (
-  value: string,
-  optionValues: AttributeOptionValue[]
-): string => {
-  const raw = value.trim();
-  if (!raw) return '';
-  const resolved = resolveAttributeOptionName(raw, optionValues);
-  const matched = optionValues.find(
-    (opt) => (opt.name || '').toLowerCase() === resolved.toLowerCase()
-  );
-  if (!matched?.name) {
-    throw new Error(`Invalid Stitch Type: ${raw}`);
-  }
-  return matched.name;
-};
 
 const toExportRow = (fabric: FabricCatalog) => ({
   'ID': fabric.id,
@@ -112,12 +45,6 @@ const toExportRow = (fabric: FabricCatalog) => ({
   'Status': fabric.status,
   'Remarks': fabric.remark || '',
 });
-
-const parseNumber = (value: string | number | undefined, fallback = 0): number => {
-  if (value === '' || value == null) return fallback;
-  const n = Number(value);
-  return Number.isFinite(n) && n >= 0 ? n : fallback;
-};
 
 const fabricDataColumns: UiTableColumn<FabricCatalog>[] = [
   { key: 'name', label: 'Name', render: (row) => <span className="font-bold text-gray-900">{row.name}</span> },
@@ -253,119 +180,22 @@ const FabricMasterPage = () => {
         try {
           const workbook = XLSX.read(ev.target?.result, { type: 'array' });
           const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
-          let successCount = 0;
-          let errorCount = 0;
-
-          const [
-            allData,
-            typesData,
-            colorsData,
-            qualitiesData,
-            yarnsData,
-            countsData,
-            measurementsData,
-            attributesRes,
-          ] = await Promise.all([
-            listFabricCatalogs({ page: 1, limit: 100000 }),
-            fabricTypeApi.list({ page: 1, limit: 1000, status: 'active' }),
-            fabricColorApi.list({ page: 1, limit: 1000, status: 'active' }),
-            fabricQualityApi.list({ page: 1, limit: 1000, status: 'active' }),
-            fabricYarnApi.list({ page: 1, limit: 1000, status: 'active' }),
-            fabricCountApi.list({ page: 1, limit: 1000, status: 'active' }),
-            fabricMeasurementApi.list({ page: 1, limit: 1000, status: 'active' }),
-            fetch(`${API_BASE_URL}/product-attributes?limit=1000`),
-          ]);
-          const allFabrics = allData.results;
-          const resolveByName = <T extends { id: string; name: string }>(items: T[], label?: string) =>
-            label ? items.find((item) => item.name.trim().toLowerCase() === label.trim().toLowerCase())?.id || null : null;
-
-          let stitchTypeOptions: AttributeOptionValue[] = [];
-          if (attributesRes.ok) {
-            const attributesData = await attributesRes.json();
-            const attributes = attributesData?.results || [];
-            stitchTypeOptions = attributes
-              .filter((attr: { name?: string }) => (attr?.name || '').toLowerCase() === 'stitch type')
-              .flatMap((attr: { optionValues?: AttributeOptionValue[] }) => attr?.optionValues || []);
-          }
-
-          for (let i = 0; i < jsonData.length; i++) {
-            const row = jsonData[i];
-            try {
-              const generatedName = buildFabricCatalogName({
-                fabricTypeName: (row['Fabric Type'] || '').toString(),
-                colourName: (row['Color'] || '').toString(),
-                qualityName: (row['Quality'] || '').toString(),
-                yarnName: (row['Yarn'] || '').toString(),
-                countName: (row['Count'] || '').toString(),
-              });
-              if (!generatedName) {
-                throw new Error('Set at least one of fabric type, color, quality, yarn, or count');
-              }
-
-              const payload = {
-                fabricSortNo: (row['Fabric Sort No.'] || '').toString().trim(),
-                millOldFabricSortNo: (row['Mill Old Fabric Sort No.'] || '').toString().trim(),
-                millNewFabricSortNo: (row['Mill New Fabric Sort No.'] || '').toString().trim(),
-                fabricType: resolveByName(typesData.results, (row['Fabric Type'] || '').toString()),
-                color: resolveByName(colorsData.results, (row['Color'] || '').toString()),
-                quality: resolveByName(qualitiesData.results, (row['Quality'] || '').toString()),
-                yarn: resolveByName(yarnsData.results, (row['Yarn'] || '').toString()),
-                count: resolveByName(countsData.results, (row['Count'] || '').toString()),
-                construction: (row['Construction'] || '').toString().trim(),
-                weave: (row['Weave'] || '').toString().trim(),
-                design: normalizeFabricDesign((row['Design'] || '').toString()),
-                wash: normalizeFabricWash((row['Wash'] || '').toString()),
-                finish: normalizeFabricFinish((row['Finish'] || '').toString()),
-                stitchType: normalizeFabricStitchType(
-                  (row['Stitch Type'] || row['Stitch type'] || '').toString(),
-                  stitchTypeOptions
-                ),
-                gsm: parseNumber(row['GSM'] ?? row['GLM']),
-                gsmMeasurement: resolveByName(
-                  measurementsData.results,
-                  (row['GSM Measurement'] || row['GLM Measurement'] || '').toString()
-                ),
-                finishedWidth: parseNumber(row['Finished Width']),
-                finishedWidthMeasurement: resolveByName(
-                  measurementsData.results,
-                  (row['Finished Width Measurement'] || '').toString()
-                ),
-                rate: parseNumber(row['Rate']),
-                gst: (row['GST'] || '').toString().trim(),
-                hsnCode: (row['HSN Code'] || '').toString().trim(),
-                minQuantity: parseNumber(row['Min Quantity in Kg']),
-                status: (row['Status']?.toString()?.toLowerCase() === 'inactive' ? 'inactive' : 'active') as
-                  | 'active'
-                  | 'inactive',
-                remark: (row['Remarks'] || row['Remark'] || '').toString().trim(),
-              };
-
-              let fabricId = row['ID']?.toString().trim();
-              if (!fabricId) {
-                const found = allFabrics.find(
-                  (f) => f.name.trim().toLowerCase() === generatedName.toLowerCase()
-                );
-                if (found) fabricId = found.id;
-              }
-
-              if (fabricId) {
-                await updateFabricCatalog(fabricId, payload);
-              } else {
-                await createFabricCatalog(payload);
-              }
-              successCount++;
-            } catch {
-              errorCount++;
-            }
-            list.setImportProgress(Math.round(((i + 1) / jsonData.length) * 100));
-          }
+          const jsonData = XLSX.utils.sheet_to_json(worksheet) as FabricMasterExcelRow[];
+          const { successCount, errorCount, firstError } = await importFabricMasterRows(jsonData, (percent) => {
+            list.setImportProgress(percent);
+          });
 
           if (fileInputRef.current) fileInputRef.current.value = '';
           list.setImportProgress(null);
           toast.dismiss(loadingToast);
           if (successCount > 0) toast.success(`Successfully imported/updated ${successCount} fabrics`);
-          if (errorCount > 0) toast.error(`Failed to import/update ${errorCount} fabrics`);
+          if (errorCount > 0) {
+            toast.error(
+              firstError
+                ? `Failed to import/update ${errorCount} fabrics. ${firstError}`
+                : `Failed to import/update ${errorCount} fabrics`
+            );
+          }
           list.refresh();
         } catch {
           list.setImportProgress(null);
