@@ -30,9 +30,9 @@ export interface FabricCatalog {
   wash?: '' | 'Yes' | 'No';
   finish?: '' | 'NA' | 'N9' | 'Silverdor' | 'Anti Micobacterial';
   stitchType?: string;
-  glm?: number;
-  glmMeasurement?: string | FabricMeasurementLookup | null;
-  glmMeasurementName?: string;
+  gsm?: number;
+  gsmMeasurement?: string | FabricMeasurementLookup | null;
+  gsmMeasurementName?: string;
   finishedWidth?: number;
   finishedWidthMeasurement?: string | FabricMeasurementLookup | null;
   finishedWidthMeasurementName?: string;

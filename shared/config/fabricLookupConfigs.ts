@@ -303,7 +303,7 @@ const measurementCategories: FabricMeasurementCategory[] = ['length', 'weight', 
 export const fabricMeasurementListConfig: CatalogListConfig<FabricMeasurementLookup> = {
   segment: 'fabric-measurement',
   title: 'Fabric Measurement',
-  description: 'Manage measurement units for GLM, finished width, and other fabric fields.',
+  description: 'Manage measurement units for GSM, finished width, and other fabric fields.',
   basePath: '/catalog/fabric-measurement',
   api: fabricMeasurementApi,
   columns: [

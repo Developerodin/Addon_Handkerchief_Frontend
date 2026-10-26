@@ -52,6 +52,8 @@ interface ExcelRow {
   'Finish'?: string;
   'Stitch Type'?: string;
   'Stitch type'?: string;
+  'GSM'?: string | number;
+  'GSM Measurement'?: string;
   'GLM'?: string | number;
   'GLM Measurement'?: string;
   'Finished Width'?: string | number;
@@ -98,8 +100,8 @@ const toExportRow = (fabric: FabricCatalog) => ({
   'Wash': fabric.wash || '',
   'Finish': fabric.finish || '',
   'Stitch Type': fabric.stitchType || '',
-  'GLM': fabric.glm ?? '',
-  'GLM Measurement': fabric.glmMeasurementName || getLookupName(fabric.glmMeasurement),
+  'GSM': fabric.gsm ?? '',
+  'GSM Measurement': fabric.gsmMeasurementName || getLookupName(fabric.gsmMeasurement),
   'Finished Width': fabric.finishedWidth ?? '',
   'Finished Width Measurement':
     fabric.finishedWidthMeasurementName || getLookupName(fabric.finishedWidthMeasurement),
@@ -131,7 +133,7 @@ const fabricDataColumns: UiTableColumn<FabricCatalog>[] = [
   { key: 'wash', label: 'Wash', render: (row) => row.wash || '—' },
   { key: 'finish', label: 'Finish', render: (row) => row.finish || '—' },
   { key: 'stitchType', label: 'Stitch Type', render: (row) => row.stitchType || '—' },
-  { key: 'glm', label: 'GLM', render: (row) => (row.glm ?? '—') },
+  { key: 'gsm', label: 'GSM', render: (row) => (row.gsm ?? '—') },
   { key: 'rate', label: 'Rate', render: (row) => (row.rate ?? '—') },
 ];
 
@@ -200,8 +202,8 @@ const FabricMasterPage = () => {
           Wash: 'Yes',
           Finish: 'NA',
           'Stitch Type': 'Hem 1',
-          GLM: 60,
-          'GLM Measurement': 'GSM',
+          GSM: 60,
+          'GSM Measurement': 'GSM',
           'Finished Width': 44,
           'Finished Width Measurement': 'Inch',
           Rate: 85,
@@ -319,8 +321,11 @@ const FabricMasterPage = () => {
                   (row['Stitch Type'] || row['Stitch type'] || '').toString(),
                   stitchTypeOptions
                 ),
-                glm: parseNumber(row['GLM']),
-                glmMeasurement: resolveByName(measurementsData.results, (row['GLM Measurement'] || '').toString()),
+                gsm: parseNumber(row['GSM'] ?? row['GLM']),
+                gsmMeasurement: resolveByName(
+                  measurementsData.results,
+                  (row['GSM Measurement'] || row['GLM Measurement'] || '').toString()
+                ),
                 finishedWidth: parseNumber(row['Finished Width']),
                 finishedWidthMeasurement: resolveByName(
                   measurementsData.results,
@@ -399,7 +404,7 @@ const FabricMasterPage = () => {
         }}
         helpContent={catalogHelpBlock(
           'Fabric Master Management',
-          'Manage handkerchief fabric catalog — mill sort numbers, type, color, quality, yarn, count, design, wash, finish, stitch type, GLM, finished width, rate, HSN/GST, and remarks.',
+          'Manage handkerchief fabric catalog — mill sort numbers, type, color, quality, yarn, count, design, wash, finish, stitch type, GSM, finished width, rate, HSN/GST, and remarks.',
           [
             'Search, paginate, and export fabrics',
             'Import via Excel. Leave Name off the sheet — the server builds it from type, color, quality, yarn, and count',

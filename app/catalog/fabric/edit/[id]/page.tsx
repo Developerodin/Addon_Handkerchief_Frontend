@@ -65,8 +65,8 @@ function EditFabricPage({ params }: { params: { id: string } }) {
     wash: '',
     finish: '',
     stitchType: '',
-    glm: '',
-    glmMeasurement: '',
+    gsm: '',
+    gsmMeasurement: '',
     finishedWidth: '',
     finishedWidthMeasurement: '',
     rate: '',
@@ -139,8 +139,8 @@ function EditFabricPage({ params }: { params: { id: string } }) {
           wash: data.wash || '',
           finish: data.finish || '',
           stitchType: data.stitchType || '',
-          glm: data.glm != null ? String(data.glm) : '',
-          glmMeasurement: getLookupId(data.glmMeasurement),
+          gsm: data.gsm != null ? String(data.gsm) : '',
+          gsmMeasurement: getLookupId(data.gsmMeasurement),
           finishedWidth: data.finishedWidth != null ? String(data.finishedWidth) : '',
           finishedWidthMeasurement: getLookupId(data.finishedWidthMeasurement),
           rate: data.rate != null ? String(data.rate) : '',
@@ -197,8 +197,8 @@ function EditFabricPage({ params }: { params: { id: string } }) {
     wash: formData.wash,
     finish: formData.finish,
     stitchType: formData.stitchType,
-    glm: formData.glm === '' ? 0 : Number(formData.glm),
-    glmMeasurement: formData.glmMeasurement || null,
+    gsm: formData.gsm === '' ? 0 : Number(formData.gsm),
+    gsmMeasurement: formData.gsmMeasurement || null,
     finishedWidth: formData.finishedWidth === '' ? 0 : Number(formData.finishedWidth),
     finishedWidthMeasurement: formData.finishedWidthMeasurement || null,
     rate: formData.rate === '' ? 0 : Number(formData.rate),
@@ -294,8 +294,8 @@ function EditFabricPage({ params }: { params: { id: string } }) {
                 )}
               </select>
             </div>
-            <div><label className="form-label">GLM (weight)</label><input name="glm" className="form-control" inputMode="decimal" value={formData.glm} onChange={handleDecimalChange} /></div>
-            <CatalogLookupField label="GLM Measurement" value={formData.glmMeasurement} items={weightMeasurements} onChange={(id) => setFormData((prev) => ({ ...prev, glmMeasurement: id }))} {...fabricCatalogLookupFields.measurement} modalTitle="Select GLM Measurement" />
+            <div><label className="form-label">GSM (weight)</label><input name="gsm" className="form-control" inputMode="decimal" value={formData.gsm} onChange={handleDecimalChange} /></div>
+            <CatalogLookupField label="GSM Measurement" value={formData.gsmMeasurement} items={weightMeasurements} onChange={(id) => setFormData((prev) => ({ ...prev, gsmMeasurement: id }))} {...fabricCatalogLookupFields.measurement} modalTitle="Select GSM Measurement" />
             <div><label className="form-label">Finished Width</label><input name="finishedWidth" className="form-control" inputMode="decimal" value={formData.finishedWidth} onChange={handleDecimalChange} /></div>
             <CatalogLookupField label="Finished Width Measurement" value={formData.finishedWidthMeasurement} items={lengthMeasurements} onChange={(id) => setFormData((prev) => ({ ...prev, finishedWidthMeasurement: id }))} {...fabricCatalogLookupFields.measurement} modalTitle="Select Finished Width Measurement" />
             <div><label className="form-label">Rate</label><input name="rate" className="form-control" inputMode="decimal" value={formData.rate} onChange={handleDecimalChange} /></div>

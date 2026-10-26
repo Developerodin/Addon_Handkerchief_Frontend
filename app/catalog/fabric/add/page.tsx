@@ -57,8 +57,8 @@ const AddFabricPage = () => {
     wash: '',
     finish: '',
     stitchType: '',
-    glm: '',
-    glmMeasurement: '',
+    gsm: '',
+    gsmMeasurement: '',
     finishedWidth: '',
     finishedWidthMeasurement: '',
     rate: '',
@@ -142,8 +142,8 @@ const AddFabricPage = () => {
     wash: formData.wash,
     finish: formData.finish,
     stitchType: formData.stitchType,
-    glm: formData.glm === '' ? 0 : Number(formData.glm),
-    glmMeasurement: formData.glmMeasurement || null,
+    gsm: formData.gsm === '' ? 0 : Number(formData.gsm),
+    gsmMeasurement: formData.gsmMeasurement || null,
     finishedWidth: formData.finishedWidth === '' ? 0 : Number(formData.finishedWidth),
     finishedWidthMeasurement: formData.finishedWidthMeasurement || null,
     rate: formData.rate === '' ? 0 : Number(formData.rate),
@@ -302,16 +302,16 @@ const AddFabricPage = () => {
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">GLM (weight)</label>
-              <input name="glm" className="form-control" inputMode="decimal" value={formData.glm} onChange={handleDecimalChange} />
+              <label className="form-label">GSM (weight)</label>
+              <input name="gsm" className="form-control" inputMode="decimal" value={formData.gsm} onChange={handleDecimalChange} />
             </div>
             <CatalogLookupField
-              label="GLM Measurement"
-              value={formData.glmMeasurement}
+              label="GSM Measurement"
+              value={formData.gsmMeasurement}
               items={weightMeasurements}
-              onChange={(id) => setFormData((prev) => ({ ...prev, glmMeasurement: id }))}
+              onChange={(id) => setFormData((prev) => ({ ...prev, gsmMeasurement: id }))}
               {...fabricCatalogLookupFields.measurement}
-              modalTitle="Select GLM Measurement"
+              modalTitle="Select GSM Measurement"
             />
             <div className="form-group">
               <label className="form-label">Finished Width</label>
