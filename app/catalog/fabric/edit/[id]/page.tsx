@@ -7,7 +7,8 @@ import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMaster
 import { UiFormFooter } from '@/shared/components/ui/UiFormFooter';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { filterDecimalInput } from '@/shared/utils/formInputFilters';
-import { getFabricCatalog, getLookupId, updateFabricCatalog } from '@/shared/services/fabricCatalogService';
+import { buildFabricCatalogName, resolveFabricLookupLabel } from '@/shared/utils/fabricCatalogName';
+import { getFabricCatalog, getLookupId, getLookupName, updateFabricCatalog } from '@/shared/services/fabricCatalogService';
 import { CatalogLookupField } from '@/shared/components/catalog/CatalogLookupField';
 import { fabricCatalogLookupFields, fabricWeaveItems } from '@/shared/config/fabricCatalogLookupFields';
 import {
@@ -42,8 +43,14 @@ function EditFabricPage({ params }: { params: { id: string } }) {
   const [counts, setCounts] = useState<FabricCountLookup[]>([]);
   const [measurements, setMeasurements] = useState<FabricMeasurementLookup[]>([]);
   const [stitchTypeOptions, setStitchTypeOptions] = useState<string[]>([]);
+  const [loadedLabels, setLoadedLabels] = useState({
+    fabricType: { id: '', name: '' },
+    color: { id: '', name: '' },
+    quality: { id: '', name: '' },
+    yarn: { id: '', name: '' },
+    count: { id: '', name: '' },
+  });
   const [formData, setFormData] = useState({
-    name: '',
     fabricSortNo: '',
     millOldFabricSortNo: '',
     millNewFabricSortNo: '',
@@ -110,8 +117,14 @@ function EditFabricPage({ params }: { params: { id: string } }) {
     const fetchFabric = async () => {
       try {
         const data = await getFabricCatalog(params.id);
+        setLoadedLabels({
+          fabricType: { id: getLookupId(data.fabricType), name: data.fabricTypeName || getLookupName(data.fabricType) },
+          color: { id: getLookupId(data.color), name: data.colourName || getLookupName(data.color) },
+          quality: { id: getLookupId(data.quality), name: data.qualityName || getLookupName(data.quality) },
+          yarn: { id: getLookupId(data.yarn), name: data.yarnName || getLookupName(data.yarn) },
+          count: { id: getLookupId(data.count), name: data.countName || getLookupName(data.count) },
+        });
         setFormData({
-          name: data.name || '',
           fabricSortNo: data.fabricSortNo || '',
           millOldFabricSortNo: data.millOldFabricSortNo || '',
           millNewFabricSortNo: data.millNewFabricSortNo || '',
@@ -149,6 +162,13 @@ function EditFabricPage({ params }: { params: { id: string } }) {
 
   const weightMeasurements = measurements.filter((m) => m.category === 'weight');
   const lengthMeasurements = measurements.filter((m) => m.category === 'length');
+  const generatedName = buildFabricCatalogName({
+    fabricTypeName: resolveFabricLookupLabel(fabricTypes, formData.fabricType, loadedLabels.fabricType),
+    colourName: resolveFabricLookupLabel(colors, formData.color, loadedLabels.color),
+    qualityName: resolveFabricLookupLabel(qualities, formData.quality, loadedLabels.quality),
+    yarnName: resolveFabricLookupLabel(yarns, formData.yarn, loadedLabels.yarn),
+    countName: resolveFabricLookupLabel(counts, formData.count, loadedLabels.count),
+  });
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -163,7 +183,6 @@ function EditFabricPage({ params }: { params: { id: string } }) {
   };
 
   const buildPayload = () => ({
-    name: formData.name.trim(),
     fabricSortNo: formData.fabricSortNo.trim(),
     millOldFabricSortNo: formData.millOldFabricSortNo.trim(),
     millNewFabricSortNo: formData.millNewFabricSortNo.trim(),
@@ -192,8 +211,8 @@ function EditFabricPage({ params }: { params: { id: string } }) {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
-      alert('Name is required');
+    if (!generatedName) {
+      alert('Set at least one of fabric type, color, quality, yarn, or count');
       return;
     }
     const loadingToast = toast.loading('Updating fabric...');
@@ -229,7 +248,17 @@ function EditFabricPage({ params }: { params: { id: string } }) {
         currentLabel="Edit Fabric"
       >
         <form onSubmit={handleSubmit}>
-          <div><label htmlFor="name" className="form-label required">Name</label><input id="name" name="name" className="form-control" value={formData.name} onChange={handleInputChange} required /></div>
+          <div>
+            <label htmlFor="fabric-name" className="form-label">Name</label>
+            <input
+              id="fabric-name"
+              className="form-control"
+              value={generatedName}
+              readOnly
+              aria-readonly="true"
+              aria-label="Generated fabric name"
+            />
+          </div>
             <div><label className="form-label">Fabric Sort No.</label><input name="fabricSortNo" className="form-control" value={formData.fabricSortNo} onChange={handleInputChange} /></div>
             <div><label className="form-label">Mill Old Fabric Sort No.</label><input name="millOldFabricSortNo" className="form-control" value={formData.millOldFabricSortNo} onChange={handleInputChange} placeholder="e.g. 17223" /></div>
             <div><label className="form-label">Mill New Fabric Sort No.</label><input name="millNewFabricSortNo" className="form-control" value={formData.millNewFabricSortNo} onChange={handleInputChange} placeholder="e.g. AW0017223AB0586" /></div>

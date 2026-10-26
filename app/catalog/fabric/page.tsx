@@ -29,6 +29,7 @@ import {
   normalizeFabricWash,
 } from '@/shared/constants/handkerchiefCatalog';
 import { API_BASE_URL } from '@/shared/data/utilities/api';
+import { buildFabricCatalogName } from '@/shared/utils/fabricCatalogName';
 import {
   AttributeOptionValue,
   resolveAttributeOptionName,
@@ -36,7 +37,6 @@ import {
 
 interface ExcelRow {
   'ID'?: string;
-  'Name'?: string;
   'Fabric Sort No.'?: string;
   'Mill Old Fabric Sort No.'?: string;
   'Mill New Fabric Sort No.'?: string;
@@ -84,7 +84,6 @@ const normalizeFabricStitchType = (
 
 const toExportRow = (fabric: FabricCatalog) => ({
   'ID': fabric.id,
-  'Name': fabric.name,
   'Fabric Sort No.': fabric.fabricSortNo || '',
   'Mill Old Fabric Sort No.': fabric.millOldFabricSortNo || '',
   'Mill New Fabric Sort No.': fabric.millNewFabricSortNo || '',
@@ -187,7 +186,6 @@ const FabricMasterPage = () => {
     try {
       const sampleData = [
         {
-          Name: 'White Cotton Voile',
           'Fabric Sort No.': 'FC-VOILE-01',
           'Mill Old Fabric Sort No.': '17223',
           'Mill New Fabric Sort No.': 'AW0017223AB0586',
@@ -292,11 +290,18 @@ const FabricMasterPage = () => {
           for (let i = 0; i < jsonData.length; i++) {
             const row = jsonData[i];
             try {
-              const name = (row['Name'] || '').toString().trim();
-              if (!name) throw new Error('Name is required');
+              const generatedName = buildFabricCatalogName({
+                fabricTypeName: (row['Fabric Type'] || '').toString(),
+                colourName: (row['Color'] || '').toString(),
+                qualityName: (row['Quality'] || '').toString(),
+                yarnName: (row['Yarn'] || '').toString(),
+                countName: (row['Count'] || '').toString(),
+              });
+              if (!generatedName) {
+                throw new Error('Set at least one of fabric type, color, quality, yarn, or count');
+              }
 
               const payload = {
-                name,
                 fabricSortNo: (row['Fabric Sort No.'] || '').toString().trim(),
                 millOldFabricSortNo: (row['Mill Old Fabric Sort No.'] || '').toString().trim(),
                 millNewFabricSortNo: (row['Mill New Fabric Sort No.'] || '').toString().trim(),
@@ -334,7 +339,7 @@ const FabricMasterPage = () => {
               let fabricId = row['ID']?.toString().trim();
               if (!fabricId) {
                 const found = allFabrics.find(
-                  (f) => f.name.trim().toLowerCase() === name.toLowerCase()
+                  (f) => f.name.trim().toLowerCase() === generatedName.toLowerCase()
                 );
                 if (found) fabricId = found.id;
               }
@@ -397,7 +402,7 @@ const FabricMasterPage = () => {
           'Manage handkerchief fabric catalog — mill sort numbers, type, color, quality, yarn, count, design, wash, finish, stitch type, GLM, finished width, rate, HSN/GST, and remarks.',
           [
             'Search, paginate, and export fabrics',
-            'Import via Excel (upsert by ID or name; resolve lookups and Stitch Type from attributes master)',
+            'Import via Excel. Leave Name off the sheet — the server builds it from type, color, quality, yarn, and count',
             'Add, edit, or delete fabric records',
           ]
         )}

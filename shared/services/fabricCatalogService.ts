@@ -67,7 +67,9 @@ export interface FabricCatalogQueryParams {
   status?: 'active' | 'inactive' | string;
 }
 
-export type CreateFabricCatalogPayload = Omit<FabricCatalog, 'id' | 'createdAt' | 'updatedAt'>;
+export type CreateFabricCatalogPayload = Omit<FabricCatalog, 'id' | 'createdAt' | 'updatedAt' | 'name'> & {
+  name?: string;
+};
 
 export type UpdateFabricCatalogPayload = Partial<CreateFabricCatalogPayload>;
 

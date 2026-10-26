@@ -7,6 +7,7 @@ import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMaster
 import { UiFormFooter } from '@/shared/components/ui/UiFormFooter';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { filterDecimalInput } from '@/shared/utils/formInputFilters';
+import { buildFabricCatalogName, resolveFabricLookupLabel } from '@/shared/utils/fabricCatalogName';
 import { createFabricCatalog } from '@/shared/services/fabricCatalogService';
 import { CatalogLookupField } from '@/shared/components/catalog/CatalogLookupField';
 import { fabricCatalogLookupFields, fabricWeaveItems } from '@/shared/config/fabricCatalogLookupFields';
@@ -42,7 +43,6 @@ const AddFabricPage = () => {
   const [measurements, setMeasurements] = useState<FabricMeasurementLookup[]>([]);
   const [stitchTypeOptions, setStitchTypeOptions] = useState<string[]>([]);
   const [formData, setFormData] = useState({
-    name: '',
     fabricSortNo: '',
     millOldFabricSortNo: '',
     millNewFabricSortNo: '',
@@ -107,6 +107,13 @@ const AddFabricPage = () => {
 
   const weightMeasurements = measurements.filter((m) => m.category === 'weight');
   const lengthMeasurements = measurements.filter((m) => m.category === 'length');
+  const generatedName = buildFabricCatalogName({
+    fabricTypeName: resolveFabricLookupLabel(fabricTypes, formData.fabricType),
+    colourName: resolveFabricLookupLabel(colors, formData.color),
+    qualityName: resolveFabricLookupLabel(qualities, formData.quality),
+    yarnName: resolveFabricLookupLabel(yarns, formData.yarn),
+    countName: resolveFabricLookupLabel(counts, formData.count),
+  });
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -121,7 +128,6 @@ const AddFabricPage = () => {
   };
 
   const buildPayload = () => ({
-    name: formData.name.trim(),
     fabricSortNo: formData.fabricSortNo.trim(),
     millOldFabricSortNo: formData.millOldFabricSortNo.trim(),
     millNewFabricSortNo: formData.millNewFabricSortNo.trim(),
@@ -150,8 +156,8 @@ const AddFabricPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
-      alert('Name is required');
+    if (!generatedName) {
+      alert('Set at least one of fabric type, color, quality, yarn, or count');
       return;
     }
     try {
@@ -178,9 +184,17 @@ const AddFabricPage = () => {
       >
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="name" className="form-label required">Name</label>
-              <input name="name" className="form-control" value={formData.name} onChange={handleInputChange} required />
-            </div>
+            <label htmlFor="fabric-name" className="form-label">Name</label>
+            <input
+              id="fabric-name"
+              className="form-control"
+              value={generatedName}
+              readOnly
+              aria-readonly="true"
+              aria-label="Generated fabric name"
+              placeholder="Select type, color, quality, yarn, or count"
+            />
+          </div>
             <div className="form-group">
               <label className="form-label">Fabric Sort No.</label>
               <input name="fabricSortNo" className="form-control" value={formData.fabricSortNo} onChange={handleInputChange} />
