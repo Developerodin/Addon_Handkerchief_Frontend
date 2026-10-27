@@ -38,7 +38,7 @@ function SelectAllCheckbox({
 
 export interface UiTableColumn<T> {
   key: string;
-  label: string;
+  label: React.ReactNode;
   align?: 'left' | 'right' | 'center';
   headerClassName?: string;
   cellClassName?: string;
@@ -61,6 +61,7 @@ export interface UiTableProps<T> {
     getRowId: (row: T) => string;
   };
   onRowClick?: (row: T) => void;
+  rowClassName?: (row: T) => string | undefined;
 }
 
 export function UiTable<T>({
@@ -70,6 +71,7 @@ export function UiTable<T>({
   className,
   selectable,
   onRowClick,
+  rowClassName,
 }: UiTableProps<T>) {
   return (
     <div className="ui-table-wrap overflow-x-auto min-h-[300px]">
@@ -108,7 +110,7 @@ export function UiTable<T>({
             return (
               <tr
                 key={id}
-                className={cn('ui-table__row group', onRowClick && 'ui-table__row--clickable')}
+                className={cn('ui-table__row group', rowClassName?.(row), onRowClick && 'ui-table__row--clickable')}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
               >
                 {selectable ? (

@@ -24,6 +24,7 @@ export function ProcessLotTable({
   onActivate,
   onSaved,
   onPrint,
+  onBrowserPrint,
 }: {
   lotNumber: string;
   rolls: RollRow[];
@@ -32,6 +33,7 @@ export function ProcessLotTable({
   onActivate: (roll: RollRow) => void;
   onSaved: (roll: RollRow) => void;
   onPrint: () => void;
+  onBrowserPrint: () => void;
 }) {
   const weighed = rolls.filter((roll) => Number(roll.netWeight) > 0).length;
 
@@ -47,15 +49,27 @@ export function ProcessLotTable({
           <span className="text-[10px] text-gray-500">({rolls.length} roll{rolls.length === 1 ? '' : 's'})</span>
           <span className="text-[10px] text-gray-400">{weighed}/{rolls.length} weighed</span>
         </div>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded bg-primary px-2.5 py-1 text-[10px] font-bold text-white disabled:opacity-50"
-          disabled={printing}
-          onClick={onPrint}
-        >
-          <i className="ri-printer-line" aria-hidden />
-          Print
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded bg-primary px-2.5 py-1 text-[10px] font-bold text-white disabled:opacity-50"
+            disabled={printing}
+            onClick={onPrint}
+            aria-label={`Print lot ${lotNumber} with QZ Tray`}
+          >
+            <i className="ri-printer-line" aria-hidden />
+            Print
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2.5 py-1 text-[10px] font-bold text-gray-700 disabled:opacity-50"
+            onClick={onBrowserPrint}
+            aria-label={`Preview lot ${lotNumber} on A4`}
+          >
+            <i className="ri-printer-line" aria-hidden />
+            A4
+          </button>
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full border-collapse text-xs">

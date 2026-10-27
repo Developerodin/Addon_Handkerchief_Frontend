@@ -191,6 +191,7 @@ export interface OrderLineRow {
     currency?: string;
     calculationPolicy?: string;
   } | null;
+  fabricIssueStatus?: 'open' | 'completed';
   floors?: FloorStep[];
   segments?: { revisionId: string; qty: number; completedQty: number }[];
 }
@@ -239,6 +240,24 @@ export interface ArticleLineRow {
   priority?: string;
   progress: number;
   revisionId?: string;
+}
+
+export interface FabricIssueRow {
+  id: string;
+  orderId: string;
+  orderNumber?: string;
+  lineId: string;
+  bomLineId: string;
+  fabricCatalogId?: string;
+  fabricName: string;
+  barcode: string;
+  netWeight: number;
+  scaleWeight: number;
+  fromLocation: string;
+  articleName?: string;
+  factoryCode?: string;
+  userName?: string;
+  createdAt?: string;
 }
 
 export interface FabricEstimateRow {

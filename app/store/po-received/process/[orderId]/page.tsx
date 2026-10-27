@@ -8,6 +8,7 @@ import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermissio
 import { factoryRequest, PageResult, PurchaseOrderRow, RollRow } from '@/shared/services/factoryApi';
 import { formatInr } from '../../../purchase-orders/add/purchaseOrderFormModel';
 import { orderTotal } from '../../goodsReceivedModel';
+import { A4BarcodePreview, A4PreviewLabel } from '@/shared/components/print/A4BarcodePreview';
 import { ProcessLotTable } from '../ProcessLotTable';
 import { connectQz, isQzConnected, printRollLabels, RollLabel } from '@/shared/utils/qzRollPrint';
 
@@ -40,6 +41,7 @@ export default function ProcessOrderPage() {
   const [connecting, setConnecting] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [itemsOpen, setItemsOpen] = useState(false);
+  const [preview, setPreview] = useState<A4PreviewLabel[] | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -103,6 +105,32 @@ export default function ProcessOrderPage() {
   };
 
   /**
+   * Opens the A4 preview for these rolls. Printing happens from that dialog.
+   */
+  const openPreview = (rows: RollRow[]) => {
+    const supplier = [order?.supplierName, order?.supplierAddress].filter(Boolean).join(', ') || '—';
+    setPreview(rows.map((roll) => {
+      const label = labelFor(roll);
+      const line = (order?.lines || []).find((item) => item.lineId === roll.lineId);
+      const fabric = [label.fabricName || line?.fabricName, line?.fabricTypeName, label.colourName || line?.colourName, line?.fabricSortNo].filter(Boolean).join(' · ') || '—';
+      return {
+        id: roll.id,
+        name: label.rollCode,
+        detail: label.barcode,
+        title: label.rollCode,
+        subtitle: '',
+        lines: [
+          `Fabric: ${fabric}`,
+          `Lot: ${label.lotNumber || '—'}`,
+          `PO: ${roll.poNumber || order?.number || '—'}`,
+          `Supplier: ${supplier}`,
+        ],
+        barcode: label.barcode,
+      };
+    }));
+  };
+
+  /**
    * Prints the given rolls. Connects first when the websocket is down.
    */
   const printLabels = async (rows: RollRow[]) => {
@@ -158,9 +186,13 @@ export default function ProcessOrderPage() {
             <button type="button" className="rounded border border-gray-300 bg-white px-3 py-1.5 text-[11px] font-bold text-gray-700 disabled:opacity-50" disabled={connecting} onClick={connect}>
               {connecting ? 'Connecting…' : 'Connect'}
             </button>
-            <button type="button" className="inline-flex items-center gap-1 rounded bg-primary px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50" disabled={printing || !rolls.length} onClick={() => printLabels(rolls)}>
+            <button type="button" className="inline-flex items-center gap-1 rounded bg-primary px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50" disabled={printing || !rolls.length} onClick={() => printLabels(rolls)} aria-label="Print all barcodes with QZ Tray">
               <i className={printing ? 'ri-loader-4-line animate-spin' : 'ri-printer-line'} aria-hidden />
               {printing ? 'Printing…' : 'Print all barcodes'}
+            </button>
+            <button type="button" className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-3 py-1.5 text-[11px] font-bold text-gray-700 disabled:opacity-50" disabled={!rolls.length} onClick={() => openPreview(rolls)} aria-label="Preview barcodes on A4">
+              <i className="ri-printer-line" aria-hidden />
+              A4 preview
             </button>
           </div>
         </header>
@@ -226,6 +258,8 @@ export default function ProcessOrderPage() {
           </section>
         ) : null}
 
+        {preview ? <A4BarcodePreview labels={preview} onClose={() => setPreview(null)} /> : null}
+
         <section className="space-y-4">
           <h2 className="text-sm font-semibold text-gray-800">Rolls ({rolls.length})</h2>
           <label className="block text-[10px] font-bold uppercase tracking-wide text-gray-500" htmlFor="roll-scan">Scan barcode</label>
@@ -249,6 +283,7 @@ export default function ProcessOrderPage() {
               onActivate={(roll) => setActiveId(roll.id)}
               onSaved={(saved) => setRolls((current) => current.map((row) => (row.id === saved.id ? { ...row, ...saved } : row)))}
               onPrint={() => printLabels(rows)}
+              onBrowserPrint={() => openPreview(rows)}
             />
           )) : <p className="text-sm text-gray-500">No roll barcodes yet. Use Process on the PO received list.</p>}
         </section>

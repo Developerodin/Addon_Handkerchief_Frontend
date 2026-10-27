@@ -8,7 +8,8 @@ import { RackFilterPanel } from './RackFilterPanel';
 import { AddRacksDrawer } from './AddRacksDrawer';
 import { PlaceRollDrawer } from './PlaceRollDrawer';
 import { RackReportDrawer } from './RackReportDrawer';
-import { downloadRacksExcel, printRackBarcodes } from './rackBarcode';
+import { A4BarcodePreview, A4PreviewLabel } from '@/shared/components/print/A4BarcodePreview';
+import { downloadRacksExcel } from './rackBarcode';
 
 const PAGE_SIZE = 24;
 const outline = 'inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50';
@@ -29,6 +30,7 @@ export function RackLayout() {
   const [placing, setPlacing] = useState<RollRow | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [barcodePreview, setBarcodePreview] = useState<A4PreviewLabel[] | null>(null);
   const [active, setActive] = useState<StorageRackCard | null>(null);
   const [rolls, setRolls] = useState<RollRow[]>([]);
   const [history, setHistory] = useState<RackMove[]>([]);
@@ -103,19 +105,29 @@ export function RackLayout() {
   };
 
   /**
-   * Prints or downloads the filtered racks. Empty filters still cover the full list.
+   * Downloads the filtered racks. Empty filters still cover the full list.
    */
-  const runExport = (kind: 'excel' | 'print') => {
+  const downloadExcel = () => {
     if (!filtered.length) {
       toast.error('No racks to export');
       return;
     }
     try {
-      if (kind === 'excel') downloadRacksExcel(filtered);
-      else printRackBarcodes(filtered);
+      downloadRacksExcel(filtered);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not export racks');
     }
+  };
+
+  /**
+   * Opens the A4 preview for the racks currently in the list.
+   */
+  const openBarcodePreview = () => {
+    if (!filtered.length) {
+      toast.error('No racks to print');
+      return;
+    }
+    setBarcodePreview(filtered.map(rackPreviewLabel));
   };
 
   return (
@@ -156,13 +168,13 @@ export function RackLayout() {
         <button type="button" className={outline} onClick={() => setAddOpen(true)}>
           <i className="ri-add-line" aria-hidden /> Add racks
         </button>
-        <button type="button" className={outline} onClick={() => runExport('excel')}>
+        <button type="button" className={outline} onClick={downloadExcel}>
           <i className="ri-file-excel-2-line text-emerald-600" aria-hidden /> Download Excel
         </button>
         <button type="button" className={outline} onClick={() => setReportOpen(true)}>
           <i className="ri-file-list-3-line text-primary" aria-hidden /> Report
         </button>
-        <button type="button" className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-[11px] font-bold text-white" onClick={() => runExport('print')}>
+        <button type="button" className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-[11px] font-bold text-white" aria-label="Preview rack barcodes on A4" onClick={openBarcodePreview}>
           <i className="ri-barcode-line" aria-hidden /> Print barcode
         </button>
       </div>
@@ -229,8 +241,18 @@ export function RackLayout() {
         />
       ) : null}
       {reportOpen ? <RackReportDrawer onClose={() => setReportOpen(false)} /> : null}
+      {barcodePreview ? <A4BarcodePreview labels={barcodePreview} onClose={() => setBarcodePreview(null)} /> : null}
     </div>
   );
+}
+
+/**
+ * Rack sticker for the A4 preview. The barcode is the rack barcode, or the rack code when none is set.
+ */
+function rackPreviewLabel(rack: StorageRackCard): A4PreviewLabel {
+  const barcode = rack.barcode || rack.code;
+  const subtitle = [rack.name && rack.name !== rack.code ? rack.name : '', rack.zone, rack.floor].filter(Boolean).join(' · ');
+  return { id: rack.code, name: rack.code, detail: barcode, title: rack.code, subtitle, barcode };
 }
 
 /**
