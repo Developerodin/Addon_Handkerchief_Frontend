@@ -10,6 +10,9 @@ import { UiIconButton, UiListEmpty, UiListError, UiListLoading, UiPagination, Ui
 import { useFactoryList } from '@/shared/hooks/useFactoryList';
 import { factoryRequest, OrderDetail, ProductionOrderRow } from '@/shared/services/factoryApi';
 import { ArticleViewTab, FabricEstimationTab, UpcomingTab } from './OrderExtraTabs';
+import { FabricIssueFigures } from '@/app/store/issue/FabricIssueFigures';
+import { issueBadge } from '@/app/store/issue/fabricIssueMath';
+import { IssueStatusBadge } from '@/app/store/issue/IssueStatusBadge';
 import { orderDateLabel, orderStatusLabel, priorityTone } from './orderLabels';
 import { OrderView } from './OrderView';
 
@@ -298,11 +301,19 @@ export default function ProductionOrdersPage() {
                   {
                     key: 'priority',
                     label: 'Priority',
-                    render: (row) => (
-                      <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${priorityTone(row.priority)}`}>
-                        {row.priority || 'Medium'}
-                      </span>
-                    ),
+                    render: (row) => {
+                      const summary = row.fabricIssue || { status: 'not-issued' as const, rolls: 0, weightKg: 0, requiredMetres: 0 };
+                      const badge = issueBadge(summary);
+                      return (
+                        <span className="grid gap-1">
+                          <span className={`inline-flex w-fit items-center rounded px-2 py-0.5 text-[10px] font-medium ${priorityTone(row.priority)}`}>
+                            {row.priority || 'Medium'}
+                          </span>
+                          <IssueStatusBadge status={badge.status} label={badge.label} />
+                          <FabricIssueFigures summary={summary} />
+                        </span>
+                      );
+                    },
                   },
                   {
                     key: 'actions',

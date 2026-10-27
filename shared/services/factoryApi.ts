@@ -206,6 +206,13 @@ export interface FloorStep {
   transferredQty?: number;
 }
 
+export interface FabricIssueSummary {
+  status: 'not-issued' | 'in-progress' | 'all-issued';
+  rolls: number;
+  weightKg: number;
+  requiredMetres: number;
+}
+
 export interface ProductionOrderRow {
   id: string;
   orderNumber?: string;
@@ -225,6 +232,7 @@ export interface ProductionOrderRow {
   floors?: FloorStep[];
   segments: { revisionId: string; qty: number; completedQty: number }[];
   lines?: OrderLineRow[];
+  fabricIssue?: FabricIssueSummary;
 }
 
 export interface ArticleLineRow {

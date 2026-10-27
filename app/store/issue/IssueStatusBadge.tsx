@@ -10,10 +10,10 @@ const TONE: Record<IssueStatus, string> = {
 /**
  * Status word with a tint. The word is the signal. The color is extra.
  */
-export function IssueStatusBadge({ status }: { status: IssueStatus }) {
+export function IssueStatusBadge({ status, label }: { status: IssueStatus; label?: string }) {
   return (
     <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold ${TONE[status]}`}>
-      {status}
+      {label || status}
     </span>
   );
 }

@@ -24,6 +24,7 @@ export default function IssuePage() {
   const [selectedId, setSelectedId] = useState('');
   const [articleId, setArticleId] = useState('');
   const [issues, setIssues] = useState<FabricIssueRow[]>([]);
+  const [issuesReady, setIssuesReady] = useState(false);
   const [issueError, setIssueError] = useState('');
   const [issueTick, setIssueTick] = useState(0);
   const [estimates, setEstimates] = useState<FabricEstimateRow[]>([]);
@@ -54,12 +55,14 @@ export default function IssuePage() {
       .then((data) => {
         if (!cancelled) {
           setIssues(data.results || []);
+          setIssuesReady(true);
           setIssueError('');
         }
       })
       .catch((err) => {
         if (!cancelled) {
           setIssues([]);
+          setIssuesReady(true);
           setIssueError(err instanceof Error ? err.message : 'Could not load issues');
         }
       });
@@ -152,6 +155,7 @@ export default function IssuePage() {
             <OrderRail
               orders={openOrders}
               issues={issues}
+              issuesReady={issuesReady}
               loading={orders.loading}
               error={orders.error || ''}
               search={orders.search}

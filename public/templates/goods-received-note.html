@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goods Received Note</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            margin: 10px;
+            color: #000;
+            background-color: #fff;
+            line-height: 1.2;
+        }
+
+        .grn-container {
+            width: 100%;
+            border: 1px solid #000;
+            box-sizing: border-box;
+            padding: 0;
+        }
+
+        .header-title {
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+            text-transform: uppercase;
+            padding: 5px 0;
+            border-bottom: 1px solid #000;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        td,
+        th {
+            border: 1px solid #000;
+            padding: 2px 4px;
+            vertical-align: top;
+            word-wrap: break-word;
+        }
+
+
+        .no-border-top {
+            border-top: none;
+        }
+
+        .no-border-bottom {
+            border-bottom: none;
+        }
+
+        .no-border-left {
+            border-left: none;
+        }
+
+        .no-border-right {
+            border-right: none;
+        }
+
+        .label-cell {
+            font-weight: normal;
+            font-size: 8px;
+            color: #333;
+            margin-bottom: 1px;
+        }
+
+        .value-cell {
+            font-weight: bold;
+            font-size: 9px;
+        }
+
+        .company-name {
+            font-weight: bold;
+            font-size: 10px;
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        /* Column Widths for Items Table */
+        .col-sr {
+            width: 4%;
+        }
+
+        .col-color {
+            width: 13%;
+            min-width: 88px;
+            font-size: 8px;
+            line-height: 1.25;
+            word-break: break-word;
+        }
+
+        .col-desc {
+            width: 26%;
+        }
+
+        .col-hsn {
+            width: 9%;
+        }
+
+        .col-qty {
+            width: 11%;
+        }
+
+        .col-rate {
+            width: 10%;
+        }
+
+        .col-per {
+            width: 7%;
+        }
+
+        .col-amount {
+            width: 20%;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-bold {
+            font-weight: bold;
+        }
+
+        .items-table th {
+            background-color: #f8f9fa;
+            font-size: 9px;
+        }
+
+        .items-table td {
+            height: 20px;
+        }
+
+        .tax-table {
+            margin-top: -1px;
+            /* Align with previous table border */
+        }
+
+        .footer-section {
+            padding: 6px;
+            border-top: 1px solid #000;
+        }
+
+        .declaration {
+            font-size: 9px;
+            margin-top: 5px;
+        }
+
+        .signature-area {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            border-top: 1px solid #000;
+            padding-top: 5px;
+        }
+
+        .sig-box {
+            text-align: center;
+            width: 30%;
+        }
+
+        .sig-box-authorised {
+            border: 1px solid #000;
+            padding: 8px 4px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            min-height: 72px;
+            box-sizing: border-box;
+            width: 38%;
+        }
+
+        .sig-box:not(.sig-box-authorised) {
+            width: 31%;
+        }
+
+        .sig-for-company {
+            font-size: 7px;
+            font-weight: bold;
+            text-align: center;
+            line-height: 1.2;
+            width: 100%;
+            margin-bottom: 8px;
+            white-space: nowrap;
+        }
+
+        .sig-label {
+            margin-top: auto;
+            font-weight: bold;
+            width: 100%;
+            text-align: center;
+        }
+
+        /* Use the paper size chosen in the print dialog. Repeat the item header on each page. */
+        @page {
+            size: auto;
+            margin: 8mm;
+        }
+
+        @media print {
+            html,
+            body {
+                margin: 0;
+                background: #fff;
+            }
+
+            .items-table thead,
+            .tax-table thead {
+                display: table-header-group;
+            }
+
+            .grn-container {
+                break-inside: auto;
+            }
+        }
+
+    </style>
+</head>
+
+<body>
+    <div class="grn-container">
+        <!-- Addon company block — populated from consignee snapshot -->
+        <div style="text-align: center; border-bottom: 1px solid #000; padding: 6px 5px;">
+            <div style="font-size: 14px; font-weight: 900; letter-spacing: 0.5px; margin-bottom: 4px;" id="consignee-name">
+                ADDON HOLDINGS PRIVATE LIMITED
+            </div>
+            <div style="font-size: 8px; line-height: 1.35;">
+                <b>Address:</b> <span id="consignee-address"></span><br>
+                <b>H.O:</b> <span id="consignee-head-office"></span><br>
+                <span style="margin-top: 2px; display: inline-block;">
+                    <b>Contact:</b> <span id="consignee-contact"></span> &nbsp;|&nbsp;
+                    <b>GST:</b> <span id="consignee-gst">27AAACA8827A1ZZ</span> &nbsp;|&nbsp;
+                    <b>State Code:</b> <span id="consignee-state-code">27</span> &nbsp;|&nbsp;
+                    <b>Email:</b> <span id="consignee-email"></span>
+                </span>
+            </div>
+        </div>
+
+        <div class="header-title" id="page-title">GOODS RECEIPT NOTE</div>
+
+        <table class="header-grid">
+            <tr>
+                <td colspan="4" rowspan="3" style="width: 50%;">
+                    <div class="label-cell">VENDOR NAME & ADDRESS</div>
+                    <div class="company-name" id="supplier-name">SUTLEJ TEXTILES AND INDUSTRIES LIM</div>
+                    <div id="supplier-address">
+                        UNIT-CHENAB TEXTILE MILLS National<br>
+                        Highway-1A, KATHUA 184102 JAMMU AND<br>
+                        KASMIR - 184102
+                    </div>
+                    <div style="margin-top: 5px;">
+                        <b>E-Mail:</b> <span id="supplier-email"></span><br>
+                        <b>MOB :</b> <span id="supplier-mob">9906010795</span><br>
+                        <b>GST :</b> <span id="supplier-gst">01AAJCS1850N1ZA</span>
+                    </div>
+                </td>
+                <td colspan="2" style="width: 25%; height: 22px;">
+                    <div class="label-cell">PO NO.</div>
+                    <div class="value-cell" id="po-no">P/25-26/00702</div>
+                </td>
+                <td colspan="2" style="width: 25%; height: 22px;">
+                    <div class="label-cell">PO Date</div>
+                    <div class="value-cell" id="po-date">16-02-2026</div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="height: 22px;">
+                    <div class="label-cell">Vendor Invoice NO.</div>
+                    <div class="value-cell" id="vendor-invoice-no"></div>
+                </td>
+                <td colspan="2" style="height: 22px;">
+                    <div class="label-cell">Vendor Invoice Date</div>
+                    <div class="value-cell" id="vendor-invoice-date"></div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="height: 22px;">
+                    <div class="label-cell">GRN NO.</div>
+                    <div class="value-cell" id="grn-no"></div>
+                </td>
+                <td colspan="2" style="height: 22px;">
+                    <div class="label-cell">GRN DATE</div>
+                    <div class="value-cell" id="grn-date"></div>
+                </td>
+            </tr>
+        </table>
+
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th class="col-sr">SR.<br>No.</th>
+                    <th class="col-color">SHADE CODE</th>
+                    <th class="col-desc">DESCRIPTION OF GOODS</th>
+                    <th class="col-hsn">HSN<br>CODE</th>
+                    <th class="col-qty">RECEIVED<br>QTY</th>
+                    <th class="col-rate">RATE</th>
+                    <th class="col-per">PER</th>
+                    <th class="col-amount">AMOUNT</th>
+                </tr>
+            </thead>
+            <tbody id="items-body">
+                <!-- Rows will be injected here -->
+                <tr>
+                    <td class="text-center col-sr">1</td>
+                    <td class="text-center col-color">N/A</td>
+                    <td class="col-desc">Example Yarn Description</td>
+                    <td class="text-center">—</td>
+                    <td class="text-right">0.00</td>
+                    <td class="text-right">0.00</td>
+                    <td class="text-center">KGS</td>
+                    <td class="text-right">0.00</td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="4" class="text-right text-bold">TOTAL RECEIVED QTY :</td>
+                    <td class="text-right text-bold" id="total-qty">0.0000</td>
+                    <td colspan="2" class="text-right text-bold">BASIC VALUE</td>
+                    <td class="text-right text-bold" id="total-amount">0.00</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <!-- Tax Table Section -->
+        <table class="tax-table">
+            <thead>
+                <tr>
+                    <th style="width: 18%;"></th>
+                    <th style="width: 14%;">Rate</th>
+                    <th style="width: 16%;">Taxable Value</th>
+                    <th style="width: 18%;">SGST</th>
+                    <th style="width: 18%;">CGST</th>
+                    <th style="width: 18%;">IGST</th>
+                </tr>
+                <tr>
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    <th>Amount</th>
+                    <th>Amount</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody id="tax-body">
+                <tr>
+                    <td></td>
+                    <td class="text-center" id="tax-rate-label">IGST 5.0%</td>
+                    <td class="text-right" id="taxable-value">0.00</td>
+                    <td class="text-right" id="sgst-amount">0.00</td>
+                    <td class="text-right" id="cgst-amount">0.00</td>
+                    <td class="text-right" id="igst-amount">0.00</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Summary of Charges -->
+        <table class="tax-table" id="summary-table">
+            <tbody>
+                <tr id="row-basic-value">
+                    <td style="width: 70%;" class="text-bold">Basic Value</td>
+                    <td class="text-right" id="basic-value">0.00</td>
+                </tr>
+                <tr id="row-discount">
+                    <td class="text-bold">Discount (−)</td>
+                    <td class="text-right" id="discount-amount">0.00</td>
+                </tr>
+                <tr id="row-taxable-value">
+                    <td class="text-bold">Taxable Value</td>
+                    <td class="text-right" id="taxable-value-after-discount">0.00</td>
+                </tr>
+                <tr id="row-freight">
+                    <td class="text-bold">Freight / Shipping</td>
+                    <td class="text-right" id="freight-amount">0.00</td>
+                </tr>
+                <tr id="row-freight-gst">
+                    <td class="text-bold">Freight GST</td>
+                    <td class="text-right" id="freight-gst-amount">0.00</td>
+                </tr>
+                <tr id="row-round-off">
+                    <td class="text-bold">Round Off</td>
+                    <td class="text-right" id="round-off-amount">0.00</td>
+                </tr>
+                <tr>
+                    <td class="text-bold" style="font-size: 11px;">FINAL TOTAL</td>
+                    <td class="text-right text-bold" id="grand-total" style="font-size: 11px;">0.00</td>
+                </tr>
+                <tr>
+                    <td colspan="2" style="font-size: 9px; font-style: italic; padding-top: 4px;">
+                        <span id="amount-in-words"></span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="footer-section">
+            <div style="margin-bottom: 6px;">
+                <b>Narration:</b> <span id="narration"></span>
+            </div>
+            <div style="margin-bottom: 8px; min-height: 80px;">
+                <b>Discrepancy Details:</b> <span id="discrepancy-details"></span>
+            </div>
+
+            <div class="signature-area">
+                <div class="sig-box">
+                    <div class="sig-label">Prepared by</div>
+                </div>
+                <div class="sig-box">
+                    <div class="sig-label">Verified by</div>
+                </div>
+                <div class="sig-box sig-box-authorised">
+                    <div class="sig-for-company">For <span id="signatory-company-name">ADDON HOLDINGS PRIVATE LIMITED</span></div>
+                    <div class="sig-label">Authorised Signatory</div>
+                </div>
+            </div>
+
+            <div class="bottom-note"></div>
+        </div>
+    </div>
+    <div style="text-align: center; font-size: 11px; margin-top: 8px;"><b>This is a computer generated document.</b></div>
+</body>
+
+</html>

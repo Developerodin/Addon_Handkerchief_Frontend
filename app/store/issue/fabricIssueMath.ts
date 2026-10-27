@@ -1,4 +1,4 @@
-import { FabricEstimateRow, FabricIssueRow, OrderLineRow, ProductionOrderRow } from '@/shared/services/factoryApi';
+import { FabricEstimateRow, FabricIssueRow, FabricIssueSummary, OrderLineRow, ProductionOrderRow } from '@/shared/services/factoryApi';
 
 export type IssueStatus = 'Not issued' | 'In progress' | 'Complete';
 
@@ -101,6 +101,33 @@ export function orderIssueStatus(order: ProductionOrderRow, issues: FabricIssueR
   if (lines.length > 0 && lines.every((line) => line.fabricIssueStatus === 'completed')) return 'Complete';
   if (mine.length > 0 || lines.some((line) => line.fabricIssueStatus === 'completed')) return 'In progress';
   return 'Not issued';
+}
+
+const EMPTY_ISSUE: FabricIssueSummary = { status: 'not-issued', rolls: 0, weightKg: 0, requiredMetres: 0 };
+
+/**
+ * Badge tone plus the word shown on an order. Complete reads as all issued.
+ */
+export function issueBadge(summary: FabricIssueSummary): { status: IssueStatus; label: string } {
+  if (summary.status === 'all-issued') return { status: 'Complete', label: 'All issued' };
+  if (summary.status === 'in-progress') return { status: 'In progress', label: 'In progress' };
+  return { status: 'Not issued', label: 'Not issued' };
+}
+
+/**
+ * Live totals from the rolls already loaded. Falls back to the order payload before that load finishes.
+ */
+export function liveIssueSummary(order: ProductionOrderRow, issues: FabricIssueRow[], ready: boolean): FabricIssueSummary {
+  if (!ready) return order.fabricIssue || EMPTY_ISSUE;
+  const mine = issues.filter((row) => row.orderId === order.id);
+  const fromLines = Math.round(buildFabricLines(order, []).reduce((sum, line) => sum + line.requiredMetres, 0) * 1000) / 1000;
+  const status = orderIssueStatus(order, issues);
+  return {
+    status: status === 'Complete' ? 'all-issued' : status === 'In progress' ? 'in-progress' : 'not-issued',
+    rolls: mine.length,
+    weightKg: Math.round(issuedWeight(mine) * 100) / 100,
+    requiredMetres: fromLines || order.fabricIssue?.requiredMetres || 0,
+  };
 }
 
 /**

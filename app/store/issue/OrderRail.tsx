@@ -3,15 +3,17 @@
 import React from 'react';
 import { ProductionOrderRow, FabricIssueRow } from '@/shared/services/factoryApi';
 import { UiSearchInput } from '@/shared/components/ui';
-import { formatOrderDate, orderIssueStatus } from './fabricIssueMath';
+import { formatOrderDate, issueBadge, liveIssueSummary } from './fabricIssueMath';
+import { FabricIssueFigures } from './FabricIssueFigures';
 import { IssueStatusBadge } from './IssueStatusBadge';
 
 /**
- * Open production orders. The card status follows issued rolls, not metres.
+ * Open production orders. The card shows issued rolls, issued weight, and metres left.
  */
 export function OrderRail({
   orders,
   issues,
+  issuesReady,
   loading,
   error,
   search,
@@ -21,6 +23,7 @@ export function OrderRail({
 }: {
   orders: ProductionOrderRow[];
   issues: FabricIssueRow[];
+  issuesReady: boolean;
   loading: boolean;
   error: string;
   search: string;
@@ -52,7 +55,8 @@ export function OrderRail({
         <ul className="grid gap-2">
           {orders.map((order) => {
             const selected = order.id === selectedId;
-            const status = orderIssueStatus(order, issues);
+            const summary = liveIssueSummary(order, issues, issuesReady);
+            const badge = issueBadge(summary);
             return (
               <li key={order.id}>
                 <button
@@ -65,10 +69,13 @@ export function OrderRail({
                 >
                   <span className="flex items-start justify-between gap-2">
                     <span className="text-sm font-bold text-[#111827]">{order.orderNumber || 'Order'}</span>
-                    <IssueStatusBadge status={status} />
+                    <IssueStatusBadge status={badge.status} label={badge.label} />
                   </span>
                   <span className="mt-1 block text-xs text-[#4B5563]">
                     {[order.orderNote, formatOrderDate(order.orderDate)].filter(Boolean).join(' · ') || order.buyer || 'No note'}
+                  </span>
+                  <span className="mt-1 block">
+                    <FabricIssueFigures summary={summary} />
                   </span>
                 </button>
               </li>

@@ -2,8 +2,7 @@
 
 import React, { useState } from 'react';
 import { factoryRequest, PurchaseOrderRow, ReceiptRow, RollRow } from '@/shared/services/factoryApi';
-import { downloadHtmlDocument, printHtmlDocument } from '@/shared/utils/printHtmlDocument';
-import { grnBody } from './grnDocument';
+import { downloadFabricGrn, printFabricGrn } from './grnDocument';
 
 interface GrnDetail {
   grn: ReceiptRow;
@@ -25,6 +24,7 @@ export function GrnDrawer({ id, onClose, onSaved }: GrnDrawerProps) {
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(false);
   const [tab, setTab] = useState<'overview' | 'lots' | 'rolls'>('overview');
+  const [busy, setBusy] = useState<'print' | 'download' | ''>('');
 
   React.useEffect(() => {
     factoryRequest<GrnDetail>(`/store/receipts/${id}`)
@@ -55,6 +55,25 @@ export function GrnDrawer({ id, onClose, onSaved }: GrnDrawerProps) {
       onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save GRN');
+    }
+  };
+
+  /**
+   * Fills the goods-received-note template and either prints or downloads it.
+   */
+  const output = async (mode: 'print' | 'download') => {
+    if (!detail?.grn || busy) return;
+    setBusy(mode);
+    setError('');
+    try {
+      const rollsForPrint = detail.rolls || [];
+      const order = detail.order || null;
+      if (mode === 'print') await printFabricGrn(detail.grn, rollsForPrint, order);
+      else await downloadFabricGrn(detail.grn, rollsForPrint, order);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not print GRN');
+    } finally {
+      setBusy('');
     }
   };
 
@@ -123,8 +142,8 @@ export function GrnDrawer({ id, onClose, onSaved }: GrnDrawerProps) {
               ) : null}
               <div className="flex flex-wrap gap-2">
                 {!editing ? <button type="button" className="rounded border border-gray-300 px-3 py-1.5 text-[11px] font-bold" onClick={() => setEditing(true)}>Edit</button> : null}
-                <button type="button" className="rounded bg-primary px-3 py-1.5 text-[11px] font-bold text-white" onClick={() => printHtmlDocument(grn.number, grnBody(grn, rolls, detail?.order || null))}>Print</button>
-                <button type="button" className="rounded border border-gray-300 px-3 py-1.5 text-[11px] font-bold" onClick={() => downloadHtmlDocument(`${grn.number}.html`, grn.number, grnBody(grn, rolls, detail?.order || null))}>Download</button>
+                <button type="button" className="rounded bg-primary px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-60" disabled={Boolean(busy)} aria-label="Print goods receipt note" onClick={() => output('print')}>{busy === 'print' ? 'Printing…' : 'Print'}</button>
+                <button type="button" className="rounded border border-gray-300 px-3 py-1.5 text-[11px] font-bold disabled:opacity-60" disabled={Boolean(busy)} aria-label="Download goods receipt note" onClick={() => output('download')}>{busy === 'download' ? 'Downloading…' : 'Download'}</button>
               </div>
             </>
           ) : null}
