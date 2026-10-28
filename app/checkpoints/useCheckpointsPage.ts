@@ -34,6 +34,7 @@ export function useCheckpointsPage() {
   const [confirming, setConfirming] = useState(false);
   const [signOffRequest, setSignOffRequest] = useState<SignOffRequest | null>(null);
   const [logItem, setLogItem] = useState<CheckpointItem | null>(null);
+  const [selectedId, setSelectedId] = useState('');
 
   const load = useCallback(async () => {
     const data = await checkpointService.list();
@@ -62,6 +63,16 @@ export function useCheckpointsPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!modules.length) {
+      setSelectedId('');
+      return;
+    }
+    if (!modules.some((module) => module.id === selectedId)) {
+      setSelectedId(modules[0].id);
+    }
+  }, [modules, selectedId]);
 
   /**
    * Saves the open module or checkpoint form, then reloads the list.
@@ -128,11 +139,25 @@ export function useCheckpointsPage() {
     }
   };
 
+  /**
+   * Saves a pendency remark when the cell loses focus.
+   */
+  const saveRemark = async (item: CheckpointItem, pendencyRemark: string) => {
+    if (pendencyRemark === (item.pendencyRemark || '')) return;
+    try {
+      await checkpointService.updateRemark(item.id, pendencyRemark);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not save the remark');
+    }
+  };
+
   return {
     canManage,
-    canDeveloper: canToggle,
-    canAddon: canToggle,
+    canEdit: canToggle,
     modules,
+    selectedId,
+    setSelectedId,
     loading,
     error,
     pendingKey,
@@ -148,5 +173,6 @@ export function useCheckpointsPage() {
     logItem,
     setLogItem,
     submitForm,
+    saveRemark,
   };
 }

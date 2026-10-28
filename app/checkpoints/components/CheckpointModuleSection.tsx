@@ -1,124 +1,91 @@
 'use client';
 
-import React, { useState } from 'react';
-import type { CheckpointItem, CheckpointModule, SignOffColumn } from '@/shared/types/checkpoint';
-import CheckpointTable from './CheckpointTable';
+import React from 'react';
+import type { CheckpointModule } from '@/shared/types/checkpoint';
 
-interface CheckpointModuleSectionProps {
-  module: CheckpointModule;
+interface CheckpointModuleCardsProps {
+  modules: CheckpointModule[];
+  selectedId: string;
   canManage: boolean;
-  canDeveloper: boolean;
-  canAddon: boolean;
-  pendingKey: string | null;
-  onSignOff: (item: CheckpointItem, column: SignOffColumn, checked: boolean) => void;
-  onEditItem: (item: CheckpointItem) => void;
-  onDeleteItem: (item: CheckpointItem) => void;
-  onLogs: (item: CheckpointItem) => void;
+  onSelect: (moduleId: string) => void;
   onAddItem: (moduleId: string) => void;
   onEditModule: (module: CheckpointModule) => void;
   onDeleteModule: (module: CheckpointModule) => void;
 }
 
 /**
- * One module accordion. Closed until the header is clicked, then the checkpoints show.
+ * Module cards above the sheet. The selected card is the checklist that is open.
  */
-export default function CheckpointModuleSection({
-  module,
+export default function CheckpointModuleCards({
+  modules,
+  selectedId,
   canManage,
-  canDeveloper,
-  canAddon,
-  pendingKey,
-  onSignOff,
-  onEditItem,
-  onDeleteItem,
-  onLogs,
+  onSelect,
   onAddItem,
   onEditModule,
   onDeleteModule,
-}: CheckpointModuleSectionProps) {
-  const [open, setOpen] = useState(false);
-  const done = module.items.filter((item) => item.complete).length;
-  const panelId = `module-panel-${module.id}`;
-
-  /**
-   * Keeps Add, Rename, and Delete from also opening or closing the accordion.
-   */
-  const stopToggle = (event: React.MouseEvent) => {
-    event.stopPropagation();
-  };
-
+}: CheckpointModuleCardsProps) {
   return (
-    <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-      <header className={`flex flex-wrap items-center justify-between gap-3 px-4 py-3 ${open ? 'border-b border-gray-100' : ''}`}>
-        <button
-          type="button"
-          id={`module-${module.id}`}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-          aria-expanded={open}
-          aria-controls={panelId}
-          onClick={() => setOpen((current) => !current)}
-        >
-          <i
-            className={`ri-arrow-right-s-line text-lg text-gray-500 transition ${open ? 'rotate-90' : ''}`}
-            aria-hidden
-          />
-          <span className="min-w-0">
-            <span className="flex flex-wrap items-center gap-2">
-              <span className="text-base font-semibold text-gray-900">{module.name}</span>
-              <span
-                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                  module.complete ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-50 text-amber-800'
-                }`}
-              >
-                {module.complete ? 'Complete' : 'In progress'}
+    <div className="flex gap-3 overflow-x-auto pb-1" role="list" aria-label="Checkpoint modules">
+      {modules.map((module) => {
+        const selected = module.id === selectedId;
+        const done = module.items.filter((item) => item.complete).length;
+        return (
+          <article
+            key={module.id}
+            role="listitem"
+            className={`min-w-[220px] max-w-xs shrink-0 rounded-xl border p-3 shadow-sm ${
+              selected ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100' : 'border-gray-200 bg-white'
+            }`}
+          >
+            <button
+              type="button"
+              aria-pressed={selected}
+              className="w-full rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+              onClick={() => onSelect(module.id)}
+            >
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-gray-900">{module.name}</span>
+                <span
+                  className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                    module.complete ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-50 text-amber-800'
+                  }`}
+                >
+                  {module.complete ? 'Complete' : 'In progress'}
+                </span>
               </span>
-            </span>
-            <span className="mt-1 block text-xs font-normal text-gray-500">
-              {done} of {module.items.length} checkpoints complete
-            </span>
-          </span>
-        </button>
-        {canManage ? (
-          <div className="flex flex-wrap gap-2" onClick={stopToggle}>
-            <button
-              type="button"
-              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-              onClick={() => onAddItem(module.id)}
-            >
-              Add checkpoint
+              <span className="mt-1 block text-xs text-gray-500">
+                {done} of {module.items.length} checkpoints complete
+              </span>
             </button>
-            <button
-              type="button"
-              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-              onClick={() => onEditModule(module)}
-            >
-              Rename
-            </button>
-            <button
-              type="button"
-              className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-              onClick={() => onDeleteModule(module)}
-            >
-              Delete
-            </button>
-          </div>
-        ) : null}
-      </header>
-      {open ? (
-        <div id={panelId} role="region" aria-labelledby={`module-${module.id}`}>
-          <CheckpointTable
-            items={module.items}
-            canManage={canManage}
-            canDeveloper={canDeveloper}
-            canAddon={canAddon}
-            pendingKey={pendingKey}
-            onSignOff={onSignOff}
-            onEdit={onEditItem}
-            onDelete={onDeleteItem}
-            onLogs={onLogs}
-          />
-        </div>
-      ) : null}
-    </section>
+            {selected && canManage ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  onClick={() => onAddItem(module.id)}
+                >
+                  Add checkpoint
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  onClick={() => onEditModule(module)}
+                >
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                  onClick={() => onDeleteModule(module)}
+                >
+                  Delete
+                </button>
+              </div>
+            ) : null}
+          </article>
+        );
+      })}
+    </div>
   );
 }

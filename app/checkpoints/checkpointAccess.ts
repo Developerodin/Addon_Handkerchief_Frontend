@@ -10,8 +10,10 @@ export interface SignOffRequest {
 }
 
 const COLUMN_LABEL: Record<SignOffColumn, string> = {
-  developer: 'Developer',
-  addon: 'Addon team',
+  developed: 'Developed',
+  testedOdin: 'Tested by Odin',
+  testedAddon: 'Tested by Addon team',
+  implemented: 'Implemented',
 };
 
 /**
@@ -58,8 +60,28 @@ export function signerCaption(name?: string, at?: string | null): string {
 }
 
 /**
- * Copy for the modal shown before a sign-off switch changes.
- * @param request - Checkpoint, column, and the next checked state
+ * Label for a log column, including the old Developer and Addon values.
+ * @param column - Stored column name
+ */
+export function logColumnLabel(column: string): string {
+  if (column === 'developer') return 'Developed';
+  if (column === 'addon') return 'Tested by Addon team';
+  return COLUMN_LABEL[column as SignOffColumn] || column;
+}
+
+/**
+ * One-line description of a log entry.
+ * @param column - Stored column
+ * @param checked - Value that was saved
+ */
+export function logAction(column: string, checked: boolean): string {
+  if (column === 'implemented') return checked ? 'set Implemented to Yes' : 'set Implemented to No';
+  return `${checked ? 'checked' : 'unchecked'} ${logColumnLabel(column)}`;
+}
+
+/**
+ * Copy for the modal shown before a checkbox or Yes/No change.
+ * @param request - Checkpoint, column, and the next value
  */
 export function signOffDialogCopy(request: SignOffRequest): {
   title: string;
@@ -67,20 +89,34 @@ export function signOffDialogCopy(request: SignOffRequest): {
   confirmLabel: string;
   tone: 'primary' | 'danger';
 } {
-  const who = COLUMN_LABEL[request.column];
   const title = request.item.title;
-  if (request.checked) {
-    return {
-      title: 'Turn sign-off on',
-      message: `Turn on the ${who} sign-off for “${title}”?`,
-      confirmLabel: 'Turn on',
-      tone: 'primary',
-    };
+  if (request.column === 'implemented') {
+    return request.checked
+      ? {
+          title: 'Mark implemented',
+          message: `Set Implemented to Yes for “${title}”?`,
+          confirmLabel: 'Yes',
+          tone: 'primary',
+        }
+      : {
+          title: 'Mark not implemented',
+          message: `Set Implemented to No for “${title}”?`,
+          confirmLabel: 'No',
+          tone: 'danger',
+        };
   }
-  return {
-    title: 'Turn sign-off off',
-    message: `Turn off the ${who} sign-off for “${title}”?`,
-    confirmLabel: 'Turn off',
-    tone: 'danger',
-  };
+  const who = COLUMN_LABEL[request.column];
+  return request.checked
+    ? {
+        title: `Check ${who}`,
+        message: `Check ${who} for “${title}”?`,
+        confirmLabel: 'Check',
+        tone: 'primary',
+      }
+    : {
+        title: `Uncheck ${who}`,
+        message: `Uncheck ${who} for “${title}”?`,
+        confirmLabel: 'Uncheck',
+        tone: 'danger',
+      };
 }

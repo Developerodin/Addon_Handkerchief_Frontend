@@ -3,7 +3,7 @@
 import React, { useEffect, useId, useState } from 'react';
 import checkpointService from '@/shared/services/checkpointService';
 import type { CheckpointItem, CheckpointLog } from '@/shared/types/checkpoint';
-import { formatSignoffTime } from '../checkpointAccess';
+import { formatSignoffTime, logAction } from '../checkpointAccess';
 
 interface CheckpointLogDrawerProps {
   item: CheckpointItem;
@@ -79,14 +79,13 @@ export default function CheckpointLogDrawer({ item, onClose }: CheckpointLogDraw
             </p>
           ) : null}
           {!loading && !error && logs.length === 0 ? (
-            <p className="text-sm text-gray-500">No one has changed a switch on this checkpoint yet.</p>
+            <p className="text-sm text-gray-500">No one has changed this checkpoint yet.</p>
           ) : null}
           <ol className="space-y-3">
             {logs.map((log) => (
               <li key={log.id} className="rounded-lg border border-gray-200 px-3 py-2">
                 <p className="text-sm font-medium text-gray-900">
-                  {log.userName} {log.checked ? 'checked' : 'unchecked'}{' '}
-                  {log.column === 'developer' ? 'Developer' : 'Addon team'}
+                  {log.userName} {logAction(log.column, log.checked)}
                 </p>
                 <p className="mt-1 text-xs text-gray-500">{formatSignoffTime(log.actedAt)}</p>
               </li>

@@ -6,15 +6,17 @@ import Seo from '@/shared/layout-components/seo/seo';
 import CheckpointConfirmDialog from './components/CheckpointConfirmDialog';
 import CheckpointFormModal from './components/CheckpointFormModal';
 import CheckpointLogDrawer from './components/CheckpointLogDrawer';
-import CheckpointModuleSection from './components/CheckpointModuleSection';
+import CheckpointModuleCards from './components/CheckpointModuleSection';
+import CheckpointTable from './components/CheckpointTable';
 import { signOffDialogCopy } from './checkpointAccess';
 import { useCheckpointsPage } from './useCheckpointsPage';
 
 /**
- * Software checkpoint list: modules, sign-off switches, and a complete column.
+ * Checkpoint sheet: module cards, then the selected module as a spreadsheet.
  */
 export default function CheckpointsPage() {
   const page = useCheckpointsPage();
+  const selected = page.modules.find((module) => module.id === page.selectedId) || null;
 
   return (
     <div className="px-4 py-4 md:px-6">
@@ -24,7 +26,7 @@ export default function CheckpointsPage() {
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Checkpoints</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">
-            Track software modules. Developer and Addon each sign off. A checkpoint, and its module, are complete only when both are on.
+            Pick a module. Each row is one feature. Check Developed, Tested by Odin, and Tested by Addon team, then mark Implemented. A No needs a pendency remark.
           </p>
         </div>
         {page.canManage ? (
@@ -57,37 +59,42 @@ export default function CheckpointsPage() {
         </div>
       ) : null}
 
-      <div className="space-y-4">
-        {page.modules.map((module) => (
-          <CheckpointModuleSection
-            key={module.id}
-            module={module}
+      {page.modules.length ? (
+        <div className="space-y-4">
+          <CheckpointModuleCards
+            modules={page.modules}
+            selectedId={page.selectedId}
             canManage={page.canManage}
-            canDeveloper={page.canDeveloper}
-            canAddon={page.canAddon}
-            pendingKey={page.pendingKey}
-            onSignOff={(item, column, checked) => page.setSignOffRequest({ item, column, checked })}
-            onEditItem={(item) =>
-              page.setForm({
-                kind: 'item',
-                itemId: item.id,
-                moduleId: item.moduleId,
-                title: item.title,
-                description: item.description || '',
-              })
-            }
-            onDeleteItem={(item) => page.setConfirm({ kind: 'item', item })}
-            onLogs={page.setLogItem}
-            onAddItem={(moduleId) =>
-              page.setForm({ kind: 'item', moduleId, title: '', description: '' })
-            }
-            onEditModule={(current) =>
-              page.setForm({ kind: 'module', moduleId: current.id, name: current.name })
-            }
+            onSelect={page.setSelectedId}
+            onAddItem={(moduleId) => page.setForm({ kind: 'item', moduleId, title: '', description: '' })}
+            onEditModule={(current) => page.setForm({ kind: 'module', moduleId: current.id, name: current.name })}
             onDeleteModule={(current) => page.setConfirm({ kind: 'module', module: current })}
           />
-        ))}
-      </div>
+          {selected ? (
+            <section className="overflow-hidden rounded-xl border border-gray-300 bg-white shadow-sm" aria-label={`${selected.name} checklist`}>
+              <CheckpointTable
+                items={selected.items}
+                canManage={page.canManage}
+                canEdit={page.canEdit}
+                pendingKey={page.pendingKey}
+                onSignOff={(item, column, checked) => page.setSignOffRequest({ item, column, checked })}
+                onRemark={page.saveRemark}
+                onEdit={(item) =>
+                  page.setForm({
+                    kind: 'item',
+                    itemId: item.id,
+                    moduleId: item.moduleId,
+                    title: item.title,
+                    description: item.description || '',
+                  })
+                }
+                onDelete={(item) => page.setConfirm({ kind: 'item', item })}
+                onLogs={page.setLogItem}
+              />
+            </section>
+          ) : null}
+        </div>
+      ) : null}
 
       {page.form ? (
         <CheckpointFormModal mode={page.form} onClose={() => page.setForm(null)} onSubmit={page.submitForm} />

@@ -145,15 +145,27 @@ class CheckpointService {
   }
 
   /**
-   * Flips Developer or Addon sign-off and records a log.
+   * Sets one spreadsheet column and records a log.
    * @param itemId - Checkpoint id
-   * @param column - Which team is signing
-   * @param checked - New switch value
+   * @param column - Developed, Odin, Addon, or Implemented
+   * @param checked - New value. For Implemented, true is Yes and false is No.
    */
   async signOff(itemId: string, column: SignOffColumn, checked: boolean): Promise<CheckpointItem> {
     return this.request<CheckpointItem>(`/items/${itemId}/signoff`, {
       method: 'PATCH',
       body: JSON.stringify({ column, checked }),
+    });
+  }
+
+  /**
+   * Saves the pendency remark for a row whose Implemented value is No.
+   * @param itemId - Checkpoint id
+   * @param pendencyRemark - Remark text
+   */
+  async updateRemark(itemId: string, pendencyRemark: string): Promise<CheckpointItem> {
+    return this.request<CheckpointItem>(`/items/${itemId}/remark`, {
+      method: 'PATCH',
+      body: JSON.stringify({ pendencyRemark }),
     });
   }
 

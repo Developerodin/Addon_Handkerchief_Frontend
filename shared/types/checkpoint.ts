@@ -1,4 +1,6 @@
-export type SignOffColumn = 'developer' | 'addon';
+export type SignOffColumn = 'developed' | 'testedOdin' | 'testedAddon' | 'implemented';
+
+export type LogColumn = SignOffColumn | 'developer' | 'addon';
 
 export interface CheckpointItem {
   id: string;
@@ -6,12 +8,19 @@ export interface CheckpointItem {
   title: string;
   description: string;
   sortOrder: number;
-  developerChecked: boolean;
-  developerCheckedByName: string;
-  developerCheckedAt: string | null;
-  addonChecked: boolean;
-  addonCheckedByName: string;
-  addonCheckedAt: string | null;
+  developedChecked: boolean;
+  developedCheckedByName: string;
+  developedCheckedAt: string | null;
+  testedOdinChecked: boolean;
+  testedOdinCheckedByName: string;
+  testedOdinCheckedAt: string | null;
+  testedAddonChecked: boolean;
+  testedAddonCheckedByName: string;
+  testedAddonCheckedAt: string | null;
+  implemented: boolean | null;
+  implementedByName: string;
+  implementedAt: string | null;
+  pendencyRemark: string;
   complete: boolean;
 }
 
@@ -27,7 +36,7 @@ export interface CheckpointLog {
   id: string;
   itemId: string;
   moduleId: string;
-  column: SignOffColumn;
+  column: LogColumn;
   checked: boolean;
   userName: string;
   actedAt: string;
