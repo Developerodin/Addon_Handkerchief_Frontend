@@ -342,6 +342,14 @@ const BaseMenuItems: any = [
     selected: false,
     path: "/versioning/review",
   },
+  {
+    icon: <i className="bx bx-list-check side-menu__icon"></i>,
+    title: "Checkpoints",
+    type: "link",
+    active: false,
+    selected: false,
+    path: "/checkpoints",
+  },
 ];
 
 export const useMenuItems = () => {

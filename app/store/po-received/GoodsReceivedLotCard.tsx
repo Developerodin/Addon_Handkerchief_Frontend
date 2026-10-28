@@ -3,7 +3,7 @@
 import React from 'react';
 import { PurchaseOrderLine } from '@/shared/services/factoryApi';
 import { lineCutoffApproved } from '../purchase-orders/cutoffApproval';
-import { fabricLineLabel, GoodsReceivedLineDraft, GoodsReceivedLotDraft, lotIsLocked } from './goodsReceivedModel';
+import { emptyGoodsLine, fabricLineLabel, GoodsReceivedLineDraft, GoodsReceivedLotDraft, lineRollTotal, lotIsLocked, lotRollTotal } from './goodsReceivedModel';
 
 const head = 'border border-gray-300 bg-gray-50 px-2 py-1.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-700';
 const inputClass = 'w-full border-0 bg-transparent px-1.5 py-1 text-xs text-gray-900 focus:bg-primary/5 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-700';
@@ -43,7 +43,7 @@ export function GoodsReceivedLotCard({
   const removeLine = (lineIndex: number) => {
     if (locked) return;
     if (lot.lines.length === 1) {
-      onChange({ ...lot, lines: [{ lineId: '', receivedQuantity: '' }] });
+      onChange({ ...lot, lines: [emptyGoodsLine()] });
       return;
     }
     onChange({ ...lot, lines: lot.lines.filter((_, i) => i !== lineIndex) });
@@ -91,7 +91,7 @@ export function GoodsReceivedLotCard({
         <table className="min-w-full border-collapse">
           <thead>
             <tr>
-              {['Lot # *', 'Rolls *', 'Gross wt *', 'Net wt *'].map((label) => (
+              {['Lot # *', 'Total rolls', 'Gross wt *', 'Net wt *'].map((label) => (
                 <th key={label} className={head}>{label}</th>
               ))}
             </tr>
@@ -103,7 +103,7 @@ export function GoodsReceivedLotCard({
                 {locked ? <p className="px-1.5 pb-1 text-[10px] text-gray-500">This lot is saved and cannot be edited.</p> : null}
               </td>
               <td className="border border-gray-300 p-0">
-                <input aria-label={`Lot ${index + 1} rolls`} inputMode="numeric" className={inputClass} value={lot.rolls} disabled={locked} onChange={(event) => onChange({ ...lot, rolls: event.target.value.replace(/[^\d]/g, '') })} />
+                <input aria-label={`Lot ${index + 1} rolls`} inputMode="numeric" className={inputClass} value={String(lotRollTotal(lot))} readOnly disabled />
               </td>
               <td className="border border-gray-300 p-0">
                 <input aria-label={`Lot ${index + 1} gross weight`} inputMode="decimal" className={inputClass} value={lot.grossWeight} disabled={locked} onChange={(event) => onChange({ ...lot, grossWeight: event.target.value.replace(/[^\d.]/g, '') })} />
@@ -118,11 +118,14 @@ export function GoodsReceivedLotCard({
       <div className="border-t border-gray-300">
         <div className="flex items-center justify-between bg-gray-50 px-3 py-1.5">
           <p className="text-[10px] font-bold uppercase text-gray-700">PO items *</p>
+          {locked && lot.lines.filter((line) => line.lineId).length > 1 && lineRollTotal(lot.lines) === 0 ? (
+            <p className="text-[10px] text-amber-800">Edit this lot and enter received rolls on each PO item.</p>
+          ) : null}
           {locked ? null : (
             <button
               type="button"
               className="text-[11px] font-semibold text-primary"
-              onClick={() => onChange({ ...lot, lines: [...lot.lines, { lineId: '', receivedQuantity: '' }] })}
+              onClick={() => onChange({ ...lot, lines: [...lot.lines, emptyGoodsLine()] })}
             >
               Add PO item
             </button>
@@ -132,13 +135,16 @@ export function GoodsReceivedLotCard({
           <thead>
             <tr>
               <th className={head}>PO item *</th>
-              <th className={head}>Received qty *</th>
+              <th className={head}>Received qty in meter *</th>
+              <th className={head}>Received rolls *</th>
               <th className={head}>Action</th>
             </tr>
           </thead>
           <tbody>
-            {lot.lines.map((line, lineIndex) => (
-              <tr key={`${lot.key}-${lineIndex}`}>
+            {lot.lines.map((line, lineIndex) => {
+              const taken = new Set(lot.lines.filter((row, rowIndex) => rowIndex !== lineIndex && row.lineId).map((row) => row.lineId));
+              return (
+                <tr key={`${lot.key}-${lineIndex}`}>
                 <td className="border border-gray-300 p-1">
                   <select
                     aria-label={`Lot ${index + 1} PO item ${lineIndex + 1}`}
@@ -150,9 +156,10 @@ export function GoodsReceivedLotCard({
                     <option value="">Select PO line…</option>
                     {lines.map((item) => {
                       const approved = lineCutoffApproved(item, cutoffs);
+                      const duplicate = taken.has(item.lineId);
                       return (
-                        <option key={item.lineId} value={item.lineId} disabled={!approved}>
-                          {fabricLineLabel(item)}{approved ? '' : ' — Cutoff not approved'}
+                        <option key={item.lineId} value={item.lineId} disabled={!approved || duplicate}>
+                          {fabricLineLabel(item)}{approved ? '' : ' — Cutoff not approved'}{duplicate ? ' — Already in this lot' : ''}
                         </option>
                       );
                     })}
@@ -160,12 +167,22 @@ export function GoodsReceivedLotCard({
                 </td>
                 <td className="border border-gray-300 p-0">
                   <input
-                    aria-label={`Lot ${index + 1} received quantity ${lineIndex + 1}`}
+                    aria-label={`Lot ${index + 1} received metres ${lineIndex + 1}`}
                     inputMode="decimal"
                     className={inputClass}
                     value={line.receivedQuantity}
                     disabled={locked}
                     onChange={(event) => patchLine(lineIndex, { receivedQuantity: event.target.value.replace(/[^\d.]/g, '') })}
+                  />
+                </td>
+                <td className="border border-gray-300 p-0">
+                  <input
+                    aria-label={`Lot ${index + 1} received rolls ${lineIndex + 1}`}
+                    inputMode="numeric"
+                    className={inputClass}
+                    value={line.rolls}
+                    disabled={locked}
+                    onChange={(event) => patchLine(lineIndex, { rolls: event.target.value.replace(/[^\d]/g, '') })}
                   />
                 </td>
                 <td className="border border-gray-300 px-2 py-1 text-center">
@@ -180,8 +197,9 @@ export function GoodsReceivedLotCard({
                     Remove
                   </button>
                 </td>
-              </tr>
-            ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

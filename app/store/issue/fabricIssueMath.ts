@@ -144,7 +144,8 @@ export function buildFabricLines(order: ProductionOrderRow, estimates: FabricEst
 function fabricRowsForArticle(line: OrderLineRow, estimates: FabricEstimateRow[]): FabricLineView[] {
   const fromSnapshot = line.snapshot?.fabricBom;
   const fromEstimate = estimates.find((row) => row.lineId === line.id)?.fabrics;
-  const bom = fromSnapshot?.length ? fromSnapshot : fromEstimate || [];
+  const source = fromSnapshot?.length ? fromSnapshot : fromEstimate || [];
+  const bom = source.filter((fabric) => (fabric.fabricCatalogId || '').trim() || (fabric.fabricName || '').trim());
   return bom.map((fabric) => {
     const bomLineId = fabric.bomLineId || fabric.fabricName;
     return {

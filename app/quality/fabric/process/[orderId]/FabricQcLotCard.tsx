@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { PurchaseOrderLine, ReceivedLot, RollRow } from '@/shared/services/factoryApi';
-import { fabricLineLabel } from '@/app/store/po-received/goodsReceivedModel';
+import { fabricIdentityLabel } from '@/app/store/po-received/goodsReceivedModel';
 import { formatQcStatus, LotQcAction, lotQcStatus, qcStatusClass } from '../../fabricQcLots';
 
 const head = 'border border-gray-200 bg-gray-50 px-2 py-1.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500';
@@ -46,7 +46,7 @@ export function FabricQcLotCard({ index, orderId, lot, lines, rolls, deciding, o
           <table className="min-w-full border-collapse text-xs">
             <thead>
               <tr>
-                {['Fabric', 'Received qty'].map((label) => (
+                {['Fabric', 'Sort No', 'Received qty'].map((label) => (
                   <th key={label} className={head}>{label}</th>
                 ))}
               </tr>
@@ -56,7 +56,8 @@ export function FabricQcLotCard({ index, orderId, lot, lines, rolls, deciding, o
                 const line = lines.find((item) => item.lineId === row.lineId);
                 return (
                   <tr key={row.lineId}>
-                    <td className="border border-gray-200 px-2 py-1.5">{line ? fabricLineLabel(line) : row.lineId}</td>
+                    <td className="border border-gray-200 px-2 py-1.5">{line ? fabricIdentityLabel(line) : row.lineId}</td>
+                    <td className="border border-gray-200 px-2 py-1.5">{line?.fabricSortNo || '—'}</td>
                     <td className="border border-gray-200 px-2 py-1.5 text-right font-bold">{row.receivedQuantity} {line?.unitName || ''}</td>
                   </tr>
                 );

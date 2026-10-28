@@ -34,6 +34,8 @@ export interface RollLabel {
   lotNumber: string;
   fabricName: string;
   colourName: string;
+  /** Sort number from the PO item this roll was stamped from. */
+  sortNo?: string;
 }
 
 /**
@@ -97,10 +99,10 @@ export async function connectQz(): Promise<string> {
 }
 
 /**
- * ZPL label: fabric, lot, roll code, and a Code 128 barcode.
+ * ZPL label: fabric, sort, colour, lot, roll code, and a Code 128 barcode.
  */
 function rollZpl(label: RollLabel): string {
-  const fabric = `${label.fabricName} ${label.colourName}`.trim().slice(0, 40);
+  const fabric = [label.fabricName, label.sortNo, label.colourName].filter(Boolean).join(' ').trim().slice(0, 40);
   return [
     '^XA',
     '^PW812',

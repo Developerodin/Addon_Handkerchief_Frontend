@@ -8,11 +8,12 @@ export async function downloadGoodsReceivedExcel(order: PurchaseOrderRow, lots: 
   const XLSX = await import('xlsx');
   const rows = (order.lines || []).map((line) => ({
     'Fabric name': line.fabricName || '',
+    'Sort No': line.fabricSortNo || '',
     Type: line.fabricTypeName || '',
     Color: line.colourName || '',
     Quantity: line.quantity || 0,
     Unit: line.unitName || '',
-    'Qty received': receivedForLine(lots, line.lineId),
+    'Qty received in meter': receivedForLine(lots, line.lineId),
     Rate: line.rate || 0,
   }));
   const book = XLSX.utils.book_new();

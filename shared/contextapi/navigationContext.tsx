@@ -97,6 +97,9 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children
     if (path === '/versioning/review') {
       return hasCrudPermission('Revision review', 'read');
     }
+    if (path === '/checkpoints') {
+      return true;
+    }
     const factoryKey = Object.keys(FACTORY_ROUTES).find((route) => path === route || path.startsWith(`${route}/`));
     if (factoryKey) {
       return hasCrudPermission(FACTORY_ROUTES[factoryKey], 'read');

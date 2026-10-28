@@ -134,7 +134,7 @@ export function GoodsReceivedDrawer({
               <table className="min-w-full border-collapse text-xs">
                 <thead>
                   <tr>
-                    {['Fabric name', 'Type', 'Color', 'Quantity', 'Qty received', 'Rate'].map((label) => (
+                    {['Fabric name', 'Sort No', 'Type', 'Color', 'Quantity', 'Qty received in meter', 'Rate'].map((label) => (
                       <th key={label} className={cell}>{label}</th>
                     ))}
                   </tr>
@@ -143,6 +143,7 @@ export function GoodsReceivedDrawer({
                   {(order.lines || []).map((line) => (
                     <tr key={line.lineId}>
                       <td className="border border-gray-300 px-2 py-1.5">{line.fabricName || '—'}</td>
+                      <td className="border border-gray-300 px-2 py-1.5">{line.fabricSortNo || '—'}</td>
                       <td className="border border-gray-300 px-2 py-1.5">{line.fabricTypeName || '—'}</td>
                       <td className="border border-gray-300 px-2 py-1.5">{line.colourName || '—'}</td>
                       <td className="border border-gray-300 px-2 py-1.5 text-right">{Number(line.quantity || 0).toLocaleString('en-IN')} {line.unitName || ''}</td>

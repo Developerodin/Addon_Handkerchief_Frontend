@@ -190,6 +190,7 @@ function FabricQcProcessPage() {
               </section>
               <ScannedRollsSection
                 rolls={scanned}
+                lines={order.lines || []}
                 busyBarcode={rejecting}
                 onReject={rejectRoll}
                 onRemove={(roll) => setScanned((current) => current.filter((row) => row.id !== roll.id))}

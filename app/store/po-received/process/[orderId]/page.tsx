@@ -5,23 +5,26 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { toast, Toaster } from 'react-hot-toast';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
-import { factoryRequest, PageResult, PurchaseOrderRow, RollRow } from '@/shared/services/factoryApi';
+import { factoryRequest, PageResult, PurchaseOrderLine, PurchaseOrderRow, RollRow } from '@/shared/services/factoryApi';
 import { formatInr } from '../../../purchase-orders/add/purchaseOrderFormModel';
-import { orderTotal } from '../../goodsReceivedModel';
+import { orderTotal, rollSortNo } from '../../goodsReceivedModel';
 import { A4BarcodePreview, A4PreviewLabel } from '@/shared/components/print/A4BarcodePreview';
 import { ProcessLotTable } from '../ProcessLotTable';
 import { connectQz, isQzConnected, printRollLabels, RollLabel } from '@/shared/utils/qzRollPrint';
 
 /**
- * Turns a roll into the label QZ Tray prints.
+ * Turns a roll into the label QZ Tray and the A4 preview print.
+ * Fabric, colour, and sort come from the PO item stamped on the roll.
  */
-function labelFor(roll: RollRow): RollLabel {
+function labelFor(roll: RollRow, lines: PurchaseOrderLine[] = []): RollLabel {
+  const line = (lines || []).find((item) => item.lineId === roll.lineId);
   return {
     barcode: roll.barcode,
     rollCode: roll.rollCode || roll.barcode,
     lotNumber: roll.receivedLotNumber || '',
-    fabricName: roll.fabricName || '',
-    colourName: roll.colourName || '',
+    fabricName: roll.fabricName || line?.fabricName || '',
+    colourName: roll.colourName || line?.colourName || '',
+    sortNo: rollSortNo(roll.lineId, lines),
   };
 }
 
@@ -35,6 +38,7 @@ export default function ProcessOrderPage() {
   const [order, setOrder] = useState<PurchaseOrderRow | null>(null);
   const [rolls, setRolls] = useState<RollRow[]>([]);
   const [activeId, setActiveId] = useState('');
+  const [scrollKey, setScrollKey] = useState('');
   const [scan, setScan] = useState('');
   const [printer, setPrinter] = useState('');
   const [qzConnected, setQzConnected] = useState(false);
@@ -110,9 +114,10 @@ export default function ProcessOrderPage() {
   const openPreview = (rows: RollRow[]) => {
     const supplier = [order?.supplierName, order?.supplierAddress].filter(Boolean).join(', ') || '—';
     setPreview(rows.map((roll) => {
-      const label = labelFor(roll);
-      const line = (order?.lines || []).find((item) => item.lineId === roll.lineId);
-      const fabric = [label.fabricName || line?.fabricName, line?.fabricTypeName, label.colourName || line?.colourName, line?.fabricSortNo].filter(Boolean).join(' · ') || '—';
+      const lines = order?.lines || [];
+      const label = labelFor(roll, lines);
+      const line = lines.find((item) => item.lineId === roll.lineId);
+      const fabric = [label.fabricName, line?.fabricTypeName, label.colourName, label.sortNo].filter(Boolean).join(' · ') || '—';
       return {
         id: roll.id,
         name: label.rollCode,
@@ -139,7 +144,7 @@ export default function ProcessOrderPage() {
       const target = printer || await connectQz();
       setPrinter(target);
       setQzConnected(true);
-      await printRollLabels(target, rows.map(labelFor));
+      await printRollLabels(target, rows.map((roll) => labelFor(roll, order?.lines || [])));
       toast.success(`${rows.length} barcode${rows.length === 1 ? '' : 's'} sent to ${target}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not print barcodes');
@@ -161,6 +166,7 @@ export default function ProcessOrderPage() {
       return;
     }
     setActiveId(found.id);
+    setScrollKey(`${found.id}|${Date.now()}`);
     setScan('');
     toast.success(found.rollCode || found.barcode);
   };
@@ -222,7 +228,7 @@ export default function ProcessOrderPage() {
                 <table className="min-w-full text-xs">
                   <thead>
                     <tr className="bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500">
-                      {['Fabric', 'Type', 'Color', 'Ordered', 'Received', 'Rate'].map((label) => (
+                      {['Fabric', 'Sort No', 'Type', 'Color', 'Ordered', 'Received', 'Rate'].map((label) => (
                         <th key={label} className="px-3 py-2 text-left">{label}</th>
                       ))}
                     </tr>
@@ -236,6 +242,7 @@ export default function ProcessOrderPage() {
                       return (
                         <tr key={line.lineId} className="border-t border-gray-100">
                           <td className="px-3 py-2">{line.fabricName || '—'}</td>
+                          <td className="px-3 py-2">{line.fabricSortNo || '—'}</td>
                           <td className="px-3 py-2">{line.fabricTypeName || '—'}</td>
                           <td className="px-3 py-2">{line.colourName || '—'}</td>
                           <td className="px-3 py-2">{line.quantity} {line.unitName || ''}</td>
@@ -278,7 +285,9 @@ export default function ProcessOrderPage() {
               key={lotNumber}
               lotNumber={lotNumber}
               rolls={rows}
+              lines={order?.lines || []}
               activeId={activeId}
+              scrollKey={scrollKey}
               printing={printing}
               onActivate={(roll) => setActiveId(roll.id)}
               onSaved={(saved) => setRolls((current) => current.map((row) => (row.id === saved.id ? { ...row, ...saved } : row)))}

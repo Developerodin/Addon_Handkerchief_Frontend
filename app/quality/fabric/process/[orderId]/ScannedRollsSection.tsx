@@ -1,11 +1,13 @@
 'use client';
 
 import React from 'react';
-import { RollRow } from '@/shared/services/factoryApi';
+import { PurchaseOrderLine, RollRow } from '@/shared/services/factoryApi';
+import { rollSortNo } from '@/app/store/po-received/goodsReceivedModel';
 import { formatQcStatus, qcStatusClass } from '../../fabricQcLots';
 
 export interface ScannedRollsSectionProps {
   rolls: RollRow[];
+  lines: PurchaseOrderLine[];
   busyBarcode: string;
   onReject: (roll: RollRow) => void;
   onRemove: (roll: RollRow) => void;
@@ -14,7 +16,7 @@ export interface ScannedRollsSectionProps {
 /**
  * Rolls scanned in this QC session. Reject persists. Remove only drops it from the list.
  */
-export function ScannedRollsSection({ rolls, busyBarcode, onReject, onRemove }: ScannedRollsSectionProps) {
+export function ScannedRollsSection({ rolls, lines, busyBarcode, onReject, onRemove }: ScannedRollsSectionProps) {
   return (
     <section className="rounded border border-gray-200" aria-label="Scanned rolls">
       <header className="border-b border-gray-200 px-4 py-3">
@@ -27,7 +29,7 @@ export function ScannedRollsSection({ rolls, busyBarcode, onReject, onRemove }: 
           <table className="min-w-full border-collapse text-xs">
             <thead>
               <tr className="bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500">
-                {['Roll', 'Barcode', 'Lot', 'Fabric', 'QC', 'Actions'].map((label) => (
+                {['Roll', 'Barcode', 'Lot', 'Fabric', 'Sort No', 'QC', 'Actions'].map((label) => (
                   <th key={label} className="border border-gray-200 px-2 py-2 text-left">{label}</th>
                 ))}
               </tr>
@@ -41,6 +43,7 @@ export function ScannedRollsSection({ rolls, busyBarcode, onReject, onRemove }: 
                     <td className="border border-gray-200 px-2 py-2 font-mono">{roll.barcode}</td>
                     <td className="border border-gray-200 px-2 py-2">{roll.receivedLotNumber || '—'}</td>
                     <td className="border border-gray-200 px-2 py-2">{roll.fabricName || '—'} {roll.colourName ? `· ${roll.colourName}` : ''}</td>
+                    <td className="border border-gray-200 px-2 py-2">{rollSortNo(roll.lineId, lines) || '—'}</td>
                     <td className="border border-gray-200 px-2 py-2">
                       <span className={`inline-flex rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${qcStatusClass(status)}`}>{formatQcStatus(status)}</span>
                     </td>

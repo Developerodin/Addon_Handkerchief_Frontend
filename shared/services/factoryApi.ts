@@ -30,6 +30,8 @@ export interface PurchaseOrderLine {
 export interface ReceivedLotLine {
   lineId: string;
   receivedQuantity: number;
+  /** Rolls received for this PO item. Missing on lots saved before per-item rolls. */
+  rolls?: number;
 }
 
 export interface ReceivedLot {

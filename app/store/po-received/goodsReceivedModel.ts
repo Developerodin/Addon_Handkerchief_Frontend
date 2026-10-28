@@ -3,6 +3,8 @@ import { PurchaseOrderLine, PurchaseOrderRow, ReceivedLot } from '@/shared/servi
 export interface GoodsReceivedLineDraft {
   lineId: string;
   receivedQuantity: string;
+  /** Physical rolls received for this PO item. Barcodes are minted from this count. */
+  rolls: string;
 }
 
 export interface GoodsReceivedLotDraft {
@@ -19,6 +21,13 @@ export interface GoodsReceivedLotDraft {
 }
 
 /**
+ * Blank PO item row inside a received lot.
+ */
+export function emptyGoodsLine(): GoodsReceivedLineDraft {
+  return { lineId: '', receivedQuantity: '', rolls: '' };
+}
+
+/**
  * Blank received-lot row.
  */
 export function emptyGoodsLot(): GoodsReceivedLotDraft {
@@ -28,10 +37,28 @@ export function emptyGoodsLot(): GoodsReceivedLotDraft {
     rolls: '',
     grossWeight: '',
     netWeight: '',
-    lines: [{ lineId: '', receivedQuantity: '' }],
+    lines: [emptyGoodsLine()],
     saved: false,
     editing: true,
   };
+}
+
+/**
+ * Rolls typed on the PO item rows. That sum is the lot total.
+ */
+export function lineRollTotal(lines: GoodsReceivedLineDraft[]): number {
+  return lines.reduce((sum, line) => sum + (Number(line.rolls) || 0), 0);
+}
+
+/**
+ * Rolls shown on the lot header.
+ * A locked lot saved before per-item rolls still shows its stored total.
+ */
+export function lotRollTotal(lot: GoodsReceivedLotDraft): number {
+  const fromLines = lineRollTotal(lot.lines);
+  if (fromLines > 0) return fromLines;
+  if (lot.saved && !lot.editing) return Number(lot.rolls) || 0;
+  return fromLines;
 }
 
 /**
@@ -52,10 +79,7 @@ export function draftsFromLots(lots: ReceivedLot[] = []): GoodsReceivedLotDraft[
     rolls: String(lot.rolls ?? ''),
     grossWeight: String(lot.grossWeight ?? ''),
     netWeight: String(lot.netWeight ?? ''),
-    lines: (lot.lines || []).map((line) => ({
-      lineId: line.lineId,
-      receivedQuantity: String(line.receivedQuantity ?? ''),
-    })),
+    lines: draftLines(lot),
     saved: true,
     editing: false,
   }));
@@ -89,6 +113,36 @@ export function fabricLineLabel(line: PurchaseOrderLine): string {
 }
 
 /**
+ * Fabric name, type, and color. Sort No is shown in its own column.
+ */
+export function fabricIdentityLabel(line: PurchaseOrderLine): string {
+  return [line.fabricName, line.fabricTypeName, line.colourName].filter(Boolean).join(' · ') || line.lineId;
+}
+
+/**
+ * Sort number on the PO line this roll was stamped from.
+ */
+export function rollSortNo(lineId: string | undefined, lines: PurchaseOrderLine[] = []): string {
+  if (!lineId) return '';
+  return lines.find((line) => line.lineId === lineId)?.fabricSortNo || '';
+}
+
+/**
+ * Received-lot lines for the drawer.
+ * A saved lot with one PO item and no per-item rolls keeps the old lot total on that row.
+ */
+function draftLines(lot: ReceivedLot): GoodsReceivedLineDraft[] {
+  const source = lot.lines || [];
+  if (!source.length) return [emptyGoodsLine()];
+  const single = source.length === 1;
+  return source.map((line) => ({
+    lineId: line.lineId,
+    receivedQuantity: String(line.receivedQuantity ?? ''),
+    rolls: Number(line.rolls) > 0 ? String(line.rolls) : single && Number(lot.rolls) > 0 ? String(lot.rolls) : '',
+  }));
+}
+
+/**
  * First problem on the received lots, or an empty string.
  */
 export function goodsLotsError(lots: GoodsReceivedLotDraft[]): string {
@@ -97,12 +151,13 @@ export function goodsLotsError(lots: GoodsReceivedLotDraft[]): string {
     const lot = lots[index];
     const label = `Lot ${index + 1}`;
     if (!lot.lotNumber.trim()) return `${label}: lot number is required`;
-    if (!(Number(lot.rolls) > 0)) return `${label}: rolls must be greater than 0`;
     if (!(Number(lot.grossWeight) > 0)) return `${label}: gross weight must be greater than 0`;
     if (!(Number(lot.netWeight) > 0)) return `${label}: net weight must be greater than 0`;
     const picked = lot.lines.filter((line) => line.lineId);
     if (!picked.length) return `${label}: select at least one PO line`;
-    if (picked.some((line) => !(Number(line.receivedQuantity) > 0))) return `${label}: received quantity must be greater than 0`;
+    if (new Set(picked.map((line) => line.lineId)).size !== picked.length) return `${label}: each PO item can only be selected once`;
+    if (picked.some((line) => !(Number(line.receivedQuantity) > 0))) return `${label}: received metres must be greater than 0`;
+    if (picked.some((line) => !(Number(line.rolls) > 0))) return `${label}: received rolls must be greater than 0`;
   }
   return '';
 }
@@ -112,15 +167,22 @@ export function goodsLotsError(lots: GoodsReceivedLotDraft[]): string {
  */
 export function goodsLotsPayload(lots: GoodsReceivedLotDraft[], order: PurchaseOrderRow) {
   return {
-    lots: lots.map((lot) => ({
-      lotNumber: lot.lotNumber.trim(),
-      rolls: Number(lot.rolls),
-      grossWeight: Number(lot.grossWeight),
-      netWeight: Number(lot.netWeight),
-      lines: lot.lines
+    lots: lots.map((lot) => {
+      const lines = lot.lines
         .filter((line) => line.lineId)
-        .map((line) => ({ lineId: line.lineId, receivedQuantity: Number(line.receivedQuantity) })),
-    })),
+        .map((line) => ({
+          lineId: line.lineId,
+          receivedQuantity: Number(line.receivedQuantity),
+          rolls: Number(line.rolls),
+        }));
+      return {
+        lotNumber: lot.lotNumber.trim(),
+        rolls: lines.reduce((sum, line) => sum + line.rolls, 0),
+        grossWeight: Number(lot.grossWeight),
+        netWeight: Number(lot.netWeight),
+        lines,
+      };
+    }),
     order,
   };
 }

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { PurchaseOrderRow, RollRow } from '@/shared/services/factoryApi';
+import { fabricIdentityLabel } from '@/app/store/po-received/goodsReceivedModel';
 import { finishedQcLots, formatQcStatus, lotQcStatus, qcStatusClass } from '../../fabricQcLots';
 
 export interface FabricQcHistorySectionProps {
@@ -39,6 +40,20 @@ export function FabricQcHistorySection({ order, rolls }: FabricQcHistorySectionP
                 <span className={`inline-flex rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${qcStatusClass(status)}`}>{formatQcStatus(status)}</span>
                 <span className="text-[10px] text-gray-400">{count || lot.rolls} roll(s)</span>
               </div>
+              {(lot.lines || []).length ? (
+                <ul className="mb-2 space-y-1" aria-label={`Fabrics in lot ${lot.lotNumber}`}>
+                  {(lot.lines || []).map((row) => {
+                    const line = (order.lines || []).find((item) => item.lineId === row.lineId);
+                    const name = line ? fabricIdentityLabel(line) : row.lineId;
+                    return (
+                      <li key={row.lineId} className="text-[11px] text-gray-800">
+                        {name}
+                        <span className="ml-2 font-semibold text-gray-500">Sort No {line?.fabricSortNo || '—'}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
               <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div>
                   <dt className="text-[9px] font-bold uppercase tracking-wide text-gray-400">QC by</dt>
