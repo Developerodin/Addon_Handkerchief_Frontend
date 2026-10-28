@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { CheckpointItem, CheckpointModule, SignOffColumn } from '@/shared/types/checkpoint';
 import CheckpointTable from './CheckpointTable';
 
@@ -20,7 +20,7 @@ interface CheckpointModuleSectionProps {
 }
 
 /**
- * One software module: header with complete state, then its checkpoint table.
+ * One module accordion. Closed until the header is clicked, then the checkpoints show.
  */
 export default function CheckpointModuleSection({
   module,
@@ -36,30 +36,50 @@ export default function CheckpointModuleSection({
   onEditModule,
   onDeleteModule,
 }: CheckpointModuleSectionProps) {
+  const [open, setOpen] = useState(false);
   const done = module.items.filter((item) => item.complete).length;
+  const panelId = `module-panel-${module.id}`;
+
+  /**
+   * Keeps Add, Rename, and Delete from also opening or closing the accordion.
+   */
+  const stopToggle = (event: React.MouseEvent) => {
+    event.stopPropagation();
+  };
 
   return (
-    <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm" aria-labelledby={`module-${module.id}`}>
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 id={`module-${module.id}`} className="text-base font-semibold text-gray-900">
-              {module.name}
-            </h2>
-            <span
-              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                module.complete ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-50 text-amber-800'
-              }`}
-            >
-              {module.complete ? 'Complete' : 'In progress'}
+    <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <header className={`flex flex-wrap items-center justify-between gap-3 px-4 py-3 ${open ? 'border-b border-gray-100' : ''}`}>
+        <button
+          type="button"
+          id={`module-${module.id}`}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={() => setOpen((current) => !current)}
+        >
+          <i
+            className={`ri-arrow-right-s-line text-lg text-gray-500 transition ${open ? 'rotate-90' : ''}`}
+            aria-hidden
+          />
+          <span className="min-w-0">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="text-base font-semibold text-gray-900">{module.name}</span>
+              <span
+                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                  module.complete ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-50 text-amber-800'
+                }`}
+              >
+                {module.complete ? 'Complete' : 'In progress'}
+              </span>
             </span>
-          </div>
-          <p className="mt-1 text-xs text-gray-500">
-            {done} of {module.items.length} checkpoints complete
-          </p>
-        </div>
+            <span className="mt-1 block text-xs font-normal text-gray-500">
+              {done} of {module.items.length} checkpoints complete
+            </span>
+          </span>
+        </button>
         {canManage ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" onClick={stopToggle}>
             <button
               type="button"
               className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
@@ -84,17 +104,21 @@ export default function CheckpointModuleSection({
           </div>
         ) : null}
       </header>
-      <CheckpointTable
-        items={module.items}
-        canManage={canManage}
-        canDeveloper={canDeveloper}
-        canAddon={canAddon}
-        pendingKey={pendingKey}
-        onSignOff={onSignOff}
-        onEdit={onEditItem}
-        onDelete={onDeleteItem}
-        onLogs={onLogs}
-      />
+      {open ? (
+        <div id={panelId} role="region" aria-labelledby={`module-${module.id}`}>
+          <CheckpointTable
+            items={module.items}
+            canManage={canManage}
+            canDeveloper={canDeveloper}
+            canAddon={canAddon}
+            pendingKey={pendingKey}
+            onSignOff={onSignOff}
+            onEdit={onEditItem}
+            onDelete={onDeleteItem}
+            onLogs={onLogs}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }
