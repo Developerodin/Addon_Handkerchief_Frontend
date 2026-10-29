@@ -321,6 +321,13 @@ export default function ProductionOrdersPage() {
                     align: 'right',
                     render: (row) => (
                       <div className="flex items-center justify-end gap-1">
+                        <Link
+                          href={`/store/fabric-return?orderId=${row.id}`}
+                          className="inline-flex items-center rounded border border-gray-300 bg-white px-2 py-1 text-[10px] font-bold text-gray-800 hover:bg-gray-50"
+                          aria-label={`Return fabric for ${row.orderNumber || 'order'}`}
+                        >
+                          Return
+                        </Link>
                         <UiIconButton
                           icon="ri-eye-line"
                           tone="view"

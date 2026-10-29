@@ -8,10 +8,27 @@ import { rollSortNo } from '../goodsReceivedModel';
 const head = 'border border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500';
 
 /**
- * True when this roll can still be weighed. Returned rolls stay view-only.
+ * True when received gross, net, and meters can still be edited.
+ * An issued roll stays locked even after the leftover comes back.
  */
 export function rollEditable(roll: RollRow): boolean {
-  return roll.status !== 'returned-to-vendor';
+  if (roll.receivedLocked) return false;
+  return roll.status !== 'returned-to-vendor' && roll.status !== 'issued' && roll.status !== 'on-floor';
+}
+
+/**
+ * Received balance is complete only when gross, net, and meters are all above zero.
+ */
+function receivedComplete(roll: RollRow): boolean {
+  return Number(roll.grossWeight) > 0 && Number(roll.netWeight) > 0 && Number(roll.qtyMeters) > 0;
+}
+
+/**
+ * Current balance text. A missing value is an old roll that has not been initialized.
+ */
+function formatBalance(value?: number | null): string {
+  if (value == null || !Number.isFinite(Number(value))) return '—';
+  return String(value);
 }
 
 /**
@@ -80,7 +97,7 @@ export function ProcessLotTable({
   onPrint: () => void;
   onBrowserPrint: () => void;
 }) {
-  const weighed = rolls.filter((roll) => Number(roll.netWeight) > 0).length;
+  const weighed = rolls.filter((roll) => receivedComplete(roll)).length;
 
   return (
     <section className="overflow-hidden rounded border border-gray-200 bg-white">
@@ -92,7 +109,7 @@ export function ProcessLotTable({
             Accepted
           </span>
           <span className="text-[10px] text-gray-500">({rolls.length} roll{rolls.length === 1 ? '' : 's'})</span>
-          <span className="text-[10px] text-gray-400">{weighed}/{rolls.length} weighed</span>
+          <span className="text-[10px] text-gray-400">{weighed}/{rolls.length} complete</span>
         </div>
         <div className="flex items-center gap-1.5">
           <button
@@ -120,7 +137,7 @@ export function ProcessLotTable({
         <table className="min-w-full border-collapse text-xs">
           <thead>
             <tr>
-              {['Roll id', 'Barcode', 'Fabric', 'Sort No', 'Color', 'Lot number', 'Gross wt', 'Net wt', 'Status'].map((label) => (
+              {['Roll id', 'Barcode', 'Fabric', 'Sort No', 'Color', 'Lot number', 'Gross wt', 'Net wt', 'Qty (m)', 'Current gross', 'Current net', 'Current m', 'Status'].map((label) => (
                 <th key={label} className={head}>{label}</th>
               ))}
             </tr>
@@ -145,7 +162,7 @@ export function ProcessLotTable({
 }
 
 /**
- * One roll. The active row accepts gross and net weight.
+ * One roll. The active row accepts received gross, net, and meters.
  */
 function RollRowView({
   roll,
@@ -165,9 +182,16 @@ function RollRowView({
   const rowRef = useRef<HTMLTableRowElement>(null);
   const [gross, setGross] = useState(String(roll.grossWeight ?? ''));
   const [net, setNet] = useState(String(roll.netWeight ?? ''));
+  const [meters, setMeters] = useState(String(roll.qtyMeters ?? ''));
   const [saving, setSaving] = useState(false);
   const locked = !rollEditable(roll);
-  const done = Number(roll.netWeight) > 0;
+  const done = receivedComplete(roll);
+
+  useEffect(() => {
+    setGross(String(roll.grossWeight ?? ''));
+    setNet(String(roll.netWeight ?? ''));
+    setMeters(String(roll.qtyMeters ?? ''));
+  }, [roll.id, roll.grossWeight, roll.netWeight, roll.qtyMeters]);
 
   useEffect(() => {
     const [targetId] = scrollKey.split('|');
@@ -184,7 +208,11 @@ function RollRowView({
     try {
       const saved = await factoryRequest<RollRow>(`/store/rolls/${roll.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ grossWeight: Number(gross) || 0, netWeight: Number(net) || 0 }),
+        body: JSON.stringify({
+          grossWeight: Number(gross) || 0,
+          netWeight: Number(net) || 0,
+          qtyMeters: Number(meters) || 0,
+        }),
       });
       onSaved(saved);
       toast.success(`${roll.rollCode || roll.barcode} weighed`);
@@ -219,6 +247,14 @@ function RollRowView({
           <input aria-label={`${roll.rollCode} net weight`} inputMode="decimal" className="w-20 rounded border border-gray-300 px-1.5 py-1 text-xs" value={net} onChange={(event) => setNet(event.target.value.replace(/[^\d.]/g, ''))} onBlur={save} disabled={saving} />
         ) : (roll.netWeight ?? 0)}
       </td>
+      <td className={rollCellClass(active)}>
+        {active && !locked ? (
+          <input aria-label={`${roll.rollCode} quantity in meters`} inputMode="decimal" className="w-20 rounded border border-gray-300 px-1.5 py-1 text-xs" value={meters} onChange={(event) => setMeters(event.target.value.replace(/[^\d.]/g, ''))} onBlur={save} disabled={saving} />
+        ) : (roll.qtyMeters ?? 0)}
+      </td>
+      <td className={rollCellClass(active)}>{formatBalance(roll.currentGrossWeight)}</td>
+      <td className={rollCellClass(active)}>{formatBalance(roll.currentNetWeight)}</td>
+      <td className={rollCellClass(active)}>{formatBalance(roll.currentQtyMeters)}</td>
       <td className={rollCellClass(active)}>
         {locked ? (
           <span className="text-[10px] font-semibold text-gray-500">View only</span>

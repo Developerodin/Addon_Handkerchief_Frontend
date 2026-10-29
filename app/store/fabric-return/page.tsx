@@ -1,64 +1,276 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
-import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
 import { UiButton } from '@/shared/components/ui';
-import { factoryRequest } from '@/shared/services/factoryApi';
-import { listStorageRacks, StorageRack } from '@/shared/services/phase3CatalogService';
+import { useFactoryList } from '@/shared/hooks/useFactoryList';
+import {
+  FabricEstimateRow,
+  FabricIssueRow,
+  FabricReturnRow,
+  ProductionOrderRow,
+  factoryRequest,
+} from '@/shared/services/factoryApi';
+import { OrderRail } from '../issue/OrderRail';
+import { FabricRequirementTable } from '../issue/FabricRequirementTable';
+import { articleLabel, buildFabricLines, formatOrderDate } from '../issue/fabricIssueMath';
+import { ReturnLogDrawer } from './ReturnLogDrawer';
+import { ReturnRollDrawer } from './ReturnRollDrawer';
 
+/**
+ * Return issued rolls to a rack. Each scan is one leftover against one fabric line.
+ */
 export default function FabricReturnPage() {
-  const [racks, setRacks] = useState<StorageRack[]>([]);
-  const [rackCode, setRackCode] = useState('');
-  const [barcode, setBarcode] = useState('');
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(false);
+  const orders = useFactoryList<ProductionOrderRow>('/production/orders', undefined, 100);
+  const queryApplied = useRef(false);
+  const [selectedId, setSelectedId] = useState('');
+  const [articleId, setArticleId] = useState('');
+  const [issues, setIssues] = useState<FabricIssueRow[]>([]);
+  const [issuesReady, setIssuesReady] = useState(false);
+  const [returns, setReturns] = useState<FabricReturnRow[]>([]);
+  const [returnError, setReturnError] = useState('');
+  const [returnTick, setReturnTick] = useState(0);
+  const [estimates, setEstimates] = useState<FabricEstimateRow[]>([]);
+  const [estimateError, setEstimateError] = useState('');
+  const [estimating, setEstimating] = useState(false);
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [activeKey, setActiveKey] = useState('');
+
+  const openOrders = useMemo(() => orders.rows.filter((order) => order.status !== 'closed'), [orders.rows]);
+  const selected = openOrders.find((order) => order.id === selectedId) || null;
+  const needsEstimate = Boolean(selected && (selected.lines || []).some((line) => !line.snapshot?.fabricBom?.length));
 
   useEffect(() => {
-    listStorageRacks({ limit: 200, page: 1 })
-      .then((data) => setRacks((data.results || []).filter((rack) => rack.status !== 'inactive')))
-      .catch((err) => setError(err instanceof Error ? err.message : 'Could not load racks'));
-  }, []);
+    if (!openOrders.length || queryApplied.current) return;
+    const wanted = new URLSearchParams(window.location.search).get('orderId') || '';
+    const fromQuery = openOrders.some((order) => order.id === wanted) ? wanted : openOrders[0].id;
+    queryApplied.current = true;
+    setSelectedId(fromQuery);
+    setArticleId('all');
+    setActiveKey('');
+  }, [openOrders]);
+
+  useEffect(() => {
+    let cancelled = false;
+    factoryRequest<{ results: FabricIssueRow[] }>('/store/issues')
+      .then((data) => {
+        if (!cancelled) {
+          setIssues(data.results || []);
+          setIssuesReady(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIssues([]);
+          setIssuesReady(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [returnTick]);
+
+  useEffect(() => {
+    let cancelled = false;
+    factoryRequest<{ results: FabricReturnRow[] }>('/store/returns')
+      .then((data) => {
+        if (!cancelled) {
+          setReturns(data.results || []);
+          setReturnError('');
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setReturns([]);
+          setReturnError(err instanceof Error ? err.message : 'Could not load returns');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [returnTick]);
+
+  useEffect(() => {
+    if (!selected || !needsEstimate) {
+      setEstimates([]);
+      setEstimateError('');
+      setEstimating(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setEstimating(true);
+    factoryRequest<{ results: FabricEstimateRow[] }>(`/production/orders/fabric-estimation?orderId=${selected.id}`)
+      .then((data) => {
+        if (!cancelled) {
+          setEstimates(data.results || []);
+          setEstimateError('');
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setEstimates([]);
+          setEstimateError(err instanceof Error ? err.message : 'Could not load fabric');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setEstimating(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected?.id, needsEstimate]);
+
+  const fabricLines = useMemo(() => (selected ? buildFabricLines(selected, estimates) : []), [selected, estimates]);
+  const visibleLines = articleId === 'all' ? fabricLines : fabricLines.filter((line) => line.lineId === articleId);
+  const activeLine = fabricLines.find((line) => line.key === activeKey) || null;
+  const logRows = selected ? returns.filter((row) => row.orderId === selected.id) : returns;
+
+  /**
+   * Another order opens on All, so every fabric line for that order is visible.
+   */
+  function selectOrder(orderId: string) {
+    setSelectedId(orderId);
+    setArticleId('all');
+    setActiveKey('');
+  }
 
   return (
     <RequireCrudPermission path="Fabric / Return" action="read">
-      <CatalogMasterFormPage seoTitle="Fabric return" title="Fabric return" listHref="/store/racks" listLabel="Fabric storage" currentLabel="Fabric return">
-        <form
-          className="grid gap-3 p-4"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            setLoading(true);
-            setError('');
-            try {
-              await factoryRequest('/store/returns', {
-                method: 'POST',
-                body: JSON.stringify({ rollBarcode: barcode.trim(), rackCode }),
-              });
-              setMessage(`${barcode.trim()} is back on ${rackCode}`);
-              setBarcode('');
-            } catch (err) {
-              setError(err instanceof Error ? err.message : 'Return failed');
-            } finally {
-              setLoading(false);
-            }
-          }}
-        >
-          <p className="text-sm text-gray-600">Scan a roll that came back from the floor or from a failed check, then put it on a rack.</p>
-          <label className="form-label" htmlFor="returnRack">Rack</label>
-          <select id="returnRack" aria-label="Rack" className="form-control" required value={rackCode} onChange={(event) => setRackCode(event.target.value)}>
-            <option value="">Select rack</option>
-            {racks.map((rack) => (
-              <option key={rack.id} value={rack.code}>{rack.code} · {rack.name}</option>
-            ))}
-          </select>
-          <label className="form-label" htmlFor="returnBarcode">Roll barcode</label>
-          <input id="returnBarcode" aria-label="Roll barcode" className="form-control" required value={barcode} onChange={(event) => setBarcode(event.target.value)} />
-          {message ? <p className="text-sm text-green-700">{message}</p> : null}
-          {error ? <p className="text-sm text-red-600" role="alert">{error}</p> : null}
-          <UiButton type="submit" variant="primary" disabled={loading}>Return to rack</UiButton>
-        </form>
-      </CatalogMasterFormPage>
+      <div className="main-content !px-4 !py-4">
+        <div className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
+          <header className="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <span className="h-5 w-[3px] rounded bg-primary" aria-hidden />
+              <h1 className="text-sm font-bold text-[#111827]">Fabric return</h1>
+            </div>
+            <UiButton type="button" variant="secondary" icon="ri-file-list-3-line" onClick={() => setLogsOpen(true)}>
+              Return log
+            </UiButton>
+          </header>
+          <div className="grid lg:grid-cols-[18rem_minmax(0,1fr)]">
+            <OrderRail
+              orders={openOrders}
+              issues={issues}
+              issuesReady={issuesReady}
+              loading={orders.loading}
+              error={orders.error || ''}
+              search={orders.search}
+              selectedId={selectedId}
+              onSearch={(value) => {
+                orders.setSearch(value);
+                orders.setPage(1);
+              }}
+              onSelect={selectOrder}
+            />
+            <section className="min-w-0 p-4" aria-label="Fabric to return">
+              {!selected ? <p className="text-sm text-[#4B5563]">Select an order to return fabric.</p> : null}
+              {selected ? (
+                <div className="grid gap-3">
+                  <header>
+                    <h2 className="text-sm font-bold text-[#111827]">{selected.orderNumber || 'Order'}</h2>
+                    <p className="text-xs text-[#4B5563]">
+                      {[selected.buyer, formatOrderDate(selected.orderDate), selected.orderNote].filter(Boolean).join(' · ') || 'No note'}
+                    </p>
+                  </header>
+                  <ArticlePicker
+                    lines={selected.lines || []}
+                    articleId={articleId}
+                    onSelect={(id) => {
+                      setArticleId(id);
+                      setActiveKey('');
+                    }}
+                  />
+                  {!articleId ? <p className="text-sm text-[#4B5563]">Select an article to see its fabric and return rolls.</p> : null}
+                  {articleId && estimating ? <p className="text-sm text-[#4B5563]">Loading fabric for this article.</p> : null}
+                  {estimateError ? <p className="text-sm text-red-700" role="alert">{estimateError}</p> : null}
+                  {returnError ? <p className="text-sm text-red-700" role="alert">{returnError}</p> : null}
+                  {articleId && !estimating ? (
+                    <FabricRequirementTable
+                      mode="return"
+                      lines={visibleLines}
+                      issues={issues.filter((row) => row.orderId === selected.id)}
+                      showArticle={articleId === 'all'}
+                      activeKey={activeKey}
+                      canComplete={false}
+                      completing={false}
+                      completeError=""
+                      onIssue={(line) => setActiveKey(line.key)}
+                      onComplete={() => undefined}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+            </section>
+          </div>
+        </div>
+      </div>
+      <ReturnRollDrawer
+        open={Boolean(activeLine)}
+        orderId={selected?.id || ''}
+        orderNumber={selected?.orderNumber || ''}
+        line={activeLine}
+        onClose={() => setActiveKey('')}
+        onReturned={() => setReturnTick((value) => value + 1)}
+      />
+      <ReturnLogDrawer open={logsOpen} orderNumber={selected?.orderNumber || ''} rows={logRows} onClose={() => setLogsOpen(false)} />
     </RequireCrudPermission>
+  );
+}
+
+/**
+ * Article chips for the selected order, including every article at once.
+ */
+function ArticlePicker({
+  lines,
+  articleId,
+  onSelect,
+}: {
+  lines: { id: string; factoryCode?: string; articleName?: string; quantity: number }[];
+  articleId: string;
+  onSelect: (id: string) => void;
+}) {
+  const total = lines.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0);
+  return (
+    <div role="group" aria-label="Select article" className="flex flex-wrap gap-2">
+      <ArticleChip label="All" detail={String(total)} pressed={articleId === 'all'} onClick={() => onSelect('all')} />
+      {lines.map((line) => (
+        <ArticleChip
+          key={line.id}
+          label={articleLabel(line.factoryCode, line.articleName)}
+          detail={String(line.quantity)}
+          pressed={articleId === line.id}
+          onClick={() => onSelect(line.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * One article, or every article on the order.
+ */
+function ArticleChip({
+  label,
+  detail,
+  pressed,
+  onClick,
+}: {
+  label: string;
+  detail: string;
+  pressed: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={onClick}
+      className={`min-h-7 min-w-16 rounded-md border px-2 py-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+        pressed ? 'border-primary bg-primary/5' : 'border-gray-200 bg-white hover:border-gray-300'
+      }`}
+    >
+      <span className="block max-w-[9rem] truncate text-xs font-bold text-[#111827]">{label}</span>
+      <span className="block text-[11px] text-[#4B5563]">{detail}</span>
+    </button>
   );
 }

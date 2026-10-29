@@ -3,7 +3,7 @@
 import React from 'react';
 import { FactoryDrawer } from '@/shared/components/factory/FactoryDrawer';
 import { FabricIssueRow } from '@/shared/services/factoryApi';
-import { articleLabel, formatIssueTime, formatKg } from './fabricIssueMath';
+import { articleLabel, formatIssueTime, formatKg, formatMetres } from './fabricIssueMath';
 
 /**
  * Rolls already issued. Scoped to the selected order when one is open.
@@ -34,7 +34,9 @@ export function IssueLogDrawer({
                 <th className="px-3 py-2">Article</th>
                 <th className="px-3 py-2">Fabric</th>
                 <th className="px-3 py-2">Barcode</th>
+                <th className="px-3 py-2">Gross kg</th>
                 <th className="px-3 py-2">Net kg</th>
+                <th className="px-3 py-2">Meters</th>
                 <th className="px-3 py-2">Rack</th>
               </tr>
             </thead>
@@ -47,7 +49,9 @@ export function IssueLogDrawer({
                   <td className="px-3 py-2 text-[#111827]">{articleLabel(row.factoryCode, row.articleName)}</td>
                   <td className="px-3 py-2 text-[#111827]">{row.fabricName || '—'}</td>
                   <td className="px-3 py-2 font-bold text-[#111827]">{row.barcode}</td>
+                  <td className="px-3 py-2 text-[#111827]">{row.grossWeight == null ? '—' : formatKg(row.grossWeight)}</td>
                   <td className="px-3 py-2 text-[#111827]">{formatKg(row.netWeight)}</td>
+                  <td className="px-3 py-2 text-[#111827]">{row.qtyMeters == null ? '—' : formatMetres(row.qtyMeters)}</td>
                   <td className="px-3 py-2 text-[#111827]">{row.fromLocation || '—'}</td>
                 </tr>
               ))}

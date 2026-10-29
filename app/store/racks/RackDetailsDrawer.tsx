@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { RollRow } from '@/shared/services/factoryApi';
+import { factoryRequest, RollRow } from '@/shared/services/factoryApi';
 
 export interface StorageRackCard {
   code: string;
   name: string;
   barcode: string;
+  location?: string;
   floor: string;
   zone: string;
   status: string;
@@ -29,7 +30,9 @@ export interface RackDetailsDrawerProps {
   history: RackMove[];
   loading: boolean;
   error: string;
+  canDelete: boolean;
   onClose: () => void;
+  onDeleted: () => void;
 }
 
 /**
@@ -64,8 +67,11 @@ function qcLabel(status?: string): string {
 /**
  * Right drawer for one storage rack: slot facts, rolls on it, and move history.
  */
-export function RackDetailsDrawer({ rack, rolls, history, loading, error, onClose }: RackDetailsDrawerProps) {
+export function RackDetailsDrawer({ rack, rolls, history, loading, error, canDelete, onClose, onDeleted }: RackDetailsDrawerProps) {
   const [tab, setTab] = useState<'details' | 'history'>('details');
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -74,6 +80,40 @@ export function RackDetailsDrawer({ rack, rolls, history, loading, error, onClos
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  useEffect(() => {
+    setConfirming(false);
+    setDeleting(false);
+    setDeleteError('');
+  }, [rack.code]);
+
+  /**
+   * Blocks a rack that still holds rolls. An empty rack asks for confirm first.
+   */
+  const requestDelete = () => {
+    if (rolls.length > 0) {
+      setDeleteError('This rack contains fabric rolls');
+      setConfirming(false);
+      return;
+    }
+    setDeleteError('');
+    setConfirming(true);
+  };
+
+  /**
+   * Removes the open rack. The server rejects the call when a roll is still on it.
+   */
+  const confirmDelete = async () => {
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await factoryRequest(`/store/racks/${encodeURIComponent(rack.code)}`, { method: 'DELETE' });
+      onDeleted();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Could not delete this rack');
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="presentation">
@@ -103,10 +143,78 @@ export function RackDetailsDrawer({ rack, rolls, history, loading, error, onClos
           {!loading && tab === 'details' ? <DetailsPane rack={rack} rolls={rolls} /> : null}
           {!loading && tab === 'history' ? <HistoryPane history={history} /> : null}
         </div>
-        <footer className="flex justify-end border-t border-gray-100 px-5 py-3">
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-5 py-3">
+          <DeleteRackControl
+            code={rack.code}
+            canDelete={canDelete}
+            loading={loading}
+            confirming={confirming}
+            deleting={deleting}
+            error={deleteError}
+            onRequest={requestDelete}
+            onConfirm={confirmDelete}
+            onCancel={() => setConfirming(false)}
+          />
           <button type="button" className="rounded bg-primary px-4 py-1.5 text-xs font-bold text-white" onClick={onClose}>Close</button>
         </footer>
       </aside>
+    </div>
+  );
+}
+
+/**
+ * Delete for the open rack. Occupied racks show an error and are not removed.
+ */
+function DeleteRackControl({
+  code,
+  canDelete,
+  loading,
+  confirming,
+  deleting,
+  error,
+  onRequest,
+  onConfirm,
+  onCancel,
+}: {
+  code: string;
+  canDelete: boolean;
+  loading: boolean;
+  confirming: boolean;
+  deleting: boolean;
+  error: string;
+  onRequest: () => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  if (!canDelete) return null;
+  return (
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+      {confirming ? (
+        <>
+          <span className="text-xs text-gray-700">Delete {code}?</span>
+          <button
+            type="button"
+            className="rounded border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"
+            disabled={deleting}
+            onClick={onConfirm}
+          >
+            {deleting ? 'Deleting…' : 'Delete'}
+          </button>
+          <button type="button" className="rounded border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700" disabled={deleting} onClick={onCancel}>
+            Cancel
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          className="rounded border border-red-200 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+          disabled={loading || deleting}
+          onClick={onRequest}
+        >
+          Delete rack
+        </button>
+      )}
+      {error ? <p className="text-xs text-red-600" role="alert">{error}</p> : null}
     </div>
   );
 }
@@ -153,9 +261,10 @@ function DetailsPane({ rack, rolls }: { rack: StorageRackCard; rolls: RollRow[] 
         <h3 className="mb-3 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-gray-500">
           <i className="ri-information-line" aria-hidden /> Slot information
         </h3>
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <Fact label="Label" value={rack.code} />
           <Fact label="Barcode" value={rack.barcode || rack.code} />
+          <Fact label="Location" value={rack.location || '-'} />
           <Fact label="Zone" value={rack.zone || '-'} />
           <Fact label="Floor" value={rack.floor || '-'} />
           <div>

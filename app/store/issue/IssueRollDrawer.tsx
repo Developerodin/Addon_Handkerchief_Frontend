@@ -14,6 +14,11 @@ interface TrackedRoll {
     fabricName?: string;
     colourName?: string;
     netWeight?: number;
+    grossWeight?: number;
+    qtyMeters?: number;
+    currentGrossWeight?: number | null;
+    currentNetWeight?: number | null;
+    currentQtyMeters?: number | null;
     scaleWeight?: number;
     status?: string;
     qcStatus?: string;
@@ -186,11 +191,12 @@ function previewProblem(line: FabricLineView, track: TrackedRoll): string {
   if (roll.status === 'issued' || roll.status === 'on-floor') return 'This roll is already issued.';
   if (roll.qcStatus === 'rejected' || roll.qcStatus === 'held') return 'A rejected or held roll cannot be issued';
   if (!track.stored) return 'This roll is not on a rack.';
+  if (!(Number(roll.currentNetWeight) > 0)) return 'This roll has no balance left.';
   return '';
 }
 
 /**
- * Weight captured at receipt, plus the rack the roll is leaving.
+ * Received balance stays on the roll. Issue takes the whole current balance.
  */
 function RollPreview({ track }: { track: TrackedRoll }) {
   const roll = track.roll;
@@ -201,9 +207,15 @@ function RollPreview({ track }: { track: TrackedRoll }) {
         <DrawerStat label="Roll code" value={roll.rollCode || '—'} />
         <DrawerStat label="Fabric" value={roll.fabricName || '—'} />
         <DrawerStat label="Colour" value={roll.colourName || '—'} />
-        <DrawerStat label="Net weight" value={formatKg(Number(roll.netWeight) || 0)} />
-        <DrawerStat label="Scale weight" value={formatKg(Number(roll.scaleWeight) || 0)} />
         <DrawerStat label="Rack" value={track.rackCode || 'Not on a rack'} />
+      </div>
+      <div className="grid grid-cols-2 gap-2 border-t border-gray-100 p-3">
+        <DrawerStat label="Received gross" value={formatKg(Number(roll.grossWeight) || 0)} />
+        <DrawerStat label="Received net" value={formatKg(Number(roll.netWeight) || 0)} />
+        <DrawerStat label="Received meters" value={formatMetres(Number(roll.qtyMeters) || 0)} />
+        <DrawerStat label="Issuing gross" value={formatKg(Number(roll.currentGrossWeight) || 0)} />
+        <DrawerStat label="Issuing net" value={formatKg(Number(roll.currentNetWeight) || 0)} />
+        <DrawerStat label="Issuing meters" value={formatMetres(Number(roll.currentQtyMeters) || 0)} />
       </div>
     </DrawerSection>
   );

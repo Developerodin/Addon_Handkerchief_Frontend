@@ -116,6 +116,11 @@ export interface RollRow {
   rollCode?: string;
   grossWeight?: number;
   netWeight?: number;
+  qtyMeters?: number;
+  currentGrossWeight?: number | null;
+  currentNetWeight?: number | null;
+  currentQtyMeters?: number | null;
+  receivedLocked?: boolean;
   receivedDate?: string | null;
   qcStatus?: 'pending' | 'passed' | 'rejected' | 'held';
   poNumber?: string;
@@ -263,12 +268,19 @@ export interface FabricIssueRow {
   fabricName: string;
   barcode: string;
   netWeight: number;
+  grossWeight?: number | null;
+  qtyMeters?: number | null;
   scaleWeight: number;
   fromLocation: string;
   articleName?: string;
   factoryCode?: string;
   userName?: string;
   createdAt?: string;
+}
+
+export interface FabricReturnRow extends Omit<FabricIssueRow, 'scaleWeight'> {
+  rackCode: string;
+  scaleWeight?: number;
 }
 
 export interface FabricEstimateRow {
