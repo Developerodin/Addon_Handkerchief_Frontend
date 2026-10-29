@@ -21,7 +21,7 @@ interface CheckpointTableProps {
 }
 
 const head =
-  'sticky top-0 z-20 h-11 border border-[#c8ccd3] bg-[#f3f4f6] px-2 text-left align-middle text-[13px] font-semibold leading-4 text-[#1f2937] dark:border-[#3a3a3c] dark:bg-[#2c2c2e] dark:text-[#f5f5f7]';
+  'sticky top-0 z-20 min-h-11 border border-[#c8ccd3] bg-[#f3f4f6] px-2 py-1 text-left align-middle text-[13px] font-semibold leading-4 text-[#1f2937] dark:border-[#3a3a3c] dark:bg-[#2c2c2e] dark:text-[#f5f5f7]';
 const cell = 'border border-[#d5d8de] p-0 align-middle dark:border-[#3a3a3c]';
 const active = 'focus-within:relative focus-within:z-[4] focus-within:shadow-[inset_0_0_0_2px_rgb(132,90,223)]';
 
@@ -146,6 +146,49 @@ interface SheetRow {
   row: number;
 }
 
+interface ColumnCounts {
+  total: number;
+  developed: number;
+  testedOdin: number;
+  testedAddon: number;
+  implemented: number;
+  pendencies: number;
+}
+
+/**
+ * Done / total for each sign-off column. A pendency counts as done when Implemented is Yes, or when it is No and a note is saved.
+ */
+function columnCounts(items: CheckpointItem[]): ColumnCounts {
+  const pendencyDone = (item: CheckpointItem) => {
+    if (item.implemented === true) return true;
+    if (item.implemented === false) return item.pendencyRemark.trim().length > 0;
+    return false;
+  };
+
+  return {
+    total: items.length,
+    developed: items.filter((item) => item.developedChecked).length,
+    testedOdin: items.filter((item) => item.testedOdinChecked).length,
+    testedAddon: items.filter((item) => item.testedAddonChecked).length,
+    implemented: items.filter((item) => item.implemented === true).length,
+    pendencies: items.filter(pendencyDone).length,
+  };
+}
+
+/**
+ * Column title plus a done/total count, for example 10/59.
+ */
+function CountHead({ label, done, total, className }: { label: string; done: number; total: number; className: string }) {
+  return (
+    <th scope="col" className={className}>
+      <span className="block">{label}</span>
+      <span className="mt-0.5 block text-[12px] font-semibold tabular-nums leading-4 text-[#374151] dark:text-[#d1d1d6]">
+        {done}/{total}
+      </span>
+    </th>
+  );
+}
+
 /**
  * Keeps the original sheet row number when a filter hides other rows.
  */
@@ -178,6 +221,7 @@ export default function CheckpointTable({
   onLogs,
 }: CheckpointTableProps) {
   const rows = visibleRows(items, query);
+  const counts = columnCounts(items);
 
   if (items.length === 0) {
     return <p className="px-4 py-8 text-[13px] text-[#374151] dark:text-[#d1d1d6]">No checkpoints in this module yet. Add one to start the sheet.</p>;
@@ -213,11 +257,11 @@ export default function CheckpointTable({
             <th scope="col" className={`${head} left-11 z-30 min-w-[14rem] shadow-[2px_0_0_#c8ccd3] dark:shadow-[2px_0_0_#3a3a3c]`}>
               Checklist
             </th>
-            <th scope="col" className={`${head} w-[7.25rem] text-center`}>Developed</th>
-            <th scope="col" className={`${head} w-[8rem] text-center`}>Tested by Odin</th>
-            <th scope="col" className={`${head} w-[8.25rem] text-center`}>Tested by Addon</th>
-            <th scope="col" className={`${head} w-[8.5rem] text-center`}>Implemented</th>
-            <th scope="col" className={`${head} min-w-[12rem]`}>Pendencies</th>
+            <CountHead label="Developed" done={counts.developed} total={counts.total} className={`${head} w-[7.25rem] text-center`} />
+            <CountHead label="Tested by Odin" done={counts.testedOdin} total={counts.total} className={`${head} w-[8rem] text-center`} />
+            <CountHead label="Tested by Addon" done={counts.testedAddon} total={counts.total} className={`${head} w-[8.25rem] text-center`} />
+            <CountHead label="Implemented" done={counts.implemented} total={counts.total} className={`${head} w-[8.5rem] text-center`} />
+            <CountHead label="Pendencies" done={counts.pendencies} total={counts.total} className={`${head} min-w-[12rem] text-center`} />
             <th scope="col" className={`${head} w-[1%] whitespace-nowrap`}>Actions</th>
           </tr>
         </thead>
