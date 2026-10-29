@@ -48,7 +48,7 @@ export function PurchaseOrderItemsTable({
         <colgroup>
           {showCommercials ? (
             <>
-              <col style={{ width: '14%' }} />
+              <col style={{ width: '13%' }} />
               <col style={{ width: '7%' }} />
               <col style={{ width: '7%' }} />
               <col style={{ width: '7%' }} />
@@ -56,22 +56,24 @@ export function PurchaseOrderItemsTable({
               <col style={{ width: '8%' }} />
               <col style={{ width: '7%' }} />
               <col style={{ width: '7%' }} />
+              <col style={{ width: '7%' }} />
               <col style={{ width: '8%' }} />
-              <col style={{ width: '12%' }} />
+              <col style={{ width: '11%' }} />
               <col style={{ width: '6%' }} />
               <col style={{ width: '4%' }} />
             </>
           ) : (
             <>
-              <col style={{ width: '18%' }} />
-              <col style={{ width: '9%' }} />
-              <col style={{ width: '8%' }} />
-              <col style={{ width: '8%' }} />
-              <col style={{ width: '9%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '8%' }} />
-              <col style={{ width: '10%' }} />
               <col style={{ width: '14%' }} />
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '12%' }} />
               <col style={{ width: '6%' }} />
             </>
           )}
@@ -84,6 +86,7 @@ export function PurchaseOrderItemsTable({
             <HeaderCell>Sort No</HeaderCell>
             <HeaderCell>Mill Old</HeaderCell>
             <HeaderCell>Mill New</HeaderCell>
+            <HeaderCell>Count</HeaderCell>
             {showCommercials ? <HeaderCell required>Rate</HeaderCell> : null}
             <HeaderCell required>Qty</HeaderCell>
             <HeaderCell required>Unit</HeaderCell>
@@ -182,6 +185,9 @@ function FabricLineRow({
       </td>
       <td className={cellClass}>
         <input aria-label="Mill New" readOnly value={line.millNewFabricSortNo} placeholder="—" title={line.millNewFabricSortNo} className={`${inputClass} truncate bg-gray-50`} />
+      </td>
+      <td className={cellClass}>
+        <input aria-label="Count" readOnly value={line.countName} placeholder="—" title={line.countName} className={`${inputClass} truncate bg-gray-50`} />
       </td>
       {showCommercials ? (
         <td className={cellClass}>

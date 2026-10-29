@@ -4,6 +4,7 @@ import {
   FabricPoLine,
   defaultMeterUnit,
   fabricColorLabel,
+  fabricCountLabel,
   fabricTypeLabel,
   gstNumber,
   matchFabric,
@@ -19,6 +20,7 @@ export interface ParsedFabricRow {
   fabricSortNo: string;
   millOldFabricSortNo: string;
   millNewFabricSortNo: string;
+  countName: string;
   rate: string;
   quantity: string;
   unit: string;
@@ -33,6 +35,7 @@ const HEADERS = [
   'Sort No',
   'Mill Old',
   'Mill New',
+  'Count',
   'Rate',
   'Quantity',
   'Unit',
@@ -67,6 +70,7 @@ export async function downloadFabricItemsExcel(lines: FabricPoLine[]): Promise<v
     'Sort No': line.fabricSortNo,
     'Mill Old': line.millOldFabricSortNo,
     'Mill New': line.millNewFabricSortNo,
+    Count: line.countName,
     Rate: line.rate,
     Quantity: line.quantity,
     Unit: line.unitName,
@@ -120,6 +124,7 @@ export function lineFromImport(
     fabricSortNo: match?.fabricSortNo || row.fabricSortNo || '',
     millOldFabricSortNo: match?.millOldFabricSortNo || row.millOldFabricSortNo || '',
     millNewFabricSortNo: match?.millNewFabricSortNo || row.millNewFabricSortNo || '',
+    countName: (match ? fabricCountLabel(match) : '') || row.countName || '',
     quantity: row.quantity,
     unitId: unit?.id || meter?.unitId || '',
     unitName: unit ? measurementLabel(unit) : meter?.unitName || '',
@@ -140,6 +145,7 @@ function parseRecord(record: Record<string, unknown>, excelRow: number): { row?:
   const fabricSortNo = cell(record, 'sort no') || cell(record, 'sort no.');
   const millOldFabricSortNo = cell(record, 'mill old') || cell(record, 'mill old fabric sort no.');
   const millNewFabricSortNo = cell(record, 'mill new') || cell(record, 'mill new fabric sort no.');
+  const countName = cell(record, 'count');
   const rate = cell(record, 'rate');
   const quantity = cell(record, 'quantity');
   const unit = cell(record, 'unit');
@@ -153,6 +159,7 @@ function parseRecord(record: Record<string, unknown>, excelRow: number): { row?:
       fabricSortNo,
       millOldFabricSortNo,
       millNewFabricSortNo,
+      countName,
       rate,
       quantity,
       unit,
@@ -176,6 +183,7 @@ function parseRecord(record: Record<string, unknown>, excelRow: number): { row?:
       fabricSortNo,
       millOldFabricSortNo,
       millNewFabricSortNo,
+      countName,
       rate,
       quantity,
       unit,

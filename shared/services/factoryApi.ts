@@ -19,6 +19,7 @@ export interface PurchaseOrderLine {
   fabricSortNo?: string;
   millOldFabricSortNo?: string;
   millNewFabricSortNo?: string;
+  countName?: string;
   quantity: number;
   unitId?: string;
   unitName?: string;

@@ -141,14 +141,17 @@ export function useCheckpointsPage() {
 
   /**
    * Saves a pendency remark when the cell loses focus.
+   * @returns false when the save failed
    */
-  const saveRemark = async (item: CheckpointItem, pendencyRemark: string) => {
-    if (pendencyRemark === (item.pendencyRemark || '')) return;
+  const saveRemark = async (item: CheckpointItem, pendencyRemark: string): Promise<boolean> => {
+    if (pendencyRemark === (item.pendencyRemark || '')) return true;
     try {
       await checkpointService.updateRemark(item.id, pendencyRemark);
       await load();
+      return true;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not save the remark');
+      return false;
     }
   };
 

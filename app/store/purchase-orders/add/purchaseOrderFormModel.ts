@@ -13,6 +13,7 @@ export interface FabricPoLine {
   fabricSortNo: string;
   millOldFabricSortNo: string;
   millNewFabricSortNo: string;
+  countName: string;
   quantity: string;
   unitId: string;
   unitName: string;
@@ -49,6 +50,7 @@ export interface PoSavePayload {
     fabricSortNo: string;
     millOldFabricSortNo: string;
     millNewFabricSortNo: string;
+    countName: string;
     quantity: number;
     unitId?: string;
     unitName: string;
@@ -93,6 +95,11 @@ export function fabricColorLabel(fabric: FabricCatalog): string {
   return fabric.colourName || getLookupName(fabric.color);
 }
 
+/** Fabric count label from the catalog row. */
+export function fabricCountLabel(fabric: FabricCatalog): string {
+  return fabric.countName || getLookupName(fabric.count);
+}
+
 /**
  * Default PO unit: Meter from the fabric measurement master.
  */
@@ -126,6 +133,7 @@ export function emptyLine(
     fabricSortNo: '',
     millOldFabricSortNo: '',
     millNewFabricSortNo: '',
+    countName: '',
     quantity: '',
     unitId: meter.unitId,
     unitName: meter.unitName,
@@ -253,6 +261,7 @@ export function toPoPayload(
     fabricSortNo: line.fabricSortNo,
     millOldFabricSortNo: line.millOldFabricSortNo,
     millNewFabricSortNo: line.millNewFabricSortNo,
+    countName: line.countName,
     quantity: Number(line.quantity || 0),
     unitId: line.unitId || undefined,
     unitName: line.unitName,
@@ -374,6 +383,7 @@ export function formSeedFromOrder(
       fabricSortNo?: string;
       millOldFabricSortNo?: string;
       millNewFabricSortNo?: string;
+      countName?: string;
       quantity: number;
       unitId?: string;
       unitName?: string;
@@ -409,6 +419,7 @@ export function formSeedFromOrder(
         fabricSortNo: line.fabricSortNo || catalog?.fabricSortNo || '',
         millOldFabricSortNo: line.millOldFabricSortNo || catalog?.millOldFabricSortNo || '',
         millNewFabricSortNo: line.millNewFabricSortNo || catalog?.millNewFabricSortNo || '',
+        countName: line.countName || (catalog ? fabricCountLabel(catalog) : ''),
         quantity: line.quantity != null ? String(line.quantity) : '',
         unitId: unit?.id || line.unitId || '',
         unitName: unit ? measurementLabel(unit) : line.unitName || '',

@@ -9,8 +9,8 @@ import { UiButton, UiIconButton, UiStatusBadge } from '@/shared/components/ui';
 import { DrawerSection, DrawerStat, FactoryDrawer } from '@/shared/components/factory/FactoryDrawer';
 import { useFactoryList } from '@/shared/hooks/useFactoryList';
 import { factoryRequest, LotRow, PageResult, PurchaseOrderRow } from '@/shared/services/factoryApi';
-import { printStoreNote } from '@/shared/utils/printStoreNote';
 import { downloadPurchaseOrderRowsExcel, downloadPurchaseOrdersExcel } from './downloadPurchaseOrdersExcel';
+import { PurchaseOrderPrintMenu } from './PurchaseOrderPrintMenu';
 import { CutoffApprovedDrawer } from './CutoffApprovedDrawer';
 import { MarkInTransitDrawer } from './MarkInTransitDrawer';
 import { PurchaseOrderSummary } from './purchaseOrderSummary';
@@ -178,22 +178,7 @@ export default function PurchaseOrdersPage() {
                     setViewLots(await lotsFor(row.id).catch(() => []));
                   }}
                 />
-                <UiIconButton
-                  icon="ri-printer-line"
-                  tone="default"
-                  title="Print"
-                  aria-label="Print purchase order"
-                  onClick={() =>
-                    printStoreNote(row.number, [
-                      row.supplierName,
-                      row.status,
-                      ...(row.lines || []).map((line) => {
-                        const sort = line.fabricSortNo ? ` [${line.fabricSortNo}]` : '';
-                        return `${line.fabricName || line.lineId}${sort}  ${line.quantity}`;
-                      }),
-                    ])
-                  }
-                />
+                <PurchaseOrderPrintMenu orderId={row.id} poNumber={row.number} />
                 {row.status === 'Draft' || row.status === 'Submitted to Vendor' ? (
                   <Link href={`/store/purchase-orders/edit/${row.id}`} className="ui-icon-btn ui-icon-btn--edit" title="Edit" aria-label="Edit purchase order">
                     <i className="ri-pencil-line text-xs" aria-hidden />
