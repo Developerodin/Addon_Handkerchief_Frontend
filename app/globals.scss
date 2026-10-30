@@ -1297,3 +1297,15 @@
     width: 3rem;
   }
 }
+
+/* Phone and tablet: keep the last buttons above the browser/OS nav bar. */
+@media (max-width: 1024px) {
+  body {
+    padding-bottom: 50px;
+  }
+
+  /* Fixed drawers ignore body padding. Lift the whole overlay. */
+  .fixed.inset-0 {
+    bottom: 50px;
+  }
+}
