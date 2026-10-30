@@ -3,89 +3,82 @@
 import React from 'react';
 import type { CheckpointModule } from '@/shared/types/checkpoint';
 
-interface CheckpointModuleCardsProps {
+interface CheckpointSheetTabsProps {
   modules: CheckpointModule[];
   selectedId: string;
   canManage: boolean;
   onSelect: (moduleId: string) => void;
-  onAddItem: (moduleId: string) => void;
-  onEditModule: (module: CheckpointModule) => void;
-  onDeleteModule: (module: CheckpointModule) => void;
+  onAddModule: () => void;
 }
 
 /**
- * Module cards above the sheet. The selected card is the checklist that is open.
+ * Workbook tabs. Each module is one sheet. Arrow keys move between sheets.
  */
-export default function CheckpointModuleCards({
+export default function CheckpointSheetTabs({
   modules,
   selectedId,
   canManage,
   onSelect,
-  onAddItem,
-  onEditModule,
-  onDeleteModule,
-}: CheckpointModuleCardsProps) {
+  onAddModule,
+}: CheckpointSheetTabsProps) {
+  /**
+   * Moves selection to the next or previous sheet and focuses that tab.
+   */
+  const moveTab = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    const current = modules.findIndex((module) => module.id === selectedId);
+    if (current < 0) return;
+    event.preventDefault();
+    const delta = event.key === 'ArrowRight' ? 1 : -1;
+    const next = modules[(current + delta + modules.length) % modules.length];
+    onSelect(next.id);
+    window.requestAnimationFrame(() => {
+      document.getElementById(`checkpoint-tab-${next.id}`)?.focus();
+    });
+  };
+
   return (
-    <div className="flex gap-3 overflow-x-auto pb-1" role="list" aria-label="Checkpoint modules">
+    <div
+      role="tablist"
+      aria-label="Checkpoint modules"
+      className="flex items-end gap-0.5 overflow-x-auto border-t border-[#c8ccd3] bg-[#e8eaee] px-2 pt-1 dark:border-[#3a3a3c] dark:bg-[#2c2c2e]"
+      onKeyDown={moveTab}
+    >
       {modules.map((module) => {
         const selected = module.id === selectedId;
         const done = module.items.filter((item) => item.complete).length;
         return (
-          <article
+          <button
             key={module.id}
-            role="listitem"
-            className={`min-w-[220px] max-w-xs shrink-0 rounded-xl border p-3 shadow-sm ${
-              selected ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100' : 'border-gray-200 bg-white'
+            id={`checkpoint-tab-${module.id}`}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            aria-controls="checkpoint-sheet"
+            tabIndex={selected ? 0 : -1}
+            className={`mb-0 shrink-0 rounded-t-md px-3 py-2 text-[13px] leading-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[rgb(132,90,223)] ${
+              selected
+                ? 'border border-b-white bg-white font-semibold text-[#111827] dark:border-[#3a3a3c] dark:border-b-[#1c1c1e] dark:bg-[#1c1c1e] dark:text-[#f5f5f7]'
+                : 'border border-transparent font-medium text-[#374151] hover:bg-[#f4f6f8] dark:text-[#d1d1d6] dark:hover:bg-[#3a3a3c]'
             }`}
+            onClick={() => onSelect(module.id)}
           >
-            <button
-              type="button"
-              aria-pressed={selected}
-              className="w-full rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-              onClick={() => onSelect(module.id)}
-            >
-              <span className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-semibold text-gray-900">{module.name}</span>
-                <span
-                  className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                    module.complete ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-50 text-amber-800'
-                  }`}
-                >
-                  {module.complete ? 'Complete' : 'In progress'}
-                </span>
-              </span>
-              <span className="mt-1 block text-xs text-gray-500">
-                {done} of {module.items.length} checkpoints complete
-              </span>
-            </button>
-            {selected && canManage ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="rounded-lg bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-                  onClick={() => onAddItem(module.id)}
-                >
-                  Add checkpoint
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-                  onClick={() => onEditModule(module)}
-                >
-                  Rename
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-                  onClick={() => onDeleteModule(module)}
-                >
-                  Delete
-                </button>
-              </div>
-            ) : null}
-          </article>
+            {module.name}
+            <span className="ms-2 font-normal tabular-nums text-[#374151] dark:text-[#d1d1d6]">
+              {done}/{module.items.length}
+            </span>
+          </button>
         );
       })}
+      {canManage ? (
+        <button
+          type="button"
+          className="mb-1 ms-1 min-h-8 shrink-0 rounded-md px-2.5 text-[13px] font-semibold text-[#374151] hover:bg-[#f4f6f8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(132,90,223)] dark:text-[#d1d1d6] dark:hover:bg-[#3a3a3c]"
+          onClick={onAddModule}
+        >
+          New module
+        </button>
+      ) : null}
     </div>
   );
 }

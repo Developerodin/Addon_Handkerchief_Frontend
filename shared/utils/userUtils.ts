@@ -42,7 +42,7 @@ export const getAllowedFinalAttributes = (): string[] => {
   return [
     'brand',
     'age group',
-    'mrp'
+    'mrp',
   ];
 };
 
@@ -80,8 +80,17 @@ export const getAllowedDesignAttributes = (): string[] => {
     'color',
     'pattern',
     'season',
-    'foot length'
+    'foot length',
   ];
+};
+
+/**
+ * Item attributes every catalog role can set, including restricted users.
+ * @param attributeName - Name from the attributes master
+ * @returns Whether the attribute is Needles
+ */
+export const isSharedItemAttribute = (attributeName: string): boolean => {
+  return attributeName.toLowerCase().trim() === 'needles';
 };
 
 /**

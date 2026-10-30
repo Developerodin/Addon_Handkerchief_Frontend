@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { listFabricCatalogs, FabricCatalog, getLookupName } from '@/shared/services/fabricCatalogService';
 import {
   FabricBomItem,
@@ -11,13 +11,70 @@ import {
   BOM_TABLE_HEAD,
   BomSelectButton,
   BomNumberInput,
+  BomTextInput,
   BomDeleteButton,
+  metresFromPiecesPerMeter,
+  shownPiecesPerMeter,
 } from './ProductBomShared';
 
 interface FabricBomTableProps {
   items: FabricBomItem[];
   onChange: (items: FabricBomItem[]) => void;
   disabled?: boolean;
+}
+
+/**
+ * Pcs-per-meter field that keeps a trailing decimal while the user is typing.
+ */
+function PcsPerMeterInput({
+  value,
+  onCommit,
+  disabled,
+}: {
+  value: number;
+  onCommit: (value: number) => void;
+  disabled?: boolean;
+}) {
+  const [text, setText] = useState(() => (value > 0 ? String(value) : ''));
+  const focused = useRef(false);
+
+  useEffect(() => {
+    if (!focused.current) setText(value > 0 ? String(value) : '');
+  }, [value]);
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      aria-label="Pieces per meter"
+      className="w-full px-3 py-2 text-[12px] border border-gray-200 rounded focus:ring-0 focus:border-purple-300 disabled:bg-gray-50 disabled:text-gray-400"
+      value={text}
+      disabled={disabled}
+      placeholder="0.00"
+      onFocus={() => {
+        focused.current = true;
+      }}
+      onBlur={() => {
+        focused.current = false;
+        const parsed = parseFloat(text);
+        const next = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+        const unchanged = text === (value > 0 ? String(value) : '');
+        if (!unchanged) onCommit(next);
+        setText(next > 0 ? String(next) : '');
+      }}
+      onChange={(e) => {
+        const raw = e.target.value;
+        if (raw !== '' && !/^\d*\.?\d*$/.test(raw)) return;
+        setText(raw);
+        if (raw === '' || raw === '.') {
+          onCommit(0);
+          return;
+        }
+        const parsed = parseFloat(raw);
+        if (Number.isFinite(parsed) && parsed > 0) onCommit(parsed);
+      }}
+    />
+  );
 }
 
 const ITEMS_PER_PAGE = 20;
@@ -91,20 +148,50 @@ export function FabricBomTable({ items, onChange, disabled }: FabricBomTableProp
       ...next[selectedRowIndex],
       fabricCatalogId: fabric.id,
       fabricName: fabric.name,
+      fabricSortNo: fabric.fabricSortNo || '',
       unitCost: Number(fabric.rate) || next[selectedRowIndex]?.unitCost || 0,
     };
     onChange(next);
     closeModal();
   };
 
-  const updateQuantity = (index: number, value: number) => {
+  /**
+   * Store pcs per meter and the metres-per-piece quantity production already uses.
+   */
+  const updatePieces = (index: number, piecesPerMeter: number) => {
     const next = [...items];
-    next[index] = { ...next[index], quantity: value };
+    const current = next[index];
+    next[index] = {
+      ...current,
+      piecesPerMeter,
+      quantity: piecesPerMeter > 0 ? metresFromPiecesPerMeter(piecesPerMeter) : current.quantity,
+    };
+    onChange(next);
+  };
+
+  /**
+   * Patch size or UOM on one fabric line.
+   */
+  const patchRow = (index: number, patch: Partial<FabricBomItem>) => {
+    const next = [...items];
+    next[index] = { ...next[index], ...patch };
     onChange(next);
   };
 
   const addRow = () => {
-    onChange([...items, { fabricCatalogId: '', fabricName: '', quantity: 0, unitCost: 0, bomLineId: newBomLineId() }]);
+    onChange([
+      ...items,
+      {
+        fabricCatalogId: '',
+        fabricName: '',
+        fabricSortNo: '',
+        quantity: 0,
+        unitCost: 0,
+        bomLineId: newBomLineId(),
+        sizeLabel: '',
+        uom: 'CM',
+      },
+    ]);
   };
 
   const removeRow = (index: number) => {
@@ -115,30 +202,34 @@ export function FabricBomTable({ items, onChange, disabled }: FabricBomTableProp
     <BomSectionCard>
       <BomSectionHeader
         title="Fabrics"
-        description="Select fabric from catalog and specify metres per piece"
+        description="Select a fabric master and enter pieces per meter of fabric"
         addLabel="Add Fabric"
         onAdd={addRow}
         disabled={disabled}
       />
-      <BomTableShell>
+      <BomTableShell minWidthClass="min-w-[980px]">
         <thead>
           <tr className="bg-gray-50/80">
-            <th className={`${BOM_TABLE_HEAD} min-w-[220px]`}>Fabric</th>
-            <th className={`${BOM_TABLE_HEAD} w-36`}>Metres</th>
+            <th className={`${BOM_TABLE_HEAD} min-w-[140px]`}>Sort no</th>
+            <th className={`${BOM_TABLE_HEAD} min-w-[220px]`}>Fabric master</th>
+            <th className={`${BOM_TABLE_HEAD} w-28`}>Size</th>
+            <th className={`${BOM_TABLE_HEAD} w-20`}>UOM</th>
+            <th className={`${BOM_TABLE_HEAD} w-32`}>Pcs / meter</th>
+            <th className={`${BOM_TABLE_HEAD} w-32`}>Metres / pc</th>
             <th className={`${BOM_TABLE_HEAD} w-16 text-right`}> </th>
           </tr>
         </thead>
         <tbody>
           {items.length === 0 ? (
             <tr>
-              <td colSpan={3} className="text-center py-10 px-4">
+              <td colSpan={7} className="text-center py-10 px-4">
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center">
                     <i className="ri-scissors-cut-line text-purple-400 text-lg" />
                   </div>
                   <p className="text-[12px] font-medium text-gray-600">No fabric lines yet</p>
                   <p className="text-[11px] text-gray-400 max-w-xs">
-                    Add fabric from the catalog and specify metres required per finished piece.
+                    Add a fabric master and enter how many pieces one meter of fabric yields.
                   </p>
                   <button
                     type="button"
@@ -154,23 +245,59 @@ export function FabricBomTable({ items, onChange, disabled }: FabricBomTableProp
           ) : (
             items.map((row, index) => {
               const rowDisabled = disabled || !row.fabricCatalogId;
+              const sortNo = (row.fabricSortNo || '').trim();
               return (
-                <tr key={index} className="border-b border-gray-100 hover:bg-gray-50/40">
+                <tr key={row.bomLineId || index} className="border-b border-gray-100 hover:bg-gray-50/40">
+                  <td className="px-3 py-2.5">
+                    <span
+                      className="block px-3 py-2 text-[12px] font-medium text-gray-800 bg-gray-50 border border-gray-100 rounded truncate"
+                      title={sortNo || undefined}
+                      aria-label="Fabric sort number"
+                    >
+                      {sortNo || '—'}
+                    </span>
+                  </td>
                   <td className="px-3 py-2.5">
                     <BomSelectButton
                       label={row.fabricName}
-                      placeholder="Select fabric catalog…"
+                      placeholder="Select fabric master…"
                       onClick={() => openModal(index)}
                       disabled={disabled}
                     />
                   </td>
                   <td className="px-3 py-2.5">
+                    <BomTextInput
+                      value={row.sizeLabel || ''}
+                      onChange={(sizeLabel) => patchRow(index, { sizeLabel })}
+                      disabled={rowDisabled}
+                      placeholder="47*47"
+                      ariaLabel="Size"
+                    />
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <BomTextInput
+                      value={row.uom || 'CM'}
+                      onChange={(uom) => patchRow(index, { uom })}
+                      disabled={rowDisabled}
+                      placeholder="CM"
+                      ariaLabel="UOM"
+                    />
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <PcsPerMeterInput
+                      value={shownPiecesPerMeter(row)}
+                      onCommit={(pieces) => updatePieces(index, pieces)}
+                      disabled={rowDisabled}
+                    />
+                  </td>
+                  <td className="px-3 py-2.5">
                     <BomNumberInput
                       value={row.quantity}
-                      onChange={(v) => updateQuantity(index, v)}
-                      disabled={rowDisabled}
+                      onChange={() => undefined}
+                      disabled
                       placeholder="0.00"
                       suffix="m"
+                      ariaLabel="Metres per piece"
                     />
                   </td>
                   <td className="px-3 py-2.5 text-right">

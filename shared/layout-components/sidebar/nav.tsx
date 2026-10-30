@@ -142,6 +142,32 @@ const BaseMenuItems: any = [
         title: "Fabric Suppliers",
       },
       {
+        icon: FabricIcon,
+        title: "Thread",
+        type: "sub",
+        active: false,
+        selected: false,
+        path: "/catalog/thread",
+        children: [
+          {
+            icon: FabricIcon,
+            path: "/catalog/thread",
+            type: "link",
+            active: false,
+            selected: false,
+            title: "Thread Catalog",
+          },
+          {
+            icon: SupplierIcon,
+            path: "/catalog/thread-suppliers",
+            type: "link",
+            active: false,
+            selected: false,
+            title: "Thread Suppliers",
+          },
+        ],
+      },
+      {
         icon: MaterialIcon,
         path: "/catalog/raw-material",
         type: "link",

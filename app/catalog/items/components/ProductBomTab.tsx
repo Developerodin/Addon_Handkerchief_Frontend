@@ -26,7 +26,11 @@ export function ProductBomTab({
         fabricLineCount={fabricItems.filter((i) => i.fabricCatalogId).length}
         packagingLineCount={packagingItems.filter((i) => i.rawMaterialId).length}
       />
-      <FabricBomTable items={fabricItems} onChange={onFabricChange} disabled={disabled} />
+      <FabricBomTable
+        items={fabricItems}
+        onChange={onFabricChange}
+        disabled={disabled}
+      />
       <RawMaterialBomTable items={packagingItems} onChange={onPackagingChange} disabled={disabled} />
     </div>
   );

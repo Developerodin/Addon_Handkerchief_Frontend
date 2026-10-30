@@ -9,8 +9,9 @@ import { API_BASE_URL } from '@/shared/data/utilities/api';
 import { toast, Toaster } from 'react-hot-toast';
 import HelpIcon from '@/shared/components/HelpIcon';
 import { useSelector } from 'react-redux';
-import { isDesignUser, isProductionUser, isFinalUser, shouldShowAttribute, shouldShowAttributeForFinal } from '@/shared/utils/userUtils';
+import { isDesignUser, isProductionUser, isFinalUser, isSharedItemAttribute, shouldShowAttribute, shouldShowAttributeForFinal } from '@/shared/utils/userUtils';
 import fabricCatalogService, { FabricCatalog } from '@/shared/services/fabricCatalogService';
+import { metresFromPiecesPerMeter } from '@/app/catalog/items/components/ProductBomShared';
 import { styleCodeService } from '@/shared/services/styleCodeService';
 import productService, { ProductBulkRow } from '@/shared/services/productService';
 import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud';
@@ -32,6 +33,7 @@ interface Product {
   softwareCode: string;
   internalCode: string;
   knittingCode?: string;
+  materialCode?: string;
   vendorCode: string;
   factoryCode: string;
   styleCode: string;
@@ -58,12 +60,24 @@ interface ProductsResponse {
 
 interface ProductBOM {
   _id?: string;
-  fabricCatalogId?: string;
+  fabricCatalogId?: string | { id?: string; _id?: string; fabricSortNo?: string };
   fabricName?: string;
   yarnCatalogId?: string;
   yarnName?: string;
   quantity: number;
   unitCost?: number;
+  piecesPerMeter?: number;
+  sizeLabel?: string;
+  uom?: string;
+}
+
+/**
+ * Catalog id from a BOM fabric cell that may be a string or a populated document.
+ */
+function bomFabricId(value: ProductBOM['fabricCatalogId']): string {
+  if (value == null || value === '') return '';
+  if (typeof value === 'object') return String(value.id || value._id || '');
+  return String(value);
 }
 
 interface ProductProcess {
@@ -331,13 +345,13 @@ const ProductListPage = () => {
   // Helper function to get allowed fields based on user type
   const getAllowedFields = () => {
     if (isProduction) {
-      return ['ID', 'Factory Code', 'Needles'];
+      return ['ID', 'Factory Code', 'Needles', 'Material Code'];
     } else if (isFinal) {
-      return ['ID', 'Description', 'Needles'];
+      return ['ID', 'Description', 'Needles', 'Material Code'];
     } else if (isDesign) {
-      return ['ID', 'Name', 'Category', 'Software Code', 'Internal Code', 'Knitting Code', 'Vendor Code', 'Needles'];
+      return ['ID', 'Name', 'Category', 'Software Code', 'Internal Code', 'Knitting Code', 'Vendor Code', 'Needles', 'Material Code'];
     } else {
-      return ['ID', 'Name', 'Category', 'Software Code', 'Internal Code', 'Knitting Code', 'Vendor Code', 'Factory Code', 'Description', 'Needles'];
+      return ['ID', 'Name', 'Category', 'Software Code', 'Internal Code', 'Knitting Code', 'Vendor Code', 'Factory Code', 'Description', 'Needles', 'Material Code'];
     }
   };
 
@@ -402,6 +416,15 @@ const ProductListPage = () => {
           const needlesVal = needlesKey ? product.attributes![needlesKey] : '';
           exportObj['Needles'] = (needlesVal && attrValueToName[needlesVal]) ? attrValueToName[needlesVal] : (needlesVal || '');
           break;
+        case 'Material Code': {
+          const stored = product.materialCode || '';
+          const materialKey = !stored && product.attributes
+            ? Object.keys(product.attributes).find(k => k.toLowerCase() === 'material code')
+            : '';
+          const materialVal = stored || (materialKey ? product.attributes![materialKey] : '');
+          exportObj['Material Code'] = materialVal || '';
+          break;
+        }
       }
     });
 
@@ -660,12 +683,12 @@ const ProductListPage = () => {
           return Object.entries(product.attributes)
             .filter(([attrName]) => {
               // Always exclude MRP from attributes (it's now in style codes)
-              if (attrName.toLowerCase() === 'mrp') {
+              if (attrName.toLowerCase() === 'mrp' || attrName.toLowerCase() === 'material code') {
                 return false;
               }
               // Filter attributes based on user type
               if (isProduction) {
-                return attrName.toLowerCase() === 'needles';
+                return isSharedItemAttribute(attrName);
               } else if (isFinal) {
                 return shouldShowAttributeForFinal(attrName, isFinal);
               } else if (isDesign) {
@@ -774,10 +797,9 @@ const ProductListPage = () => {
       clearInterval(progressTimer2);
       setExportProgress(55);
       
-      // Create reverse mapping from fabric catalog ID to fabric name
-      const fabricNameMapping: Record<string, string> = {};
+      const fabricSortById: Record<string, string> = {};
       allFabricCatalogs.forEach((fabric: FabricCatalog) => {
-        fabricNameMapping[fabric.id] = fabric.name;
+        if (fabric.fabricSortNo) fabricSortById[fabric.id] = fabric.fabricSortNo;
       });
       setExportProgress(60);
       
@@ -789,14 +811,34 @@ const ProductListPage = () => {
           // Update progress during data processing
           setExportProgress(60 + Math.floor((index / selectedProductsData.length) * 15));
         }
-        return (product.bom || []).map(bom => {
-          const fabricId = bom.fabricCatalogId || bom.yarnCatalogId || '';
+        const lines = product.bom || [];
+        if (lines.length === 0) {
+          return [{
+            'Product ID': product.id,
+            'Product Name': product.name,
+            'Sort No': '',
+            'Size': '',
+            'UOM': '',
+            'Pcs per meter': '',
+            'Unit Cost': '',
+          }];
+        }
+        return lines.map((bom) => {
+          const fabricRef = bom.fabricCatalogId;
+          const fabricId = bomFabricId(fabricRef) || String(bom.yarnCatalogId || '');
+          const sortFromRef = fabricRef && typeof fabricRef === 'object' ? fabricRef.fabricSortNo || '' : '';
+          const pcs = bom.piecesPerMeter && bom.piecesPerMeter > 0
+            ? bom.piecesPerMeter
+            : bom.quantity > 0
+              ? Number((1 / bom.quantity).toFixed(6))
+              : '';
           return {
             'Product ID': product.id,
             'Product Name': product.name,
-            'Fabric Name': bom.fabricName || bom.yarnName || fabricNameMapping[fabricId] || fabricId,
-            'Fabric ID': fabricId,
-            'Quantity': bom.quantity,
+            'Sort No': sortFromRef || fabricSortById[fabricId] || '',
+            'Size': bom.sizeLabel || '',
+            'UOM': bom.uom || 'CM',
+            'Pcs per meter': pcs,
             'Unit Cost': bom.unitCost ?? '',
           };
         });
@@ -1038,6 +1080,7 @@ const ProductListPage = () => {
         if (allowedFields.includes('Description')) row['Description'] = exampleNum === 1 ? 'Example product description' : 'Another example product';
         // Needles: pass option value name (string from masters); backend expects e.g. attributes.Needles: "7 GG"
         if (allowedFields.includes('Needles')) row['Needles'] = exampleNum === 1 ? '7 GG' : '10 GG';
+        if (allowedFields.includes('Material Code')) row['Material Code'] = '';
         // Style codes: only Style Code ID 1, 2, 3... (no EAN/MRP columns)
         if (!isProduction) {
           row['Style Code ID 1'] = exampleNum === 1 ? '6990090b7cd417242c5e848f' : '';
@@ -1072,7 +1115,8 @@ const ProductListPage = () => {
         { 'Instructions': '7. Only fill in the fields visible in this template based on your user role.', '': '' },
         { 'Instructions': '8. If a category name is not found, the product will be created without a category.', '': '' },
         { 'Instructions': '9. Style Codes: Use Style Code ID 1, Style Code ID 2, etc. with IDs from the Style Code master. Fill only the ID – no other columns needed.', '': '' },
-        { 'Instructions': '11. Needles: Use the Needles option value name from the attribute master (e.g. "7 GG"). Backend expects attributes.Needles as string from masters. You can use ID or option name in Excel; system passes the resolved name string on import.', '': '' }
+        { 'Instructions': '11. Needles: Use the Needles option value name from the attribute master (e.g. "7 GG"). Backend expects attributes.Needles as string from masters. You can use ID or option name in Excel; system passes the resolved name string on import.', '': '' },
+        { 'Instructions': '12. Material Code: Free text. Type the code as it should be stored. Leave blank if the item has no material code.', '': '' }
       ];
       const wsInstructions = XLSX.utils.json_to_sheet(instructionsTemplate);
       XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instructions');
@@ -1183,26 +1227,20 @@ const ProductListPage = () => {
         {
           'Product ID': '680c7a2bc30d1e00643b84e8',
           'Product Name': 'Example Product 1',
-          'Fabric Name': 'Cotton Poplin White',
-          'Fabric ID': '',
-          'Quantity': 0.25,
-          'Unit Cost': 45
+          'Sort No': 'H0001W',
+          'Size': '47*47',
+          'UOM': 'CM',
+          'Pcs per meter': 5.9,
+          'Unit Cost': ''
         },
         {
           'Product ID': '680c7a2bc30d1e00643b84e8',
           'Product Name': 'Example Product 1',
-          'Fabric Name': 'Linen Blend Ivory',
-          'Fabric ID': '',
-          'Quantity': 0.1,
-          'Unit Cost': 60
-        },
-        {
-          'Product ID': '68246cc23d04e20065d3d60a',
-          'Product Name': 'Example Product 2',
-          'Fabric Name': 'Cotton Poplin White',
-          'Fabric ID': '',
-          'Quantity': 0.3,
-          'Unit Cost': 45
+          'Sort No': 'H0002W',
+          'Size': '45*45',
+          'UOM': 'CM',
+          'Pcs per meter': 6.2,
+          'Unit Cost': ''
         }
       ];
       
@@ -1220,27 +1258,27 @@ const ProductListPage = () => {
           '': ''
         },
         {
-          'Instructions': '2. Product ID is required and must be a valid product ID from your system.',
+          'Instructions': '2. Do not change Product ID. It must be the product id from Export by BOM.',
           '': ''
         },
         {
-          'Instructions': '3. Product Name is for reference only (not used in import).',
+          'Instructions': '3. Product Name is for reference only and is not imported.',
           '': ''
         },
         {
-          'Instructions': '4. Fabric Name must match a fabric catalog name (or provide Fabric ID).',
+          'Instructions': '4. Sort No is the fabric master code (for example H0001W). It must match a fabric catalog sort number.',
           '': ''
         },
         {
-          'Instructions': '5. Quantity is metres per piece (positive number).',
+          'Instructions': '5. Fill Size, UOM, and Pcs per meter. UOM defaults to CM when blank. Metres per piece is calculated as 1 / Pcs per meter.',
           '': ''
         },
         {
-          'Instructions': '6. Each row represents one fabric-quantity pair for a product.',
+          'Instructions': '6. Unit Cost is optional. Leave it blank to use the fabric catalog rate.',
           '': ''
         },
         {
-          'Instructions': '7. Multiple fabrics for the same product should be on separate rows.',
+          'Instructions': '7. One row per fabric. Repeat Product ID for each extra fabric on the same product.',
           '': ''
         }
       ];
@@ -1488,18 +1526,24 @@ const ProductListPage = () => {
           });
           // Needles: resolve Excel value (id or name) -> option value name (backend expects string from masters e.g. Needles: "7 GG")
           const needlesToNameMap: Record<string, string> = {};
-          const needlesAttr = allAttributes.find((a: any) => (a.name || '').toLowerCase() === 'needles');
-          if (needlesAttr && Array.isArray(needlesAttr.optionValues)) {
-            needlesAttr.optionValues.forEach((opt: any) => {
+          /**
+           * Maps an attribute's option ids and names onto a lookup used during Excel import.
+           * @param attr - Product attribute from the attributes master
+           * @param target - Lookup filled with id and name keys
+           */
+          const mapOptionNames = (attr: any, target: Record<string, string>) => {
+            if (!attr || !Array.isArray(attr.optionValues)) return;
+            attr.optionValues.forEach((opt: any) => {
               const id = String(opt.id || opt._id || opt.valueId || '');
               const name = (opt.name || opt.value || '').toString().trim();
               if (name) {
-                needlesToNameMap[name.toLowerCase()] = name;
-                needlesToNameMap[name] = name;
+                target[name.toLowerCase()] = name;
+                target[name] = name;
               }
-              if (id) needlesToNameMap[id] = name || id;
+              if (id) target[id] = name || id;
             });
-          }
+          };
+          mapOptionNames(allAttributes.find((a: any) => (a.name || '').toLowerCase() === 'needles'), needlesToNameMap);
 
           setImportProgress(50);
 
@@ -1542,6 +1586,10 @@ const ProductListPage = () => {
               productData.attributes = productData.attributes || {};
               const needlesName = needlesToNameMap[needlesVal.toLowerCase()] || needlesToNameMap[needlesVal] || needlesVal;
               productData.attributes['Needles'] = needlesName;
+            }
+            const materialCodeVal = String(getRowVal(row, 'Material Code') ?? '').trim();
+            if (materialCodeVal) {
+              productData.materialCode = materialCodeVal;
             }
 
             // Only include fields allowed for this user type
@@ -1739,16 +1787,19 @@ const ProductListPage = () => {
             const attributeName = row['Attribute Name'].toString().trim();
             const attributeValue = row['Attribute Value'].toString().trim();
             
-            // Always exclude MRP from attributes (it's now in style codes)
             if (attributeName.toLowerCase() === 'mrp') {
               mappingErrors.push(`Product ${productId}: MRP is no longer an attribute. Please use Style Codes sheet instead.`);
+              return;
+            }
+            if (attributeName.toLowerCase() === 'material code') {
+              mappingErrors.push(`Product ${productId}: Material Code is a general field. Use the Material Code column on the Products sheet.`);
               return;
             }
             
             // Filter attributes based on user type
             let isAllowed = false;
             if (isProduction) {
-              isAllowed = attributeName.toLowerCase() === 'needles';
+              isAllowed = isSharedItemAttribute(attributeName);
             } else if (isFinal) {
               isAllowed = shouldShowAttributeForFinal(attributeName, isFinal);
             } else if (isDesign) {
@@ -1883,14 +1934,16 @@ const ProductListPage = () => {
           });
           console.log('Parsed BOM data:', bomData);
 
-          // Filter out rows without required fields
+          // Blank export rows (product only) are skipped. A fabric key with no consumption is an error later.
           const validBOM = bomData.filter((row: any) => {
             const fabricName = row['Fabric Name'] || row['Yarn Name'];
-            return row['Product ID'] && fabricName && row['Quantity'] !== undefined;
+            const sortNo = row['Sort No'] || row['Fabric Sort No'] || row['Fabric Master'];
+            const fabricId = row['Fabric ID'];
+            return row['Product ID'] && (sortNo || fabricId || fabricName);
           });
 
           if (validBOM.length === 0) {
-            toast.error('No valid BOM entries found in the Excel file. Please ensure Product ID, Fabric Name (or Yarn Name), and Quantity are provided.');
+            toast.error('No valid BOM entries found. Each row needs Product ID, Sort No, and Pcs per meter.');
             setImportProgress(null);
             toast.dismiss(loadingToast);
             return;
@@ -1919,11 +1972,17 @@ const ProductListPage = () => {
             }
           }
           
-          // Create mapping from fabric name to fabric catalog ID
+          // Name, id, and sort number all resolve to a fabric catalog id.
           const fabricMapping: Record<string, string> = {};
+          const sortMapping: Record<string, string> = {};
+          const fabricById: Record<string, FabricCatalog> = {};
           allFabricCatalogs.forEach((fabric: FabricCatalog) => {
             fabricMapping[fabric.name.toLowerCase()] = fabric.id;
-            if (fabric.id) fabricMapping[fabric.id.toLowerCase()] = fabric.id;
+            if (fabric.id) {
+              fabricMapping[fabric.id.toLowerCase()] = fabric.id;
+              fabricById[fabric.id] = fabric;
+            }
+            if (fabric.fabricSortNo) sortMapping[fabric.fabricSortNo.toLowerCase()] = fabric.id;
           });
 
           console.log('Fabric mapping created:', fabricMapping);
@@ -1931,32 +1990,66 @@ const ProductListPage = () => {
           setImportProgress(50);
 
           // Group BOM by product ID and map fabric names to IDs
-          const productBOM: Record<string, Array<{fabricCatalogId: string, fabricName: string, quantity: number, unitCost?: number}>> = {};
+          const productBOM: Record<string, Array<{
+            fabricCatalogId: string;
+            fabricName: string;
+            quantity: number;
+            unitCost?: number;
+            piecesPerMeter?: number;
+            sizeLabel: string;
+            uom: string;
+          }>> = {};
           const mappingErrors: string[] = [];
 
           validBOM.forEach((row: any) => {
             const productId = row['Product ID'].toString().trim();
-            const fabricName = (row['Fabric Name'] || row['Yarn Name'] || '').toString().trim();
+            const legacyName = (row['Fabric Name'] || row['Yarn Name'] || '').toString().trim();
             const fabricIdCol = row['Fabric ID'] ? row['Fabric ID'].toString().trim() : '';
-            const quantity = parseFloat(row['Quantity']);
+            const sortNo = (row['Sort No'] || row['Fabric Sort No'] || row['Fabric Master'] || '').toString().trim();
+            const pcsCell = row['Pcs per meter'];
+            let piecesPerMeter: number | undefined;
+            if (pcsCell !== undefined && String(pcsCell).trim() !== '') {
+              const parsedPcs = parseFloat(pcsCell);
+              if (!Number.isNaN(parsedPcs) && parsedPcs > 0) piecesPerMeter = parsedPcs;
+            }
+            let quantity = parseFloat(row['Quantity']);
+            if (piecesPerMeter && piecesPerMeter > 0) quantity = metresFromPiecesPerMeter(piecesPerMeter);
             const unitCost = row['Unit Cost'] !== undefined && row['Unit Cost'] !== '' ? parseFloat(row['Unit Cost']) : undefined;
-            
-            const fabricCatalogId = fabricIdCol
-              || fabricMapping[fabricName.toLowerCase()]
-              || fabricMapping[fabricIdCol.toLowerCase()];
-            
-            if (!fabricCatalogId) {
-              mappingErrors.push(`Fabric name "${fabricName}" not found in the system`);
+            const fabricLabel = sortNo || legacyName || fabricIdCol;
+
+            if (!Number.isFinite(quantity) || quantity < 0) {
+              mappingErrors.push(`Product ${productId}: Pcs per meter is missing for "${fabricLabel}"`);
               return;
             }
-            
+
+            let fabricCatalogId = '';
+            if (sortNo) {
+              fabricCatalogId = sortMapping[sortNo.toLowerCase()] || '';
+            } else if (fabricIdCol) {
+              fabricCatalogId = fabricMapping[fabricIdCol.toLowerCase()] || fabricIdCol;
+            } else if (legacyName) {
+              fabricCatalogId = fabricMapping[legacyName.toLowerCase()] || '';
+            }
+
+            if (!fabricCatalogId) {
+              mappingErrors.push(sortNo
+                ? `Sort No "${sortNo}" not found in the fabric catalog`
+                : `Fabric "${fabricLabel}" not found in the system`);
+              return;
+            }
+
             if (!productBOM[productId]) {
               productBOM[productId] = [];
             }
+            const sizeLabel = row['Size'] != null ? String(row['Size']).trim() : '';
+            const uomCell = row['UOM'] != null ? String(row['UOM']).trim() : '';
             productBOM[productId].push({
               fabricCatalogId,
-              fabricName,
+              fabricName: fabricById[fabricCatalogId]?.name || legacyName || sortNo,
               quantity,
+              sizeLabel,
+              uom: uomCell || 'CM',
+              ...(piecesPerMeter ? { piecesPerMeter } : {}),
               ...(unitCost != null && !Number.isNaN(unitCost) ? { unitCost } : {}),
             });
           });
@@ -1965,9 +2058,9 @@ const ProductListPage = () => {
           if (mappingErrors.length > 0) {
             const errorMessages = mappingErrors.slice(0, 5).join('\n');
             if (mappingErrors.length > 5) {
-              toast.error(`Some fabrics not found:\n${errorMessages}\n...and ${mappingErrors.length - 5} more errors`);
+              toast.error(`BOM import stopped:\n${errorMessages}\n...and ${mappingErrors.length - 5} more errors`);
             } else {
-              toast.error(`Some fabrics not found:\n${errorMessages}`);
+              toast.error(`BOM import stopped:\n${errorMessages}`);
             }
             setImportProgress(null);
             toast.dismiss(loadingToast);
@@ -2324,14 +2417,16 @@ const ProductListPage = () => {
       const rows = await productService.bulkExport();
       setExportProgress(50);
       const wb = XLSX.utils.book_new();
-      const cols = ['id', 'name', 'knittingCode', 'factoryCode', 'Needles', 'styleCodeId1', 'styleCodeId2', 'styleCodeId3', 'styleCodeId4', 'styleCodeId5', 'styleCodeId6', 'styleCodeId7', 'styleCodeId8', 'styleCodeId9', 'styleCodeId10'];
+      const cols = ['id', 'name', 'knittingCode', 'factoryCode', 'materialCode', 'Needles', 'styleCodeId1', 'styleCodeId2', 'styleCodeId3', 'styleCodeId4', 'styleCodeId5', 'styleCodeId6', 'styleCodeId7', 'styleCodeId8', 'styleCodeId9', 'styleCodeId10'];
       const exportData = rows.map((r: ProductBulkRow) => {
         const row: Record<string, string> = {};
         const src = r as unknown as Record<string, unknown>;
         cols.forEach(c => {
-          const val = c === 'Needles' && src['attributes'] && typeof src['attributes'] === 'object'
-            ? (src['attributes'] as Record<string, unknown>)['Needles']
-            : src[c];
+          const nested = src['attributes'];
+          const fromAttributes = c === 'Needles' && nested && typeof nested === 'object'
+            ? (nested as Record<string, unknown>)[c]
+            : undefined;
+          const val = fromAttributes != null && String(fromAttributes) !== '' ? fromAttributes : src[c];
           row[c] = val != null ? String(val) : '';
         });
         return row;
@@ -2388,10 +2483,12 @@ const ProductListPage = () => {
         if (knittingCode) product.knittingCode = knittingCode;
         const factoryCode = getVal(row, 'factoryCode');
         if (factoryCode) product.factoryCode = factoryCode;
+        const materialCode = getVal(row, 'materialCode') || getVal(row, 'Material Code');
+        if (materialCode) product.materialCode = materialCode;
+        const attributes: { Needles?: string } = {};
         const Needles = getVal(row, 'Needles');
-        if (Needles) {
-          product.attributes = { Needles };
-        }
+        if (Needles) attributes.Needles = Needles;
+        if (Object.keys(attributes).length > 0) product.attributes = attributes;
         for (let i = 1; i <= 10; i++) {
           const val = getVal(row, `styleCodeId${i}`);
           if (val) product[`styleCodeId${i}`] = val;
@@ -2728,6 +2825,7 @@ const ProductListPage = () => {
                   {!isDesign && !isProduction && <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Internal Code</th>}
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Category</th>
                   <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Factory Code</th>
+                  <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Material Code</th>
                   {isFinal && <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">EAN Code</th>}
                   {isFinal && <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Description</th>}
                   {(canUpdate || canDelete) && (
@@ -2764,6 +2862,7 @@ const ProductListPage = () => {
                     {!isDesign && !isProduction && <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{product.internalCode || ''}</td>}
                     <td className="px-1.5 py-2.5 text-[12px] font-semibold text-gray-600 border border-gray-200">{getCategoryName(product.category)}</td>
                     <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{product.factoryCode || ''}</td>
+                    <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{product.materialCode || ''}</td>
                     {isFinal && <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-600 border border-gray-200">{product.eanCode || ''}</td>}
                     {isFinal && <td className="px-1.5 py-2.5 text-[12px] font-medium text-gray-400 max-w-xs truncate border border-gray-200" title={product.description || ''}>{product.description || ''}</td>}
                     {(canUpdate || canDelete) && (

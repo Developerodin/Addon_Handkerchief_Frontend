@@ -36,6 +36,7 @@ export function FabricRequirementTable({
   completeError,
   onIssue,
   onComplete,
+  mode = 'issue',
 }: {
   lines: FabricLineView[];
   issues: FabricIssueRow[];
@@ -46,6 +47,7 @@ export function FabricRequirementTable({
   completeError: string;
   onIssue: (line: FabricLineView) => void;
   onComplete: () => void;
+  mode?: 'issue' | 'return';
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('fabric');
   const [sortAsc, setSortAsc] = useState(true);
@@ -54,18 +56,19 @@ export function FabricRequirementTable({
   const columns: UiTableColumn<FabricLineView>[] = [
     {
       key: 'issue',
-      label: 'Issue',
+      label: mode === 'return' ? 'Return' : 'Issue',
       render: (line) => {
-        const closed = line.fabricIssueStatus === 'completed';
+        const closed = mode === 'issue' && line.fabricIssueStatus === 'completed';
+        const label = mode === 'return' ? 'Return' : 'Issue';
         return (
           <UiButton
             type="button"
             variant="primary"
             disabled={closed}
-            title={closed ? 'Fabric issue is complete for this article.' : 'Issue a roll'}
+            title={closed ? 'Fabric issue is complete for this article.' : `${label} a roll`}
             onClick={() => onIssue(line)}
           >
-            Issue
+            {label}
           </UiButton>
         );
       },

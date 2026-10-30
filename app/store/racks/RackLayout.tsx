@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
+import { useNavigation } from '@/shared/contextapi/navigationContext';
 import { factoryRequest, RollRow } from '@/shared/services/factoryApi';
 import { RackDetailsDrawer, RackMove, StorageRackCard } from './RackDetailsDrawer';
 import { RackFilterPanel } from './RackFilterPanel';
@@ -20,6 +21,8 @@ const outline = 'inline-flex items-center gap-1 rounded-md border border-gray-20
  * Rolls storage: scan a roll onto a rack barcode, filter the grid, and open a rack.
  */
 export function RackLayout() {
+  const { hasCrudPermission } = useNavigation();
+  const canDeleteRack = hasCrudPermission('Fabric / Storage', 'delete');
   const [racks, setRacks] = useState<StorageRackCard[]>([]);
   const [query, setQuery] = useState('');
   const [fabric, setFabric] = useState('');
@@ -57,10 +60,7 @@ export function RackLayout() {
     () => [...new Set(racks.map((rack) => rack.zone).filter(Boolean))].sort(),
     [racks],
   );
-  const floors = useMemo(
-    () => [...new Set(racks.map((rack) => rack.floor).filter(Boolean))].sort(),
-    [racks],
-  );
+  const existingCodes = useMemo(() => racks.map((rack) => rack.code), [racks]);
 
   const filtered = useMemo(() => filterRacks(racks, { query, fabric, occupancy, section }), [racks, query, fabric, occupancy, section]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -217,7 +217,20 @@ export function RackLayout() {
         ))}
       </div>
       {active ? (
-        <RackDetailsDrawer rack={active} rolls={rolls} history={history} loading={loadingRack} error={error} onClose={() => setActive(null)} />
+        <RackDetailsDrawer
+          rack={active}
+          rolls={rolls}
+          history={history}
+          loading={loadingRack}
+          error={error}
+          canDelete={canDeleteRack}
+          onClose={() => setActive(null)}
+          onDeleted={() => {
+            toast.success(`Deleted ${active.code}`);
+            setActive(null);
+            load().catch((err) => setError(err instanceof Error ? err.message : 'Could not refresh racks'));
+          }}
+        />
       ) : null}
       {placing ? (
         <PlaceRollDrawer
@@ -233,11 +246,10 @@ export function RackLayout() {
       ) : null}
       {addOpen ? (
         <AddRacksDrawer
-          sections={sections}
-          floors={floors}
+          existingCodes={existingCodes}
           onClose={() => setAddOpen(false)}
-          onCreated={(count) => {
-            toast.success(`Added ${count} rack${count === 1 ? '' : 's'}`);
+          onCreated={(created, skipped) => {
+            toast.success(addedRackMessage(created, skipped));
             setAddOpen(false);
             load().catch((err) => setError(err instanceof Error ? err.message : 'Could not refresh racks'));
           }}
@@ -260,7 +272,16 @@ export function RackLayout() {
 }
 
 /**
- * Rack sticker for QZ Tray. The barcode is the rack barcode, or the rack code when none is set.
+ * Toast after a fill-to-count add. created is how many new codes were inserted.
+ */
+function addedRackMessage(created: number, skipped: number): string {
+  if (!created) return skipped ? 'Those racks already exist' : 'No racks to add';
+  const added = `Added ${created} rack${created === 1 ? '' : 's'}`;
+  return skipped ? `${added}. ${skipped} already existed.` : added;
+}
+
+/**
+ * Rack sticker for QZ Tray / A4 preview. The barcode is the rack barcode, or the rack code when none is set.
  */
 function rackPrintItem(rack: StorageRackCard): RackPrintItem {
   return {

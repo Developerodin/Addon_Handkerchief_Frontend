@@ -11,6 +11,10 @@ interface TrackedRoll {
   receivedLotNumber?: string;
   grossWeight?: number;
   netWeight?: number;
+  qtyMeters?: number;
+  currentGrossWeight?: number | null;
+  currentNetWeight?: number | null;
+  currentQtyMeters?: number | null;
   scaleWeight?: number;
   qcStatus?: string;
   status?: string;
@@ -139,10 +143,23 @@ function RollCard({ roll, location, stored }: { roll: TrackedRoll; location: str
         <i className="ri-file-list-3-line shrink-0 text-primary" aria-hidden />
         <span className="truncate" title={roll.rollCode || roll.barcode}>Roll {roll.rollCode || roll.barcode}</span>
       </h3>
-      <div className="grid grid-cols-3 gap-3" role="group" aria-label="Roll weights">
-        <Weight label="Gross (kg)" value={formatKg(roll.grossWeight)} />
-        <Weight label="Net (kg)" value={formatKg(roll.netWeight)} highlight />
-        <Weight label="Scale (kg)" value={formatKg(roll.scaleWeight)} />
+      <div className="grid gap-3" role="group" aria-label="Roll weights">
+        <div>
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-gray-500">Received</p>
+          <div className="grid grid-cols-3 gap-2">
+            <Weight label="Gross (kg)" value={formatKg(roll.grossWeight)} />
+            <Weight label="Net (kg)" value={formatKg(roll.netWeight)} highlight />
+            <Weight label="Meters" value={formatMeters(roll.qtyMeters)} />
+          </div>
+        </div>
+        <div>
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-gray-500">Current</p>
+          <div className="grid grid-cols-3 gap-2">
+            <Weight label="Gross (kg)" value={formatKg(roll.currentGrossWeight)} />
+            <Weight label="Net (kg)" value={formatKg(roll.currentNetWeight)} highlight />
+            <Weight label="Meters" value={formatMeters(roll.currentQtyMeters)} />
+          </div>
+        </div>
       </div>
       <dl>
         <Fact label="Barcode" value={roll.barcode} />
@@ -152,6 +169,7 @@ function RollCard({ roll, location, stored }: { roll: TrackedRoll; location: str
         <Fact label="Colour" value={roll.colourName} />
         <Fact label="Lot" value={roll.receivedLotNumber} />
         <Fact label="GRN" value={roll.grnNumber} />
+        <Fact label="Scale (kg)" value={formatKg(roll.scaleWeight)} />
         <Fact label="Location" value={stored ? location : location || '—'} />
         <Fact label="Stored" value={stored ? 'Yes' : 'No'} />
         <Fact label="QC" value={qc} />
@@ -217,9 +235,17 @@ function Fact({ label, value }: { label: string; value?: string | null }) {
 /**
  * Kilograms, or an em dash when the weight was never recorded.
  */
-function formatKg(value?: number): string {
+function formatKg(value?: number | null): string {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
   return value.toFixed(2);
+}
+
+/**
+ * Meters, or an em dash when the quantity was never recorded.
+ */
+function formatMeters(value?: number | null): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+  return value.toLocaleString('en-IN', { maximumFractionDigits: 3 });
 }
 
 /**

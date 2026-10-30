@@ -12,18 +12,15 @@ import { PurchaseOrderExcelActions } from './PurchaseOrderExcelActions';
 import { PurchaseOrderFormActions } from './PurchaseOrderFormActions';
 import { PurchaseOrderItemsTable } from './PurchaseOrderItemsTable';
 import { downloadFabricItemsExcel, downloadFabricItemsTemplate, lineFromImport, parseFabricItemsExcel } from './purchaseOrderExcel';
+import { lineAfterPick, lineAfterQuery } from './purchaseOrderLineDraft';
 import {
   creditDaysFromTerms,
-  defaultMeterUnit,
   emptyLine,
   fabricsForSupplier,
-  fabricColorLabel,
-  fabricTypeLabel,
   filterFabrics,
   firstIssue,
   formatInr,
   formatQty,
-  gstNumber,
   lineHasContent,
   PoFormSeed,
   PoSavePayload,
@@ -144,49 +141,11 @@ export function PurchaseOrderForm({ fabrics, suppliers, units, saving, seed, all
   const onQuery = (lineId: string, query: string) => {
     setActiveLineId(lineId);
     const matches = filterFabrics(fabricChoices, query);
-    const exact = matches.some((fabric) => fabric.name.toLowerCase() === query.trim().toLowerCase());
-    setLines((prev) =>
-      prev.map((line) => {
-        if (line.lineId !== lineId) return line;
-        if (exact && line.fabricName && line.fabricName.toLowerCase() === query.trim().toLowerCase()) return { ...line, query };
-        return {
-          ...line,
-          query,
-          fabricId: exact ? line.fabricId : '',
-          fabricName: exact ? line.fabricName : '',
-          fabricTypeName: exact ? line.fabricTypeName : '',
-          colourName: exact ? line.colourName : '',
-          fabricSortNo: exact ? line.fabricSortNo : '',
-          millOldFabricSortNo: exact ? line.millOldFabricSortNo : '',
-          millNewFabricSortNo: exact ? line.millNewFabricSortNo : '',
-          unmatched: query.trim().length > 0 && matches.length === 0,
-        };
-      })
-    );
+    setLines((prev) => prev.map((line) => (line.lineId === lineId ? lineAfterQuery(line, query, matches) : line)));
   };
 
   const onPick = (lineId: string, fabric: FabricCatalog) => {
-    setLines((prev) =>
-      prev.map((line) => {
-        if (line.lineId !== lineId) return line;
-        const meter = !line.unitId ? defaultMeterUnit(units) : null;
-        return {
-          ...line,
-          query: fabric.name,
-          fabricId: fabric.id,
-          fabricName: fabric.name,
-          fabricTypeName: fabricTypeLabel(fabric),
-          colourName: fabricColorLabel(fabric),
-          fabricSortNo: fabric.fabricSortNo || '',
-          millOldFabricSortNo: fabric.millOldFabricSortNo || '',
-          millNewFabricSortNo: fabric.millNewFabricSortNo || '',
-          rate: fabric.rate != null ? String(fabric.rate) : '',
-          gstPercent: gstNumber(fabric.gst),
-          unmatched: false,
-          ...(meter ? { unitId: meter.unitId, unitName: meter.unitName } : {}),
-        };
-      })
-    );
+    setLines((prev) => prev.map((line) => (line.lineId === lineId ? lineAfterPick(line, fabric, units) : line)));
     setActiveLineId(null);
   };
 
