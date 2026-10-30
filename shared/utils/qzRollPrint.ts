@@ -292,12 +292,31 @@ function detailCell(x: number, y: number, title: string, value: string | undefin
 }
 
 /**
- * Field name and value on one full-width line. Fabric name may wrap the value onto a second line.
+ * Width left for the value after the field name on a full-width line.
+ */
+function fullValueWidth(title: string, settings: RollPrintSettings): number {
+  const titleDots = Math.ceil(title.length * settings.nameFontSize * 0.5);
+  const valueX = 24 + titleDots + 4;
+  return Math.max(160, ROLL_DOTS - valueX - 20);
+}
+
+/**
+ * Two lines when the fabric name fits, three when it does not. Never a blank third line.
+ */
+function fabricLines(value: string | undefined, settings: RollPrintSettings): number {
+  const charWidth = Math.max(1, settings.valueFontSize * 0.5);
+  const perLine = Math.max(1, Math.floor(fullValueWidth('Fabric name', settings) / charWidth));
+  const needed = Math.ceil(zplText(value).length / perLine);
+  return Math.min(3, Math.max(2, needed));
+}
+
+/**
+ * Field name and value on one full-width line. Fabric name may wrap onto two or three lines.
  */
 function fullLine(y: number, title: string, value: string | undefined, settings: RollPrintSettings, maxLines = 1): string {
   const titleDots = Math.ceil(title.length * settings.nameFontSize * 0.5);
   const valueX = 24 + titleDots + 4;
-  const valueWidth = Math.max(160, ROLL_DOTS - valueX - 20);
+  const valueWidth = fullValueWidth(title, settings);
   const nameY = y + Math.max(0, settings.valueFontSize - settings.nameFontSize);
   return [
     `^FO24,${nameY}^A0N,${settings.nameFontSize},${settings.nameFontSize}^FD${zplText(title)}^FS`,
@@ -325,7 +344,7 @@ function rollZpl(label: RollLabel, settings: RollPrintSettings = DEFAULT_ROLL_PR
     detailsY += settings.valueFontSize * lines + 14;
   };
   pushFull('Roll id', label.rollCode);
-  pushFull('Fabric name', label.fabricName, 2);
+  pushFull('Fabric name', label.fabricName, fabricLines(label.fabricName, settings));
   pushFull('Supplier', label.supplierName);
   pushFull('PO No', label.poNumber);
   pushFull('Lot no', label.lotNumber);

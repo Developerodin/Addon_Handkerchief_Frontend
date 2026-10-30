@@ -82,6 +82,7 @@ export interface TransitPackEntry {
   estimatedDelivery: string;
   rolls: string;
   weight: string;
+  quantity: string;
   notes: string;
   millName: string;
   consigneeName: string;
@@ -121,6 +122,7 @@ export function emptyTransitEntry(order: PurchaseOrderRow | null): TransitPackEn
     estimatedDelivery: order?.estimatedDelivery ? order.estimatedDelivery.slice(0, 10) : '',
     rolls: '0',
     weight: '0.00',
+    quantity: '',
     notes: '',
     millName: '',
     consigneeName: '',
@@ -187,6 +189,7 @@ export function entryFromPackingList(row: PackingListRow): TransitPackEntry {
     estimatedDelivery: (row.expectedDelivery || '').slice(0, 10),
     rolls: String(row.rolls || row.boxes || 0),
     weight: row.weight == null ? '0.00' : String(row.weight),
+    quantity: row.quantity == null ? '' : String(row.quantity),
     notes: row.notes || '',
     millName: row.millName || '',
     consigneeName: row.consigneeName || '',
