@@ -19,10 +19,10 @@ function cell(title: string, value: string | undefined): string {
 }
 
 /**
- * Field name and value on one full-width line.
+ * Field name and value on one full-width line. Fabric name may wrap the value.
  */
-function fullLine(title: string, value: string | undefined): string {
-  return `<div class="line"><div class="name">${escapeHtml(title)}</div><div class="value">${escapeHtml(value)}</div></div>`;
+function fullLine(title: string, value: string | undefined, wrap = false): string {
+  return `<div class="${wrap ? 'line wrap' : 'line'}"><div class="name">${escapeHtml(title)}</div><div class="value">${escapeHtml(value)}</div></div>`;
 }
 
 /**
@@ -42,7 +42,7 @@ export function openRollLabelPreview(
     <section class="page">
       <div class="barcode"><svg id="bc-${index}"></svg></div>
       ${fullLine('Roll id', label.rollCode)}
-      ${fullLine('Fabric name', label.fabricName)}
+      ${fullLine('Fabric name', label.fabricName, true)}
       ${fullLine('Supplier', label.supplierName)}
       ${fullLine('PO No', label.poNumber)}
       ${fullLine('Lot no', label.lotNumber)}
@@ -66,8 +66,11 @@ export function openRollLabelPreview(
       .barcode { display: flex; justify-content: center; }
       .barcode svg { width: 86mm; height: ${Math.max(8, Math.round(settings.barcodeHeight * 25.4 / 203))}mm; }
       .barcode { margin-bottom: 6mm; }
-      .line { display: flex; align-items: baseline; gap: 2mm; margin-bottom: 2mm; }
-      .line .value { flex: 1; min-width: 0; }
+      .line { display: flex; align-items: flex-start; gap: 2mm; margin-bottom: 2mm; }
+      .line .name { flex: 0 0 auto; }
+      .line .value { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; }
+      .line.wrap { min-height: 2.4em; }
+      .line.wrap .value { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
       .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm 4mm; margin-top: 2mm; }
       .name { font-size: ${Math.max(7, Math.round(settings.nameFontSize * 72 / 203))}pt; color: #444; line-height: 1.1; }
       .value { font-size: ${Math.max(9, Math.round(settings.valueFontSize * 72 / 203))}pt; font-weight: 600; line-height: 1.15; word-break: break-word; }

@@ -229,12 +229,12 @@ function LabelPreview({
 }) {
   const namePx = Math.max(8, Math.round(settings.nameFontSize * 0.45));
   const valuePx = Math.max(10, Math.round(settings.valueFontSize * 0.45));
-  const before: Array<[string, string | undefined]> = [
-    ['Roll id', label.rollCode],
-    ['Fabric name', label.fabricName],
-    ['Supplier', label.supplierName],
-    ['PO No', label.poNumber],
-    ['Lot no', label.lotNumber],
+  const before: Array<[string, string | undefined, boolean]> = [
+    ['Roll id', label.rollCode, false],
+    ['Fabric name', label.fabricName, true],
+    ['Supplier', label.supplierName, false],
+    ['PO No', label.poNumber, false],
+    ['Lot no', label.lotNumber, false],
   ];
   const pairs: Array<[string, string | undefined]> = [
     ['Sort no.', label.sortNo],
@@ -242,10 +242,15 @@ function LabelPreview({
     ['Count', label.countName],
     ['Color', label.colourName],
   ];
-  const line = (title: string, value: string | undefined) => (
-    <div key={title} className="flex items-baseline gap-1">
-      <div className="shrink-0 text-gray-500" style={{ fontSize: namePx, lineHeight: 1.1 }}>{title}</div>
-      <div className="min-w-0 break-all font-semibold text-gray-900" style={{ fontSize: valuePx, lineHeight: 1.15 }}>{value || '—'}</div>
+  const line = (title: string, value: string | undefined, wrap: boolean) => (
+    <div key={title} className="flex items-start gap-1" style={{ minHeight: wrap ? valuePx * 2.4 : undefined }}>
+      <span className="shrink-0 text-gray-500" style={{ fontSize: namePx, lineHeight: 1.2 }}>{title}</span>
+      <span
+        className={wrap ? 'line-clamp-2 min-w-0 font-semibold text-gray-900' : 'min-w-0 truncate font-semibold text-gray-900'}
+        style={{ fontSize: valuePx, lineHeight: 1.2 }}
+      >
+        {value || '—'}
+      </span>
     </div>
   );
 
@@ -254,14 +259,14 @@ function LabelPreview({
       <div className="flex justify-center" style={{ marginBottom: '4%' }}>
         <svg ref={barcodeRef} role="img" aria-label={`Barcode ${label.barcode}`} />
       </div>
-      <div className="mb-1.5 space-y-1">
-        {before.map(([title, value]) => line(title, value))}
+      <div className="mb-1 space-y-0.5">
+        {before.map(([title, value, wrap]) => line(title, value, wrap))}
       </div>
       <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
         {pairs.map(([title, value]) => (
           <div key={title}>
             <div className="text-gray-500" style={{ fontSize: namePx, lineHeight: 1.1 }}>{title}</div>
-            <div className="font-semibold text-gray-900" style={{ fontSize: valuePx, lineHeight: 1.15 }}>{value || '—'}</div>
+            <div className="truncate font-semibold text-gray-900" style={{ fontSize: valuePx, lineHeight: 1.15 }}>{value || '—'}</div>
           </div>
         ))}
       </div>

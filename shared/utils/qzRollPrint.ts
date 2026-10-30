@@ -292,16 +292,16 @@ function detailCell(x: number, y: number, title: string, value: string | undefin
 }
 
 /**
- * Field name and value on one full-width line, so a long roll id is not squeezed into half the sticker.
+ * Field name and value on one full-width line. Fabric name may wrap the value onto a second line.
  */
-function fullLine(y: number, title: string, value: string | undefined, settings: RollPrintSettings): string {
-  const titleDots = Math.round(title.length * settings.nameFontSize * 0.55);
-  const valueX = 24 + titleDots + 12;
+function fullLine(y: number, title: string, value: string | undefined, settings: RollPrintSettings, maxLines = 1): string {
+  const titleDots = Math.ceil(title.length * settings.nameFontSize * 0.7);
+  const valueX = 24 + titleDots + 8;
   const valueWidth = Math.max(160, ROLL_DOTS - valueX - 20);
   const nameY = y + Math.max(0, settings.valueFontSize - settings.nameFontSize);
   return [
     `^FO24,${nameY}^A0N,${settings.nameFontSize},${settings.nameFontSize}^FD${zplText(title)}^FS`,
-    `^FO${valueX},${y}^A0N,${settings.valueFontSize},${settings.valueFontSize}^FB${valueWidth},1,0,L^FD${zplText(value)}^FS`,
+    `^FO${valueX},${y}^A0N,${settings.valueFontSize},${settings.valueFontSize}^FB${valueWidth},${maxLines},2,L^FD${zplText(value)}^FS`,
   ].join('\n');
 }
 
@@ -318,15 +318,14 @@ function rollZpl(label: RollLabel, settings: RollPrintSettings = DEFAULT_ROLL_PR
     [['Count', label.countName], ['Color', label.colourName]],
   ];
   let detailsY = barcodeY + settings.barcodeHeight + 56;
-  const fullStep = settings.valueFontSize + 14;
   const rowStep = settings.nameFontSize + 6 + settings.valueFontSize + 14;
   const details: string[] = [];
-  const pushFull = (title: string, value: string | undefined) => {
-    details.push(fullLine(detailsY, title, value, settings));
-    detailsY += fullStep;
+  const pushFull = (title: string, value: string | undefined, lines = 1) => {
+    details.push(fullLine(detailsY, title, value, settings, lines));
+    detailsY += settings.valueFontSize * lines + 14;
   };
   pushFull('Roll id', label.rollCode);
-  pushFull('Fabric name', label.fabricName);
+  pushFull('Fabric name', label.fabricName, 2);
   pushFull('Supplier', label.supplierName);
   pushFull('PO No', label.poNumber);
   pushFull('Lot no', label.lotNumber);
