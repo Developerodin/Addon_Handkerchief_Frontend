@@ -268,6 +268,17 @@ const Header = ({ local_varaiable, ThemeChanger }: any) => {
             </div>
             <div className="header-content-right">
               <TaskNotificationsBell />
+              <div className="header-element py-[1rem] md:px-[0.65rem] px-2">
+                <a
+                  href={`${assetBase}/Addon_webapp.apk`}
+                  download="Addon_webapp.apk"
+                  aria-label="Download Android app"
+                  title="Download Android app"
+                  className="inline-flex flex-shrink-0 justify-center items-center gap-2 !rounded-full font-medium dark:hover:bg-black/20 dark:text-[#8c9097] dark:text-white/50 dark:hover:text-white dark:focus:ring-white/10 dark:focus:ring-offset-white/10"
+                >
+                  <i className="bx bx-download header-link-icon" aria-hidden="true"></i>
+                </a>
+              </div>
               <div className="header-element header-fullscreen py-[1rem] md:px-[0.65rem] px-2">
                 <button
                   aria-label="anchor"

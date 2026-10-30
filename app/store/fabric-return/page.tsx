@@ -21,7 +21,7 @@ import { ReturnRollDrawer } from './ReturnRollDrawer';
  * Return issued rolls to a rack. Each scan is one leftover against one fabric line.
  */
 export default function FabricReturnPage() {
-  const orders = useFactoryList<ProductionOrderRow>('/production/orders', undefined, 100);
+  const orders = useFactoryList<ProductionOrderRow>('/production/orders', { fabricQueue: 'return' }, 100);
   const queryApplied = useRef(false);
   const [selectedId, setSelectedId] = useState('');
   const [articleId, setArticleId] = useState('');
@@ -36,7 +36,7 @@ export default function FabricReturnPage() {
   const [logsOpen, setLogsOpen] = useState(false);
   const [activeKey, setActiveKey] = useState('');
 
-  const openOrders = useMemo(() => orders.rows.filter((order) => order.status !== 'closed'), [orders.rows]);
+  const openOrders = orders.rows;
   const selected = openOrders.find((order) => order.id === selectedId) || null;
   const needsEstimate = Boolean(selected && (selected.lines || []).some((line) => !line.snapshot?.fabricBom?.length));
 
@@ -160,6 +160,7 @@ export default function FabricReturnPage() {
                 orders.setSearch(value);
                 orders.setPage(1);
               }}
+              emptyMessage="Issue fabric before returning a roll"
               onSelect={selectOrder}
             />
             <section className="min-w-0 p-4" aria-label="Fabric to return">

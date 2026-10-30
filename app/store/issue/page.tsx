@@ -20,7 +20,7 @@ import { articleLabel, buildFabricLines, formatOrderDate } from './fabricIssueMa
  * Issue fabric rolls to an order and article. Each scan is one roll against one fabric line.
  */
 export default function IssuePage() {
-  const orders = useFactoryList<ProductionOrderRow>('/production/orders', undefined, 100);
+  const orders = useFactoryList<ProductionOrderRow>('/production/orders', { fabricQueue: 'issue' }, 100);
   const [selectedId, setSelectedId] = useState('');
   const [articleId, setArticleId] = useState('');
   const [issues, setIssues] = useState<FabricIssueRow[]>([]);
@@ -35,7 +35,7 @@ export default function IssuePage() {
   const [completing, setCompleting] = useState(false);
   const [completeError, setCompleteError] = useState('');
 
-  const openOrders = useMemo(() => orders.rows.filter((order) => order.status !== 'closed'), [orders.rows]);
+  const openOrders = orders.rows;
   const selected = openOrders.find((order) => order.id === selectedId) || null;
   const needsEstimate = Boolean(selected && (selected.lines || []).some((line) => !line.snapshot?.fabricBom?.length));
 
@@ -164,6 +164,7 @@ export default function IssuePage() {
                 orders.setSearch(value);
                 orders.setPage(1);
               }}
+              emptyMessage="Release an order to issue fabric"
               onSelect={selectOrder}
             />
             <section className="min-w-0 p-4" aria-label="Fabric to issue">
@@ -222,7 +223,10 @@ export default function IssuePage() {
         orderNumber={selected?.orderNumber || ''}
         line={activeLine}
         onClose={() => setActiveKey('')}
-        onIssued={() => setIssueTick((value) => value + 1)}
+        onIssued={() => {
+          setIssueTick((value) => value + 1);
+          orders.reload().catch(() => undefined);
+        }}
       />
       <IssueLogDrawer
         open={logsOpen}

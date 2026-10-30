@@ -8,7 +8,7 @@ import { FabricIssueFigures } from './FabricIssueFigures';
 import { IssueStatusBadge } from './IssueStatusBadge';
 
 /**
- * Open production orders. The card shows issued rolls, issued weight, and metres left.
+ * Orders in one fabric queue. The card shows issued rolls, issued weight, and metres left.
  */
 export function OrderRail({
   orders,
@@ -18,6 +18,7 @@ export function OrderRail({
   error,
   search,
   selectedId,
+  emptyMessage = 'Release an order to issue fabric',
   onSearch,
   onSelect,
 }: {
@@ -28,6 +29,7 @@ export function OrderRail({
   error: string;
   search: string;
   selectedId: string;
+  emptyMessage?: string;
   onSearch: (value: string) => void;
   onSelect: (orderId: string) => void;
 }) {
@@ -50,7 +52,7 @@ export function OrderRail({
           </p>
         ) : null}
         {!loading && !error && orders.length === 0 ? (
-          <p className="text-sm text-[#4B5563]">No open orders. Release an order, then issue fabric here.</p>
+          <p className="text-sm text-[#4B5563]">{emptyMessage}</p>
         ) : null}
         <ul className="grid gap-2">
           {orders.map((order) => {
