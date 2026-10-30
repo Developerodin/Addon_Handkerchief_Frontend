@@ -295,8 +295,8 @@ function detailCell(x: number, y: number, title: string, value: string | undefin
  * Field name and value on one full-width line. Fabric name may wrap the value onto a second line.
  */
 function fullLine(y: number, title: string, value: string | undefined, settings: RollPrintSettings, maxLines = 1): string {
-  const titleDots = Math.ceil(title.length * settings.nameFontSize * 0.7);
-  const valueX = 24 + titleDots + 8;
+  const titleDots = Math.ceil(title.length * settings.nameFontSize * 0.5);
+  const valueX = 24 + titleDots + 4;
   const valueWidth = Math.max(160, ROLL_DOTS - valueX - 20);
   const nameY = y + Math.max(0, settings.valueFontSize - settings.nameFontSize);
   return [

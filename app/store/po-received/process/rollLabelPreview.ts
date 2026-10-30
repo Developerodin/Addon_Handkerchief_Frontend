@@ -66,7 +66,7 @@ export function openRollLabelPreview(
       .barcode { display: flex; justify-content: center; }
       .barcode svg { width: 86mm; height: ${Math.max(8, Math.round(settings.barcodeHeight * 25.4 / 203))}mm; }
       .barcode { margin-bottom: 6mm; }
-      .line { display: flex; align-items: flex-start; gap: 2mm; margin-bottom: 2mm; }
+      .line { display: flex; align-items: flex-start; gap: 1mm; margin-bottom: 2mm; }
       .line .name { flex: 0 0 auto; }
       .line .value { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; }
       .line.wrap { min-height: 2.4em; }

@@ -243,7 +243,7 @@ function LabelPreview({
     ['Color', label.colourName],
   ];
   const line = (title: string, value: string | undefined, wrap: boolean) => (
-    <div key={title} className="flex items-start gap-1" style={{ minHeight: wrap ? valuePx * 2.4 : undefined }}>
+    <div key={title} className="flex items-start gap-0.5" style={{ minHeight: wrap ? valuePx * 2.4 : undefined }}>
       <span className="shrink-0 text-gray-500" style={{ fontSize: namePx, lineHeight: 1.2 }}>{title}</span>
       <span
         className={wrap ? 'line-clamp-2 min-w-0 font-semibold text-gray-900' : 'min-w-0 truncate font-semibold text-gray-900'}
