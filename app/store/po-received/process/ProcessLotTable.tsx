@@ -67,7 +67,6 @@ export function ProcessLotTable({
   onActivate,
   onSaved,
   onPrint,
-  onBrowserPrint,
 }: {
   lotNumber: string;
   rolls: RollRow[];
@@ -78,7 +77,6 @@ export function ProcessLotTable({
   onActivate: (roll: RollRow) => void;
   onSaved: (roll: RollRow) => void;
   onPrint: () => void;
-  onBrowserPrint: () => void;
 }) {
   const weighed = rolls.filter((roll) => Number(roll.netWeight) > 0).length;
 
@@ -104,15 +102,6 @@ export function ProcessLotTable({
           >
             <i className="ri-printer-line" aria-hidden />
             Print
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2.5 py-1 text-[10px] font-bold text-gray-700 disabled:opacity-50"
-            onClick={onBrowserPrint}
-            aria-label={`Preview lot ${lotNumber} on A4`}
-          >
-            <i className="ri-printer-line" aria-hidden />
-            A4
           </button>
         </div>
       </div>

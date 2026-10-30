@@ -7,10 +7,22 @@ import { approvedCutoffKeys, cutoffKey } from './cutoffApproval';
 import { FileUploadService, UploadedFile } from '@/shared/services/fileUploadService';
 import { formatInr } from './add/purchaseOrderFormModel';
 import {
+  cartonPayload,
+  cartonQuantity,
+  enrichCartons,
+  FabricMasterHit,
+  millOldSortKey,
+  ParsedPackingList,
+  totalsFromCartons,
+} from './packingListPdf';
+import { readPackingListPdf } from './packingListPdfRead';
+import { PackingCartonTable, PackingListPdfPreview } from './PackingListPdfPreview';
+import {
   emptyTransitEntry,
   entryFromPackingList,
   lineLabel,
   orderAmount,
+  PackingCarton,
   PackingListRow,
   transitEntryError,
   TransitPackEntry,
@@ -35,6 +47,10 @@ export function MarkInTransitDrawer({ order, onClose, onSaved }: MarkInTransitDr
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [readingPdf, setReadingPdf] = useState(false);
+  const [pendingPdf, setPendingPdf] = useState<{ entryKey: string; file: File } | null>(null);
+  const [millDraft, setMillDraft] = useState('');
+  const [preview, setPreview] = useState<{ entryKey: string; parsed: ParsedPackingList; cartons: PackingCarton[]; file: File } | null>(null);
 
   useEffect(() => {
     if (!order) return undefined;
@@ -62,6 +78,7 @@ export function MarkInTransitDrawer({ order, onClose, onSaved }: MarkInTransitDr
           }),
         }));
         setEntries(saved.length ? saved : [emptyTransitEntry(order)]);
+        setPendingPdf(null);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -90,6 +107,38 @@ export function MarkInTransitDrawer({ order, onClose, onSaved }: MarkInTransitDr
 
   const patch = (key: string, next: Partial<TransitPackEntry>) => {
     setEntries((rows) => rows.map((row) => (row.key === key ? { ...row, ...next } : row)));
+  };
+
+  const openPdf = async (entryKey: string, file: File, millName: string) => {
+    if (!order) return;
+    setReadingPdf(true);
+    setError('');
+    try {
+      const parsed = await readPackingListPdf(file, millName);
+      const keys = Array.from(new Set(parsed.cartons.map((row) => millOldSortKey(`${row.millSortKey}\n${row.materialCode}`) || row.millSortKey).filter(Boolean)));
+      const catalogs: FabricMasterHit[] = [];
+      for (const key of keys) {
+        try {
+          const page = await factoryRequest<PageResult<FabricMasterHit>>(`/fabric-catalogs?search=${encodeURIComponent(key)}&limit=20`);
+          catalogs.push(...(page.results || []));
+        } catch {
+          // The purchase-order lines already carry Mill Old and Mill New.
+        }
+      }
+      const cartons = enrichCartons(parsed.cartons, catalogs, order.lines || [], approvedKeys);
+      setPreview({ entryKey, parsed, cartons, file });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not read the packing list';
+      setError(message);
+      toast.error(message);
+    } finally {
+      setReadingPdf(false);
+    }
+  };
+
+  const requestPdf = (entryKey: string, file: File) => {
+    setMillDraft(order.supplierName || '');
+    setPendingPdf({ entryKey, file });
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -122,22 +171,33 @@ export function MarkInTransitDrawer({ order, onClose, onSaved }: MarkInTransitDr
       for (const entry of entries) {
         const selected = (order.lines || []).filter((line) => entry.lineIds.includes(line.lineId));
         const uploaded = await uploadEntryFiles(entry.files);
+        const cartonNames = Array.from(new Set(entry.cartons.map((row) => row.fabricName).filter(Boolean)));
+        const pdfQuantity = cartonQuantity(entry.cartons);
         const body = {
           lotId: savedLotId,
           packingListCode: entry.packingNumber.trim(),
           shipmentDate: entry.dispatchDate,
           expectedDelivery: entry.estimatedDelivery,
-          fabricName: selected.map((line) => line.fabricName).filter(Boolean).join(', '),
+          fabricName: cartonNames.length ? cartonNames.join(', ') : selected.map((line) => line.fabricName).filter(Boolean).join(', '),
           rolls: Number(entry.rolls),
           boxes: Number(entry.rolls),
-          quantity: selected.reduce((sum, line) => sum + (line.quantity || 0), 0),
+          quantity: entry.cartons.length && pdfQuantity > 0 ? pdfQuantity : selected.reduce((sum, line) => sum + (line.quantity || 0), 0),
           weight: Number(entry.weight),
           courierName: entry.courierName.trim(),
           courierNumber: entry.courierNumber.trim(),
           vehicleNumber: entry.vehicleNumber.trim(),
           challanNumber: entry.challanNumber.trim(),
           notes: entry.notes.trim(),
+          millName: entry.millName.trim(),
+          consigneeName: entry.consigneeName.trim(),
+          customerCity: entry.customerCity.trim(),
+          invoiceNumber: entry.invoiceNumber.trim(),
+          invoiceDate: entry.invoiceDate || null,
+          division: entry.division.trim(),
+          lrNo: entry.lrNo.trim(),
+          lrDate: entry.lrDate || null,
           lineIds: entry.lineIds,
+          cartons: entry.cartons.map(cartonPayload),
           files: [...entry.savedFiles, ...uploaded],
         };
         if (entry.id) {
@@ -156,6 +216,9 @@ export function MarkInTransitDrawer({ order, onClose, onSaved }: MarkInTransitDr
       setSaving(false);
     }
   };
+
+  const anyApproved = (order.lines || []).some((line) => approvedKeys.has(cutoffKey(line)));
+  const packingBlocked = !loading && !anyApproved;
 
   return (
     <div className="fixed inset-0 z-[80] flex justify-end bg-gray-900/40" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onClose(); }}>
@@ -212,23 +275,42 @@ export function MarkInTransitDrawer({ order, onClose, onSaved }: MarkInTransitDr
             <p className="text-xs text-gray-500">
               {loading
                 ? 'Loading the saved packlist…'
-                : 'Each packlist entry is one row. Select the fabric lines, then fill packing, courier, dates, rolls, weight, and notes.'}
+                : packingBlocked
+                  ? 'Approve cutoff before adding a packing entry.'
+                  : 'Each packlist entry is one row. Select the fabric lines, then fill packing, courier, dates, rolls, weight, and notes.'}
             </p>
-            {entries.map((entry, index) => (
-              <PacklistEntry
-                key={entry.key}
-                index={index}
-                entry={entry}
-                lines={order.lines || []}
-                approvedKeys={approvedKeys}
-                canRemove={entries.length > 1}
-                onChange={(next) => patch(entry.key, next)}
-                onRemove={() => setEntries((rows) => rows.filter((row) => row.key !== entry.key))}
-              />
-            ))}
+            {loading ? null : packingBlocked ? (
+              <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Approve cutoff before adding a packing entry. Receiving and later steps stay blocked until cutoff is approved.
+              </p>
+            ) : (
+              entries.map((entry, index) => (
+                <PacklistEntry
+                  key={entry.key}
+                  index={index}
+                  entry={entry}
+                  lines={order.lines || []}
+                  approvedKeys={approvedKeys}
+                  canRemove={entries.length > 1}
+                  onChange={(next) => patch(entry.key, next)}
+                  onRemove={() => setEntries((rows) => rows.filter((row) => row.key !== entry.key))}
+                  onPdf={(file) => requestPdf(entry.key, file)}
+                  readingPdf={readingPdf}
+                  onCartons={(cartons) => {
+                    const totals = totalsFromCartons(cartons);
+                    patch(entry.key, { cartons, rolls: totals.rolls, weight: totals.weight, lineIds: totals.lineIds });
+                  }}
+                />
+              ))
+            )}
             {error ? <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800" role="alert">{error}</p> : null}
             <div className="flex justify-center">
-              <button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => setEntries((rows) => [...rows, emptyTransitEntry(order)])}>
+              <button
+                type="button"
+                className="text-xs font-semibold text-primary hover:underline disabled:cursor-not-allowed disabled:text-gray-400 disabled:no-underline"
+                disabled={loading || packingBlocked}
+                onClick={() => setEntries((rows) => [...rows, emptyTransitEntry(order)])}
+              >
                 + Add Another Entry
               </button>
             </div>
@@ -237,12 +319,65 @@ export function MarkInTransitDrawer({ order, onClose, onSaved }: MarkInTransitDr
             <button type="button" className="rounded border border-gray-300 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50" disabled={saving} onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="inline-flex items-center gap-1.5 rounded bg-primary px-4 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-60" disabled={saving || loading}>
+            <button type="submit" className="inline-flex items-center gap-1.5 rounded bg-primary px-4 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-60" disabled={saving || loading || packingBlocked}>
               {saving ? <i className="ri-loader-4-line animate-spin" aria-hidden /> : <i className="ri-check-line" aria-hidden />}
               Update to In Transit
             </button>
           </footer>
         </form>
+        {preview && order ? (
+          <PackingListPdfPreview
+            parsed={preview.parsed}
+            order={order}
+            entry={entries.find((row) => row.key === preview.entryKey) || entries[0]}
+            cartons={preview.cartons}
+            onCartons={(cartons) => setPreview((current) => (current ? { ...current, cartons } : current))}
+            onClose={() => setPreview(null)}
+            onApply={(next) => {
+              const file = preview.file;
+              setEntries((rows) => rows.map((row) => {
+                if (row.key !== preview.entryKey) return row;
+                const files = row.files.includes(file) ? row.files : [...row.files, file];
+                return { ...row, ...next, files };
+              }));
+              setPreview(null);
+            }}
+          />
+        ) : null}
+        {pendingPdf ? (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-900/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingPdf(null); }}>
+            <form
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="mill-confirm-title"
+              className="w-full max-w-md rounded bg-white p-4 shadow-2xl"
+              onSubmit={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const next = pendingPdf;
+                const millName = millDraft.trim();
+                if (!next || !millName) return;
+                setPendingPdf(null);
+                void openPdf(next.entryKey, next.file, millName);
+              }}
+            >
+              <h2 id="mill-confirm-title" className="text-sm font-bold text-gray-900">Confirm mill name</h2>
+              <p className="mt-1 text-xs text-gray-500">This name is saved on the packing list. The purchase order supplier is not changed.</p>
+              <label className="mt-3 block text-[10px] font-bold uppercase text-gray-600" htmlFor="confirmed-mill-name">Mill name</label>
+              <input
+                id="confirmed-mill-name"
+                className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+                value={millDraft}
+                onChange={(event) => setMillDraft(event.target.value)}
+                autoFocus
+              />
+              <div className="mt-4 flex justify-end gap-2">
+                <button type="button" className="rounded border border-gray-300 bg-white px-4 py-2 text-xs font-semibold text-gray-700" onClick={() => setPendingPdf(null)}>Cancel</button>
+                <button type="submit" className="rounded bg-primary px-4 py-2 text-xs font-semibold text-white disabled:opacity-60" disabled={!millDraft.trim() || readingPdf}>Use this mill name</button>
+              </div>
+            </form>
+          </div>
+        ) : null}
       </aside>
     </div>
   );
@@ -268,16 +403,49 @@ async function uploadEntryFiles(files: File[]): Promise<UploadedFile[]> {
   return uploaded;
 }
 
+function formatQty(value: number): string {
+  return Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+}
+
+/** Quantity on this packing list for one purchase-order line. */
+function packedQuantity(line: PurchaseOrderLine, cartons: PackingCarton[]): number {
+  return cartons.reduce((sum, row) => sum + (row.lineId === line.lineId ? Number(row.totalQty) || 0 : 0), 0);
+}
+
+function quantityMeasure(line: PurchaseOrderLine, cartons: PackingCarton[]): string {
+  const ordered = Number(line.quantity || 0);
+  if (!cartons.length) return [formatQty(ordered), line.unitName].filter(Boolean).join(' ');
+  return [formatQty(packedQuantity(line, cartons)), 'of', formatQty(ordered), line.unitName].filter(Boolean).join(' ');
+}
+
 /**
  * Readable line for the selected-items list under packlist notes.
+ * With cartons, the quantity is what this list packs out of the ordered quantity.
  */
-function selectedLineText(line: PurchaseOrderLine): string {
-  const qty = Number(line.quantity || 0).toLocaleString('en-IN');
-  const measure = [qty, line.unitName].filter(Boolean).join(' ');
+function selectedLineText(line: PurchaseOrderLine, cartons: PackingCarton[]): string {
   return (
-    [line.fabricName, line.fabricSortNo, line.fabricTypeName, line.colourName, measure].filter(Boolean).join(' · ') ||
+    [line.fabricName, line.fabricSortNo, line.fabricTypeName, line.colourName, quantityMeasure(line, cartons)].filter(Boolean).join(' · ') ||
     line.lineId
   );
+}
+
+function selectedTotal(lines: PurchaseOrderLine[], cartons: PackingCarton[]): string {
+  const itemLabel = lines.length === 1 ? '1 item' : `${lines.length} items`;
+  const amount = cartons.length
+    ? lines.reduce((sum, line) => sum + packedQuantity(line, cartons), 0)
+    : lines.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0);
+  const units = Array.from(new Set(lines.map((line) => line.unitName).filter(Boolean)));
+  const unit = units.length === 1 ? ` ${units[0]}` : '';
+  return `Total · ${itemLabel} · ${formatQty(amount)}${unit}`;
+}
+
+function packingIsPartial(lines: PurchaseOrderLine[], cartons: PackingCarton[]): boolean {
+  if (!cartons.length) return false;
+  return lines.some((line) => {
+    const packed = packedQuantity(line, cartons);
+    const ordered = Number(line.quantity || 0);
+    return packed > 0 && packed + 0.001 < ordered;
+  });
 }
 
 function PacklistEntry({
@@ -288,6 +456,9 @@ function PacklistEntry({
   canRemove,
   onChange,
   onRemove,
+  onPdf,
+  readingPdf,
+  onCartons,
 }: {
   index: number;
   entry: TransitPackEntry;
@@ -296,6 +467,9 @@ function PacklistEntry({
   canRemove: boolean;
   onChange: (next: Partial<TransitPackEntry>) => void;
   onRemove: () => void;
+  onPdf: (file: File) => void;
+  readingPdf: boolean;
+  onCartons: (cartons: PackingCarton[]) => void;
 }) {
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLTableCellElement>(null);
@@ -371,8 +545,8 @@ function PacklistEntry({
               <td className="border border-gray-300 p-0"><input aria-label="Challan number" className={inputClass} value={entry.challanNumber} onChange={(event) => onChange({ challanNumber: event.target.value })} /></td>
               <td className="border border-gray-300 p-0"><input aria-label="Dispatch date" type="date" className={inputClass} value={entry.dispatchDate} onChange={(event) => onChange({ dispatchDate: event.target.value })} /></td>
               <td className="border border-gray-300 p-0"><input aria-label="Estimated delivery" type="date" className={inputClass} value={entry.estimatedDelivery} onChange={(event) => onChange({ estimatedDelivery: event.target.value })} /></td>
-              <td className="border border-gray-300 p-0"><input aria-label="Rolls" inputMode="numeric" className={inputClass} value={entry.rolls} onChange={(event) => onChange({ rolls: event.target.value.replace(/[^\d]/g, '') })} /></td>
-              <td className="border border-gray-300 p-0"><input aria-label="Weight" inputMode="decimal" className={inputClass} value={entry.weight} onChange={(event) => onChange({ weight: event.target.value.replace(/[^\d.]/g, '') })} /></td>
+              <td className="border border-gray-300 p-0"><input aria-label="Rolls" inputMode="numeric" readOnly={entry.cartons.length > 0} className={inputClass} value={entry.rolls} onChange={(event) => onChange({ rolls: event.target.value.replace(/[^\d]/g, '') })} /></td>
+              <td className="border border-gray-300 p-0"><input aria-label="Weight" inputMode="decimal" readOnly={entry.cartons.length > 0} className={inputClass} value={entry.weight} onChange={(event) => onChange({ weight: event.target.value.replace(/[^\d.]/g, '') })} /></td>
             </tr>
             <tr>
               <td className="border border-gray-300 bg-gray-50 px-2 py-1 text-[10px] font-bold uppercase text-gray-600">Notes</td>
@@ -384,11 +558,17 @@ function PacklistEntry({
               <td className="border border-gray-300 bg-gray-50 px-2 py-1 text-[10px] font-bold uppercase text-gray-600">Selected</td>
               <td className="border border-gray-300 px-2 py-1.5" colSpan={9}>
                 {selected.length ? (
-                  <ul className="list-disc space-y-0.5 pl-4 text-xs text-gray-800">
-                    {selected.map((line) => (
-                      <li key={line.lineId}>{selectedLineText(line)}</li>
-                    ))}
-                  </ul>
+                  <>
+                    <ul className="list-disc space-y-0.5 pl-4 text-xs text-gray-800">
+                      {selected.map((line) => (
+                        <li key={line.lineId}>{selectedLineText(line, entry.cartons)}</li>
+                      ))}
+                    </ul>
+                    <p className="mt-1 text-xs font-semibold text-gray-900">{selectedTotal(selected, entry.cartons)}</p>
+                    {packingIsPartial(selected, entry.cartons) ? (
+                      <p className="mt-1 text-[11px] text-amber-800">This packing list covers part of the order. Add another entry for the rest.</p>
+                    ) : null}
+                  </>
                 ) : (
                   <p className="text-xs text-gray-400">No PO items selected</p>
                 )}
@@ -398,6 +578,28 @@ function PacklistEntry({
         </table>
       </div>
       <div className="border-t border-gray-200 px-3 py-2">
+        <p className="mb-1 text-[10px] font-bold uppercase text-gray-600">Packing list PDF</p>
+        <label className="mb-3 flex cursor-pointer flex-col items-center rounded border border-dashed border-primary/40 px-3 py-3 text-xs text-gray-600 hover:bg-primary/5">
+          <i className={readingPdf ? 'ri-loader-4-line mb-1 animate-spin text-base' : 'ri-file-pdf-line mb-1 text-base'} aria-hidden />
+          {readingPdf ? 'Reading packing list…' : 'Upload packing list PDF'}
+          <input
+            type="file"
+            accept="application/pdf,.pdf"
+            className="sr-only"
+            aria-label="Upload packing list PDF"
+            disabled={readingPdf}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (file) onPdf(file);
+            }}
+          />
+        </label>
+        {entry.cartons.length ? (
+          <div className="mb-3">
+            <PackingCartonTable cartons={entry.cartons} lines={lines} onChange={onCartons} />
+          </div>
+        ) : null}
         <p className="mb-1 text-[10px] font-bold uppercase text-gray-600">Files</p>
         <label className="flex cursor-pointer flex-col items-center rounded border border-dashed border-gray-300 px-3 py-3 text-xs text-gray-500 hover:bg-gray-50">
           <i className="ri-upload-2-line mb-1 text-base" aria-hidden />

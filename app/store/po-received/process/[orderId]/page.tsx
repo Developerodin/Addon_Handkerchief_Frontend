@@ -8,16 +8,40 @@ import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermissio
 import { factoryRequest, PageResult, PurchaseOrderLine, PurchaseOrderRow, RollRow } from '@/shared/services/factoryApi';
 import { formatInr } from '../../../purchase-orders/add/purchaseOrderFormModel';
 import { orderTotal, rollSortNo } from '../../goodsReceivedModel';
-import { A4BarcodePreview, A4PreviewLabel } from '@/shared/components/print/A4BarcodePreview';
 import { ProcessLotTable } from '../ProcessLotTable';
-import { connectQz, isQzConnected, printRollLabels, RollLabel } from '@/shared/utils/qzRollPrint';
+import { RollPrintPickModal } from '../RollPrintPickModal';
+import { RollPrintSettingsModal } from '../RollPrintSettingsModal';
+import { getFabricCatalog } from '@/shared/services/fabricCatalogService';
+import { connectQz, isQzConnected, RollLabel } from '@/shared/utils/qzRollPrint';
 
 /**
- * Turns a roll into the label QZ Tray and the A4 preview print.
+ * Count is stored on the fabric catalog, not the PO line. A failed lookup leaves that cell blank.
+ */
+async function countsByFabric(lines: PurchaseOrderLine[]): Promise<Record<string, string>> {
+  const ids = [...new Set(lines.map((line) => line.fabricId).filter((id): id is string => Boolean(id)))];
+  const counts: Record<string, string> = {};
+  await Promise.all(ids.map(async (id) => {
+    try {
+      const fabric = await getFabricCatalog(id);
+      counts[id] = fabric.countName || '';
+    } catch {
+      counts[id] = '';
+    }
+  }));
+  return counts;
+}
+
+/**
+ * Turns a roll into the 100×100 mm label.
  * Fabric, colour, and sort come from the PO item stamped on the roll.
  */
-function labelFor(roll: RollRow, lines: PurchaseOrderLine[] = []): RollLabel {
+function labelFor(
+  roll: RollRow,
+  lines: PurchaseOrderLine[] = [],
+  extras: { supplierName?: string; poNumber?: string; countByFabricId?: Record<string, string> } = {},
+): RollLabel {
   const line = (lines || []).find((item) => item.lineId === roll.lineId);
+  const fabricId = line?.fabricId || '';
   return {
     barcode: roll.barcode,
     rollCode: roll.rollCode || roll.barcode,
@@ -25,6 +49,10 @@ function labelFor(roll: RollRow, lines: PurchaseOrderLine[] = []): RollLabel {
     fabricName: roll.fabricName || line?.fabricName || '',
     colourName: roll.colourName || line?.colourName || '',
     sortNo: rollSortNo(roll.lineId, lines),
+    fabricType: line?.fabricTypeName || '',
+    countName: fabricId ? extras.countByFabricId?.[fabricId] || '' : '',
+    poNumber: roll.poNumber || extras.poNumber || '',
+    supplierName: extras.supplierName || '',
   };
 }
 
@@ -43,9 +71,9 @@ export default function ProcessOrderPage() {
   const [printer, setPrinter] = useState('');
   const [qzConnected, setQzConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [printing, setPrinting] = useState(false);
   const [itemsOpen, setItemsOpen] = useState(false);
-  const [preview, setPreview] = useState<A4PreviewLabel[] | null>(null);
+  const [pickRolls, setPickRolls] = useState<RollRow[] | null>(null);
+  const [settingsLabels, setSettingsLabels] = useState<RollLabel[] | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -109,47 +137,28 @@ export default function ProcessOrderPage() {
   };
 
   /**
-   * Opens the A4 preview for these rolls. Printing happens from that dialog.
+   * Builds labels for the chosen rolls, including fabric count.
    */
-  const openPreview = (rows: RollRow[]) => {
-    const supplier = [order?.supplierName, order?.supplierAddress].filter(Boolean).join(', ') || '—';
-    setPreview(rows.map((roll) => {
-      const lines = order?.lines || [];
-      const label = labelFor(roll, lines);
-      const line = lines.find((item) => item.lineId === roll.lineId);
-      const fabric = [label.fabricName, line?.fabricTypeName, label.colourName, label.sortNo].filter(Boolean).join(' · ') || '—';
-      return {
-        id: roll.id,
-        name: label.rollCode,
-        detail: label.barcode,
-        title: label.rollCode,
-        subtitle: '',
-        lines: [
-          `Fabric: ${fabric}`,
-          `Lot: ${label.lotNumber || '—'}`,
-          `PO: ${roll.poNumber || order?.number || '—'}`,
-          `Supplier: ${supplier}`,
-        ],
-        barcode: label.barcode,
-      };
+  const labelsFor = async (rows: RollRow[]): Promise<RollLabel[]> => {
+    const lines = order?.lines || [];
+    const countByFabricId = await countsByFabric(lines);
+    return rows.map((roll) => labelFor(roll, lines, {
+      supplierName: order?.supplierName || '',
+      poNumber: order?.number || '',
+      countByFabricId,
     }));
   };
 
   /**
-   * Prints the given rolls. Connects first when the websocket is down.
+   * Opens print settings for the chosen rolls. The preview is inside that dialog.
    */
-  const printLabels = async (rows: RollRow[]) => {
-    setPrinting(true);
+  const openSettings = async (rows: RollRow[]) => {
     try {
-      const target = printer || await connectQz();
-      setPrinter(target);
-      setQzConnected(true);
-      await printRollLabels(target, rows.map((roll) => labelFor(roll, order?.lines || [])));
-      toast.success(`${rows.length} barcode${rows.length === 1 ? '' : 's'} sent to ${target}`);
+      const labels = await labelsFor(rows);
+      setPickRolls(null);
+      setSettingsLabels(labels);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not print barcodes');
-    } finally {
-      setPrinting(false);
+      toast.error(err instanceof Error ? err.message : 'Could not prepare labels');
     }
   };
 
@@ -192,13 +201,9 @@ export default function ProcessOrderPage() {
             <button type="button" className="rounded border border-gray-300 bg-white px-3 py-1.5 text-[11px] font-bold text-gray-700 disabled:opacity-50" disabled={connecting} onClick={connect}>
               {connecting ? 'Connecting…' : 'Connect'}
             </button>
-            <button type="button" className="inline-flex items-center gap-1 rounded bg-primary px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50" disabled={printing || !rolls.length} onClick={() => printLabels(rolls)} aria-label="Print all barcodes with QZ Tray">
-              <i className={printing ? 'ri-loader-4-line animate-spin' : 'ri-printer-line'} aria-hidden />
-              {printing ? 'Printing…' : 'Print all barcodes'}
-            </button>
-            <button type="button" className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-3 py-1.5 text-[11px] font-bold text-gray-700 disabled:opacity-50" disabled={!rolls.length} onClick={() => openPreview(rolls)} aria-label="Preview barcodes on A4">
+            <button type="button" className="inline-flex items-center gap-1 rounded bg-primary px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50" disabled={!rolls.length} onClick={() => setPickRolls(rolls)} aria-label="Choose roll barcodes to print">
               <i className="ri-printer-line" aria-hidden />
-              A4 preview
+              Print all barcodes
             </button>
           </div>
         </header>
@@ -265,7 +270,16 @@ export default function ProcessOrderPage() {
           </section>
         ) : null}
 
-        {preview ? <A4BarcodePreview labels={preview} onClose={() => setPreview(null)} /> : null}
+        {pickRolls ? (
+          <RollPrintPickModal
+            rolls={pickRolls}
+            onClose={() => setPickRolls(null)}
+            onPrint={openSettings}
+          />
+        ) : null}
+        {settingsLabels ? (
+          <RollPrintSettingsModal labels={settingsLabels} onClose={() => setSettingsLabels(null)} />
+        ) : null}
 
         <section className="space-y-4">
           <h2 className="text-sm font-semibold text-gray-800">Rolls ({rolls.length})</h2>
@@ -288,11 +302,10 @@ export default function ProcessOrderPage() {
               lines={order?.lines || []}
               activeId={activeId}
               scrollKey={scrollKey}
-              printing={printing}
+              printing={false}
               onActivate={(roll) => setActiveId(roll.id)}
               onSaved={(saved) => setRolls((current) => current.map((row) => (row.id === saved.id ? { ...row, ...saved } : row)))}
-              onPrint={() => printLabels(rows)}
-              onBrowserPrint={() => openPreview(rows)}
+              onPrint={() => setPickRolls(rows)}
             />
           )) : <p className="text-sm text-gray-500">No roll barcodes yet. Use Process on the PO received list.</p>}
         </section>

@@ -21,6 +21,7 @@
     "file-saver": "^2.0.5",
     "js-cookie": "^3.0.8",
     "next": "14.2.1",
+    "pdfjs-dist": "^4.4.168",
     "preline": "^2.1.0",
     "react": "^18",
     "react-apexcharts": "^1.4.1",
@@ -32,6 +33,7 @@
     "sass": "^1.75.0",
     "simplebar-react": "^3.2.5",
     "tailwind-clip-path": "^1.0.0",
+    "tesseract.js": "^5.1.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

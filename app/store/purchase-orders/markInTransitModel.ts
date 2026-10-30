@@ -9,6 +9,39 @@ export interface SavedPackFile {
   size?: number;
 }
 
+export interface PackingCartonExtra {
+  label: string;
+  value: string;
+}
+
+/** One carton row from a packing-list PDF. Totals on the packing list are sums of these rows. */
+export interface PackingCarton {
+  materialCode: string;
+  millSortKey: string;
+  fabricId?: string;
+  fabricName?: string;
+  fabricSortNo?: string;
+  millOldFabricSortNo?: string;
+  millNewFabricSortNo?: string;
+  fabricTypeName?: string;
+  colourName?: string;
+  cartonNumber: string;
+  count: string;
+  netWeight: string;
+  grossWeight: string;
+  totalPcs: string;
+  totalQty: string;
+  uom: string;
+  designShade: string;
+  product: string;
+  batch: string;
+  finishWidth: string;
+  lotNumber: string;
+  size: string;
+  lineId?: string;
+  extras: PackingCartonExtra[];
+}
+
 export interface PackingListRow {
   id: string;
   packingListCode?: string;
@@ -17,12 +50,22 @@ export interface PackingListRow {
   rolls?: number;
   boxes?: number;
   weight?: number;
+  quantity?: number;
   courierName?: string;
   courierNumber?: string;
   vehicleNumber?: string;
   challanNumber?: string;
   notes?: string;
+  millName?: string;
+  consigneeName?: string;
+  customerCity?: string;
+  invoiceNumber?: string;
+  invoiceDate?: string | null;
+  division?: string;
+  lrNo?: string;
+  lrDate?: string | null;
   lineIds?: string[];
+  cartons?: Array<Partial<PackingCarton> & { count?: number | string; netWeight?: number | string; grossWeight?: number | string; totalPcs?: number | string; totalQty?: number | string; finishWidth?: number | string }>;
   files?: SavedPackFile[];
 }
 
@@ -40,6 +83,15 @@ export interface TransitPackEntry {
   rolls: string;
   weight: string;
   notes: string;
+  millName: string;
+  consigneeName: string;
+  customerCity: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  division: string;
+  lrNo: string;
+  lrDate: string;
+  cartons: PackingCarton[];
   files: File[];
   savedFiles: SavedPackFile[];
 }
@@ -70,8 +122,51 @@ export function emptyTransitEntry(order: PurchaseOrderRow | null): TransitPackEn
     rolls: '0',
     weight: '0.00',
     notes: '',
+    millName: '',
+    consigneeName: '',
+    customerCity: '',
+    invoiceNumber: '',
+    invoiceDate: '',
+    division: '',
+    lrNo: '',
+    lrDate: '',
+    cartons: [],
     files: [],
     savedFiles: [],
+  };
+}
+
+function cartonText(value: number | string | undefined): string {
+  if (value == null || value === '') return '';
+  return String(value);
+}
+
+function cartonFromSaved(row: NonNullable<PackingListRow['cartons']>[number]): PackingCarton {
+  return {
+    materialCode: row.materialCode || '',
+    millSortKey: row.millSortKey || '',
+    fabricId: row.fabricId || '',
+    fabricName: row.fabricName || '',
+    fabricSortNo: row.fabricSortNo || '',
+    millOldFabricSortNo: row.millOldFabricSortNo || '',
+    millNewFabricSortNo: row.millNewFabricSortNo || '',
+    fabricTypeName: row.fabricTypeName || '',
+    colourName: row.colourName || '',
+    cartonNumber: row.cartonNumber || '',
+    count: cartonText(row.count),
+    netWeight: cartonText(row.netWeight),
+    grossWeight: cartonText(row.grossWeight),
+    totalPcs: cartonText(row.totalPcs),
+    totalQty: cartonText(row.totalQty),
+    uom: row.uom || '',
+    designShade: row.designShade || '',
+    product: row.product || '',
+    batch: row.batch || '',
+    finishWidth: cartonText(row.finishWidth),
+    lotNumber: row.lotNumber || '',
+    size: row.size || '',
+    lineId: row.lineId || '',
+    extras: (row.extras || []).map((extra) => ({ label: extra.label || '', value: extra.value || '' })),
   };
 }
 
@@ -93,6 +188,15 @@ export function entryFromPackingList(row: PackingListRow): TransitPackEntry {
     rolls: String(row.rolls || row.boxes || 0),
     weight: row.weight == null ? '0.00' : String(row.weight),
     notes: row.notes || '',
+    millName: row.millName || '',
+    consigneeName: row.consigneeName || '',
+    customerCity: row.customerCity || '',
+    invoiceNumber: row.invoiceNumber || '',
+    invoiceDate: (row.invoiceDate || '').slice(0, 10),
+    division: row.division || '',
+    lrNo: row.lrNo || '',
+    lrDate: (row.lrDate || '').slice(0, 10),
+    cartons: (row.cartons || []).map(cartonFromSaved),
     files: [],
     savedFiles: (row.files || []).map((file) => ({
       url: file.url,
@@ -141,6 +245,10 @@ export function transitEntryError(
   if (!entry.dispatchDate) return `${label}: dispatch date is required`;
   if (!entry.estimatedDelivery) return `${label}: estimated delivery is required`;
   if (!(Number(entry.rolls) > 0)) return `${label}: rolls must be greater than 0`;
-  if (!(Number(entry.weight) > 0)) return `${label}: weight must be greater than 0`;
+  if (!(Number(entry.weight) > 0)) {
+    return entry.cartons.length
+      ? `${label}: enter a gross weight on the carton rows`
+      : `${label}: weight must be greater than 0`;
+  }
   return '';
 }

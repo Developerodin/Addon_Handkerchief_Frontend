@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast';
 import { factoryRequest, LotRow, PageResult, PurchaseOrderRow } from '@/shared/services/factoryApi';
 import { formatInr } from '../purchase-orders/add/purchaseOrderFormModel';
 import { PackingListRow } from '../purchase-orders/markInTransitModel';
+import { measurementName } from '../purchase-orders/packingListPdf';
 import { fabricLineLabel } from './goodsReceivedModel';
 import { downloadGoodsReceivedExcel } from './goodsReceivedExcel';
 import { GoodsReceivedLotCard } from './GoodsReceivedLotCard';
@@ -226,6 +227,13 @@ function PacklistBlock({ pack, index, order }: { pack: PackingListRow; index: nu
     ['PO items', names],
   ];
   if (pack.notes) rows.push(['Notes', pack.notes]);
+  if (pack.millName) rows.push(['Mill', pack.millName]);
+  if (pack.consigneeName) rows.push(['Consignee', pack.consigneeName]);
+  if (pack.customerCity) rows.push(['Customer city', pack.customerCity]);
+  if (pack.invoiceNumber) rows.push(['Invoice number', pack.invoiceNumber]);
+  if (pack.division) rows.push(['Division', pack.division]);
+  if (pack.lrNo) rows.push(['LR no', pack.lrNo]);
+  if (pack.lrDate) rows.push(['LR date', new Date(pack.lrDate).toLocaleDateString('en-GB')]);
   return (
     <div className="mb-3 overflow-hidden rounded border border-gray-300 bg-white last:mb-0">
       <p className="border-b border-gray-300 bg-gray-50 px-2 py-1.5 text-[10px] font-bold uppercase text-gray-700">Packlist {index + 1}</p>
@@ -239,6 +247,34 @@ function PacklistBlock({ pack, index, order }: { pack: PackingListRow; index: nu
           ))}
         </tbody>
       </table>
+      {pack.cartons?.length ? (
+        <div className="overflow-x-auto border-t border-gray-300">
+          <table className="min-w-full border-collapse text-xs">
+            <thead className="bg-gray-50">
+              <tr>
+                {['Carton', 'Fabric', 'Mill old', 'Count', 'Net wt', 'Gross wt', 'Qty', 'UOM', 'Batch'].map((label) => (
+                  <th key={label} className={cell}>{label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {pack.cartons.map((carton, cartonIndex) => (
+                <tr key={`${carton.cartonNumber || cartonIndex}`}>
+                  <td className="border border-gray-300 px-2 py-1.5">{carton.cartonNumber || '—'}</td>
+                  <td className="border border-gray-300 px-2 py-1.5">{carton.fabricName || carton.materialCode || '—'}</td>
+                  <td className="border border-gray-300 px-2 py-1.5">{carton.millOldFabricSortNo || carton.millSortKey || '—'}</td>
+                  <td className="border border-gray-300 px-2 py-1.5 text-right">{carton.count ?? 0}</td>
+                  <td className="border border-gray-300 px-2 py-1.5 text-right">{carton.netWeight ?? 0}</td>
+                  <td className="border border-gray-300 px-2 py-1.5 text-right">{carton.grossWeight ?? 0}</td>
+                  <td className="border border-gray-300 px-2 py-1.5 text-right">{carton.totalQty ?? 0}</td>
+                  <td className="border border-gray-300 px-2 py-1.5">{carton.uom ? measurementName(carton.uom) : '—'}</td>
+                  <td className="border border-gray-300 px-2 py-1.5">{carton.batch || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -8,7 +8,9 @@ import { RackFilterPanel } from './RackFilterPanel';
 import { AddRacksDrawer } from './AddRacksDrawer';
 import { PlaceRollDrawer } from './PlaceRollDrawer';
 import { RackReportDrawer } from './RackReportDrawer';
-import { A4BarcodePreview, A4PreviewLabel } from '@/shared/components/print/A4BarcodePreview';
+import { RackPrintPickModal } from './RackPrintPickModal';
+import { RackPrintSettingsModal } from './RackPrintSettingsModal';
+import { RackPrintItem } from '@/shared/utils/qzRackPrint';
 import { downloadRacksExcel } from './rackBarcode';
 
 const PAGE_SIZE = 24;
@@ -30,7 +32,8 @@ export function RackLayout() {
   const [placing, setPlacing] = useState<RollRow | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
-  const [barcodePreview, setBarcodePreview] = useState<A4PreviewLabel[] | null>(null);
+  const [pickOpen, setPickOpen] = useState(false);
+  const [printRacks, setPrintRacks] = useState<RackPrintItem[] | null>(null);
   const [active, setActive] = useState<StorageRackCard | null>(null);
   const [rolls, setRolls] = useState<RollRow[]>([]);
   const [history, setHistory] = useState<RackMove[]>([]);
@@ -120,14 +123,14 @@ export function RackLayout() {
   };
 
   /**
-   * Opens the A4 preview for the racks currently in the list.
+   * Asks how many racks to print before opening QZ Tray settings.
    */
-  const openBarcodePreview = () => {
+  const openBarcodePrint = () => {
     if (!filtered.length) {
       toast.error('No racks to print');
       return;
     }
-    setBarcodePreview(filtered.map(rackPreviewLabel));
+    setPickOpen(true);
   };
 
   return (
@@ -174,7 +177,7 @@ export function RackLayout() {
         <button type="button" className={outline} onClick={() => setReportOpen(true)}>
           <i className="ri-file-list-3-line text-primary" aria-hidden /> Report
         </button>
-        <button type="button" className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-[11px] font-bold text-white" aria-label="Preview rack barcodes on A4" onClick={openBarcodePreview}>
+        <button type="button" className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-[11px] font-bold text-white" aria-label="Print rack barcodes" onClick={openBarcodePrint}>
           <i className="ri-barcode-line" aria-hidden /> Print barcode
         </button>
       </div>
@@ -241,18 +244,32 @@ export function RackLayout() {
         />
       ) : null}
       {reportOpen ? <RackReportDrawer onClose={() => setReportOpen(false)} /> : null}
-      {barcodePreview ? <A4BarcodePreview labels={barcodePreview} onClose={() => setBarcodePreview(null)} /> : null}
+      {pickOpen ? (
+        <RackPrintPickModal
+          racks={filtered.map(rackPrintItem)}
+          onClose={() => setPickOpen(false)}
+          onConfirm={(chosen) => {
+            setPickOpen(false);
+            setPrintRacks(chosen);
+          }}
+        />
+      ) : null}
+      {printRacks ? <RackPrintSettingsModal racks={printRacks} onClose={() => setPrintRacks(null)} /> : null}
     </div>
   );
 }
 
 /**
- * Rack sticker for the A4 preview. The barcode is the rack barcode, or the rack code when none is set.
+ * Rack sticker for QZ Tray. The barcode is the rack barcode, or the rack code when none is set.
  */
-function rackPreviewLabel(rack: StorageRackCard): A4PreviewLabel {
-  const barcode = rack.barcode || rack.code;
-  const subtitle = [rack.name && rack.name !== rack.code ? rack.name : '', rack.zone, rack.floor].filter(Boolean).join(' · ');
-  return { id: rack.code, name: rack.code, detail: barcode, title: rack.code, subtitle, barcode };
+function rackPrintItem(rack: StorageRackCard): RackPrintItem {
+  return {
+    rackCode: rack.code,
+    barcode: rack.barcode || rack.code,
+    shelf: rack.zone,
+    floor: rack.floor,
+    zone: rack.zone,
+  };
 }
 
 /**
