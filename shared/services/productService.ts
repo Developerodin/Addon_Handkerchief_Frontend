@@ -7,6 +7,7 @@ export interface ProductBulkRow {
   name: string;
   knittingCode?: string;
   factoryCode?: string;
+  materialCode?: string;
   attributes?: { Needles?: string };
   styleCodeId1?: string;
   styleCodeId2?: string;

@@ -11,10 +11,12 @@ import { StyleCodeDetailFields } from '@/app/catalog/items/components/StyleCodeD
 import { mapStyleCodeToItemRow } from '@/shared/utils/styleCodeFields';
 import { ProcessSequenceEditor } from '@/app/catalog/items/components/ProcessSequenceEditor';
 import { ProductBomTab } from '@/app/catalog/items/components/ProductBomTab';
+import { FabricBomItem, fabricBomRowIsSavable, toFabricBomPayload } from '@/app/catalog/items/components/ProductBomShared';
 import ProductImageUploadField from '@/app/catalog/items/components/ProductImageUploadField';
+import { MaterialCodeSelect } from '@/app/catalog/items/components/MaterialCodeSelect';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { useSelector } from 'react-redux';
-import { isDesignUser, isProductionUser, isFinalUser, shouldShowAttribute, shouldShowAttributeForFinal } from '@/shared/utils/userUtils';
+import { isDesignUser, isProductionUser, isFinalUser, isSharedItemAttribute, shouldShowAttribute, shouldShowAttributeForFinal } from '@/shared/utils/userUtils';
 
 const normalizeProductionType = (value?: string): 'normal' | 'embroidery' | 'sticker' => {
   if (value === 'embroidery') return 'embroidery';
@@ -38,6 +40,7 @@ interface Product {
   internalCode: string;
   articleName?: string;
   knittingCode?: string;
+  materialCode?: string;
   vendorCode: string;
   vendorName?: string;
   piecesPerCut?: 3 | 4;
@@ -54,13 +57,7 @@ interface Product {
     name: string;
   };
   attributes: Record<string, string>;
-  bom: Array<{
-    fabricCatalogId: string;
-    fabricName: string;
-    quantity: number;
-    unitCost?: number;
-    bomLineId?: string;
-  }>;
+  bom: FabricBomItem[];
   rawMaterials?: Array<{
     rawMaterialId: string;
     rawMaterialName?: string;
@@ -144,6 +141,7 @@ const EditProductPage = () => {
     internalCode: '',
     articleName: '',
     knittingCode: '',
+    materialCode: '',
     vendorCode: '',
     vendorName: '',
     piecesPerCut: 3,
@@ -355,12 +353,17 @@ const EditProductPage = () => {
                 typeof fabricRef === 'object' && fabricRef !== null
                   ? fabricRef.id || fabricRef._id
                   : fabricRef || '';
+              const storedPieces = Number(item.piecesPerMeter);
               return {
                 fabricCatalogId: String(fabricCatalogId || ''),
                 fabricName: item.fabricName || item.yarnName || item.materialName || (typeof fabricRef === 'object' ? fabricRef.name : '') || '',
+                fabricSortNo: typeof fabricRef === 'object' && fabricRef ? fabricRef.fabricSortNo || '' : '',
                 quantity: item.quantity || 0,
                 unitCost: Number(item.unitCost) || 0,
                 bomLineId: item.bomLineId || '',
+                ...(Number.isFinite(storedPieces) && storedPieces > 0 ? { piecesPerMeter: storedPieces } : {}),
+                sizeLabel: item.sizeLabel || '',
+                uom: item.uom || 'CM',
               };
             })
           : [];
@@ -393,6 +396,9 @@ const EditProductPage = () => {
 
         console.log('Normalized processes:', product.processes);
         
+        const legacyMaterialKey = Object.keys(product.attributes || {}).find(
+          (key: string) => key.toLowerCase() === 'material code'
+        );
         setFormData({
           ...product,
           articleName: product.articleName || '',
@@ -400,6 +406,7 @@ const EditProductPage = () => {
           gst: product.gst || '',
           vendorName: product.vendorName || '',
           piecesPerCut: Number(product.piecesPerCut) === 4 ? 4 : 3,
+          materialCode: product.materialCode || (legacyMaterialKey ? product.attributes[legacyMaterialKey] : '') || '',
           productionType: normalizeProductionType(product.productionType),
           attributes: normalizedAttributes,
           processes: product.processes,
@@ -677,6 +684,7 @@ const EditProductPage = () => {
     productData.productionType = normalizeProductionType(formData.productionType);
     productData.piecesPerCut = formData.piecesPerCut === 4 ? 4 : 3;
     productData.vendorName = (formData.vendorName || '').trim();
+    productData.materialCode = (formData.materialCode || '').trim();
 
       // Style codes: send only IDs (entries with valid styleCodeId)
       const styleCodeIds = (formData.styleCodes || [])
@@ -725,13 +733,13 @@ const EditProductPage = () => {
       // Attributes - filter based on user type
       let allowedAttributes;
       if (isProduction) {
-        // Production user: Only "needles" attribute
+        // Production user: Only needles
         allowedAttributes = Object.fromEntries(
           Object.entries(formData.attributes).filter(([key]) => {
             const category = attributeCategories.find(cat => 
               cat.name === key || cat.id === key
             );
-            return category && category.name.toLowerCase() === 'needles';
+            return category ? isSharedItemAttribute(category.name) : false;
           })
         );
       } else if (isFinal) {
@@ -760,7 +768,7 @@ const EditProductPage = () => {
       }
       
       // Send attributes as attribute name -> option value name (string from masters; backend accepts e.g. Needles: "7 GG")
-      const attrsFiltered = Object.entries(allowedAttributes).filter(([key]) => !['brand', 'pack'].includes(key.toLowerCase()));
+      const attrsFiltered = Object.entries(allowedAttributes).filter(([key]) => !['brand', 'pack', 'material code'].includes(key.toLowerCase()));
       productData.attributes = Object.fromEntries(
         attrsFiltered
           .map(([key, valueName]) => {
@@ -775,13 +783,7 @@ const EditProductPage = () => {
 
       // BOM, rawMaterials and Processes for production users and non-design/non-final/non-production users
       if (isProduction || (!isDesign && !isFinal && !isProduction)) {
-        productData.bom = formData.bom.filter(item => item.fabricCatalogId && item.quantity > 0).map(item => ({
-          fabricCatalogId: item.fabricCatalogId,
-          fabricName: item.fabricName,
-          quantity: Number(item.quantity),
-          unitCost: Number(item.unitCost) || 0,
-          bomLineId: item.bomLineId,
-        }));
+        productData.bom = formData.bom.filter(fabricBomRowIsSavable).map(toFabricBomPayload);
         productData.rawMaterials = (formData.rawMaterials || [])
           .filter(item => item.rawMaterialId && (item.quantity ?? 0) >= 0)
           .map(item => ({
@@ -881,6 +883,12 @@ const EditProductPage = () => {
                             required
                           />
                         </div>
+                        <MaterialCodeSelect
+                          inputId="materialCodeProduction"
+                          value={formData.materialCode || ''}
+                          disabled={isLoading}
+                          onChange={(value) => handleInputChange({ target: { name: 'materialCode', value } } as React.ChangeEvent<HTMLSelectElement>)}
+                        />
                       </>
                     ) : isFinal ? (
                       // Final user: Production Type + Factory Code above Style Codes, then Style Codes + Description
@@ -910,6 +918,12 @@ const EditProductPage = () => {
                             required
                           />
                         </div>
+                        <MaterialCodeSelect
+                          inputId="materialCodeFinal"
+                          value={formData.materialCode || ''}
+                          disabled={isLoading}
+                          onChange={(value) => handleInputChange({ target: { name: 'materialCode', value } } as React.ChangeEvent<HTMLSelectElement>)}
+                        />
                         <div className="md:col-span-2">
                           <div className="flex justify-between items-center mb-4">
                             <label className="form-label">Style Codes</label>
@@ -1026,6 +1040,11 @@ const EditProductPage = () => {
                                 onChange={handleInputChange}
                                                               />
                             </div>
+                            <MaterialCodeSelect
+                              value={formData.materialCode || ''}
+                              disabled={isLoading}
+                              onChange={(value) => handleInputChange({ target: { name: 'materialCode', value } } as React.ChangeEvent<HTMLSelectElement>)}
+                            />
                             <div>
                               <label className="form-label">Article Name</label>
                               <input
@@ -1243,6 +1262,11 @@ const EditProductPage = () => {
                                 onChange={handleInputChange}
                                                               />
                             </div>
+                            <MaterialCodeSelect
+                              value={formData.materialCode || ''}
+                              disabled={isLoading}
+                              onChange={(value) => handleInputChange({ target: { name: 'materialCode', value } } as React.ChangeEvent<HTMLSelectElement>)}
+                            />
                             <div>
                               <label className="form-label">Article Name</label>
                               <input
@@ -1356,8 +1380,8 @@ const EditProductPage = () => {
                 {activeTab === 'attributes' && (() => {
                   const baseFilter = (category: AttributeCategory) => {
                     const nameLower = category.name.toLowerCase();
-                    if (nameLower === 'brand' || nameLower === 'pack') return false;
-                    if (isProduction) return nameLower === 'needles';
+                    if (nameLower === 'brand' || nameLower === 'pack' || nameLower === 'material code') return false;
+                    if (isProduction) return isSharedItemAttribute(category.name);
                     if (isFinal) return shouldShowAttributeForFinal(category.name, isFinal);
                     if (isDesign) return shouldShowAttribute(category.name, isDesign);
                     return true;

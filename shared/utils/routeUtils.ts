@@ -27,6 +27,8 @@ export const getFirstAvailableRoute = (permissions: NavigationPermissions | null
     { path: '/catalog/fabric-count', key: 'Fabric Count' },
     { path: '/catalog/fabric-measurement', key: 'Fabric Measurement' },
     { path: '/catalog/fabric-suppliers', key: 'Fabric Suppliers' },
+    { path: '/catalog/thread', key: 'Thread Catalog' },
+    { path: '/catalog/thread-suppliers', key: 'Thread Suppliers' },
     { path: '/catalog/raw-material', key: 'Packaging materials' },
     { path: '/catalog/processes', key: 'Process Master' },
     { path: '/catalog/attributes', key: 'Attributes Master' },

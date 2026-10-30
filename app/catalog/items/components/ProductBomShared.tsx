@@ -23,9 +23,61 @@ export function newBomLineId(): string {
 export interface FabricBomItem {
   fabricCatalogId: string;
   fabricName?: string;
+  /** Fabric master sort number, for example H0001W. Display only. */
+  fabricSortNo?: string;
+  /** Metres per finished piece. Kept for production math. */
   quantity: number;
   unitCost: number;
   bomLineId?: string;
+  /** Pieces yielded by one metre. When set, quantity is 1 / piecesPerMeter. */
+  piecesPerMeter?: number;
+  /** Finished size label, for example 47*47. */
+  sizeLabel?: string;
+  /** Unit for sizeLabel. Defaults to CM. */
+  uom?: string;
+}
+
+/**
+ * Metres of fabric per finished piece from pieces yielded by one metre.
+ */
+export function metresFromPiecesPerMeter(piecesPerMeter: number): number {
+  if (!Number.isFinite(piecesPerMeter) || piecesPerMeter <= 0) return 0;
+  return Number((1 / piecesPerMeter).toFixed(6));
+}
+
+/**
+ * Pcs per meter shown in the grid. A stored value wins; older rows invert metres per piece.
+ */
+export function shownPiecesPerMeter(row: Pick<FabricBomItem, 'piecesPerMeter' | 'quantity'>): number {
+  if (typeof row.piecesPerMeter === 'number') return row.piecesPerMeter;
+  if (row.quantity > 0) return Number((1 / row.quantity).toFixed(6));
+  return 0;
+}
+
+/**
+ * A fabric line can be saved once a catalog is chosen and consumption is above zero.
+ */
+export function fabricBomRowIsSavable(item: FabricBomItem): boolean {
+  const pieces = Number(item.piecesPerMeter);
+  return Boolean(item.fabricCatalogId) && (item.quantity > 0 || (Number.isFinite(pieces) && pieces > 0));
+}
+
+/**
+ * Payload for POST/PATCH. piecesPerMeter above zero is the source for quantity.
+ */
+export function toFabricBomPayload(item: FabricBomItem) {
+  const pieces = Number(item.piecesPerMeter);
+  const hasPieces = Number.isFinite(pieces) && pieces > 0;
+  return {
+    fabricCatalogId: item.fabricCatalogId,
+    fabricName: item.fabricName || '',
+    quantity: hasPieces ? metresFromPiecesPerMeter(pieces) : Number(item.quantity) || 0,
+    unitCost: Number(item.unitCost) || 0,
+    bomLineId: item.bomLineId,
+    ...(hasPieces ? { piecesPerMeter: pieces } : {}),
+    sizeLabel: (item.sizeLabel || '').trim(),
+    uom: (item.uom || 'CM').trim() || 'CM',
+  };
 }
 
 export interface PackagingBomItem {
@@ -139,12 +191,14 @@ export function BomNumberInput({
   disabled,
   placeholder,
   suffix,
+  ariaLabel,
 }: {
   value: number;
   onChange: (value: number) => void;
   disabled?: boolean;
   placeholder?: string;
   suffix?: string;
+  ariaLabel?: string;
 }) {
   return (
     <div className="relative">
@@ -152,6 +206,7 @@ export function BomNumberInput({
         type="number"
         step="any"
         min="0"
+        aria-label={ariaLabel}
         className={`w-full px-3 py-2 text-[12px] border border-gray-200 rounded focus:ring-0 focus:border-purple-300 disabled:bg-gray-50 disabled:text-gray-400${suffix ? ' pr-8' : ''}`}
         value={Number.isFinite(value) ? value : ''}
         onChange={(e) => onChange(Number(e.target.value))}
@@ -170,10 +225,36 @@ export function BomNumberInput({
 export const BOM_TABLE_HEAD =
   'px-3 py-2.5 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border-b border-gray-200';
 
-export function BomTableShell({ children }: { children: React.ReactNode }) {
+export function BomTextInput({
+  value,
+  onChange,
+  disabled,
+  placeholder,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
+  ariaLabel?: string;
+}) {
+  return (
+    <input
+      type="text"
+      aria-label={ariaLabel}
+      className="w-full px-3 py-2 text-[12px] border border-gray-200 rounded focus:ring-0 focus:border-purple-300 disabled:bg-gray-50 disabled:text-gray-400"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+      placeholder={placeholder}
+    />
+  );
+}
+
+export function BomTableShell({ children, minWidthClass = 'min-w-[420px]' }: { children: React.ReactNode; minWidthClass?: string }) {
   return (
     <div className="overflow-x-auto border-t border-gray-200">
-      <table className="w-full border-collapse min-w-[420px]">{children}</table>
+      <table className={`w-full border-collapse ${minWidthClass}`}>{children}</table>
     </div>
   );
 }

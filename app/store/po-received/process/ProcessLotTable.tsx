@@ -24,14 +24,6 @@ function receivedComplete(roll: RollRow): boolean {
 }
 
 /**
- * Current balance text. A missing value is an old roll that has not been initialized.
- */
-function formatBalance(value?: number | null): string {
-  if (value == null || !Number.isFinite(Number(value))) return '—';
-  return String(value);
-}
-
-/**
  * Finds the nearest ancestor that actually scrolls vertically.
  * `overflow-x-auto` computes overflow-y to auto, so height must exceed the box.
  */
@@ -137,7 +129,7 @@ export function ProcessLotTable({
         <table className="min-w-full border-collapse text-xs">
           <thead>
             <tr>
-              {['Roll id', 'Barcode', 'Fabric', 'Sort No', 'Color', 'Lot number', 'Gross wt', 'Net wt', 'Qty (m)', 'Current gross', 'Current net', 'Current m', 'Status'].map((label) => (
+              {['Roll id', 'Barcode', 'Fabric', 'Sort No', 'Color', 'Lot number', 'Gross wt', 'Net wt', 'Qty (m)', 'Status'].map((label) => (
                 <th key={label} className={head}>{label}</th>
               ))}
             </tr>
@@ -252,9 +244,6 @@ function RollRowView({
           <input aria-label={`${roll.rollCode} quantity in meters`} inputMode="decimal" className="w-20 rounded border border-gray-300 px-1.5 py-1 text-xs" value={meters} onChange={(event) => setMeters(event.target.value.replace(/[^\d.]/g, ''))} onBlur={save} disabled={saving} />
         ) : (roll.qtyMeters ?? 0)}
       </td>
-      <td className={rollCellClass(active)}>{formatBalance(roll.currentGrossWeight)}</td>
-      <td className={rollCellClass(active)}>{formatBalance(roll.currentNetWeight)}</td>
-      <td className={rollCellClass(active)}>{formatBalance(roll.currentQtyMeters)}</td>
       <td className={rollCellClass(active)}>
         {locked ? (
           <span className="text-[10px] font-semibold text-gray-500">View only</span>

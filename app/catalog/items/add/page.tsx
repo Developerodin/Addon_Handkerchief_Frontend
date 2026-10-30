@@ -13,10 +13,12 @@ import { StyleCodeDetailFields } from '@/app/catalog/items/components/StyleCodeD
 import { mapStyleCodeToItemRow } from '@/shared/utils/styleCodeFields';
 import { ProcessSequenceEditor } from '@/app/catalog/items/components/ProcessSequenceEditor';
 import { ProductBomTab } from '@/app/catalog/items/components/ProductBomTab';
+import { FabricBomItem, fabricBomRowIsSavable, toFabricBomPayload } from '@/app/catalog/items/components/ProductBomShared';
 import { RawMaterialBomItem } from '@/app/catalog/items/components/RawMaterialBomTable';
+import { MaterialCodeSelect } from '@/app/catalog/items/components/MaterialCodeSelect';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { useSelector } from 'react-redux';
-import { isDesignUser, isProductionUser, isFinalUser, shouldShowAttribute, shouldShowAttributeForFinal } from '@/shared/utils/userUtils';
+import { isDesignUser, isProductionUser, isFinalUser, isSharedItemAttribute, shouldShowAttribute, shouldShowAttributeForFinal } from '@/shared/utils/userUtils';
 
 const normalizeProductionType = (value?: string): 'normal' | 'embroidery' | 'sticker' => {
   if (value === 'embroidery') return 'embroidery';
@@ -78,14 +80,6 @@ interface Attributes {
   [key: string]: AttributeOptionValue[];
 }
 
-interface BomItem {
-  fabricCatalogId: string;
-  fabricName: string;
-  quantity: number;
-  unitCost: number;
-  bomLineId?: string;
-}
-
 interface ProcessItem {
   processId: string;
 }
@@ -121,7 +115,7 @@ const AddProductPage = () => {
   const isFinal = isFinalUser(user);
   
   const [activeTab, setActiveTab] = useState('general');
-  const [bomItems, setBomItems] = useState<BomItem[]>([]);
+  const [bomItems, setBomItems] = useState<FabricBomItem[]>([]);
   const [rawMaterialItems, setRawMaterialItems] = useState<RawMaterialBomItem[]>([]);
   const [processItems, setProcessItems] = useState<ProcessItem[]>([{ processId: '' }]);
   const [softwareCode, setSoftwareCode] = useState('');
@@ -141,6 +135,7 @@ const AddProductPage = () => {
     internalCode: '',
     articleName: '',
     knittingCode: '',
+    materialCode: '',
     vendorCode: '',
     vendorName: '',
     piecesPerCut: 3 as 3 | 4,
@@ -437,6 +432,7 @@ const AddProductPage = () => {
       productData.productionType = normalizeProductionType(generalForm.productionType);
       productData.piecesPerCut = generalForm.piecesPerCut === 4 ? 4 : 3;
       productData.vendorName = generalForm.vendorName.trim();
+      productData.materialCode = generalForm.materialCode.trim();
 
       // Style codes: send only IDs
       const styleCodeIds = styleCodes
@@ -486,9 +482,9 @@ const AddProductPage = () => {
       // Attributes - filter based on user type
       let allowedAttributes;
       if (isProduction) {
-        // Production user: Only "needles" attribute
-        allowedAttributes = attributeDefinitions.filter(attr => 
-          attr.name.toLowerCase() === 'needles'
+        // Production user: Only needles
+        allowedAttributes = attributeDefinitions.filter(attr =>
+          isSharedItemAttribute(attr.name)
         );
       } else if (isFinal) {
         // Final user: Only Brand, Age group, MRP
@@ -504,9 +500,9 @@ const AddProductPage = () => {
         // Other users: All attributes
         allowedAttributes = attributeDefinitions;
       }
-      // Brand and Pack are in style codes, not product-level attributes
+      // Brand and Pack live on style codes. Material Code is a general field.
       allowedAttributes = allowedAttributes.filter(
-        attr => !['brand', 'pack'].includes(attr.name.toLowerCase())
+        attr => !['brand', 'pack', 'material code'].includes(attr.name.toLowerCase())
       );
 
       // Send attributes as attribute name -> option value name (string from masters; backend accepts e.g. Needles: "7 GG")
@@ -523,15 +519,7 @@ const AddProductPage = () => {
 
       // BOM, rawMaterials and Processes for production users and non-design/non-final/non-production users
       if (isProduction || (!isDesign && !isFinal && !isProduction)) {
-        productData.bom = bomItems
-          .filter(item => item.fabricCatalogId && item.quantity > 0)
-          .map(item => ({
-            fabricCatalogId: item.fabricCatalogId,
-            fabricName: item.fabricName,
-            quantity: item.quantity,
-            unitCost: Number(item.unitCost) || 0,
-            bomLineId: item.bomLineId,
-          }));
+        productData.bom = bomItems.filter(fabricBomRowIsSavable).map(toFabricBomPayload);
 
         productData.rawMaterials = rawMaterialItems
           .filter(item => item.rawMaterialId && (item.quantity ?? 0) >= 0)
@@ -609,7 +597,7 @@ const AddProductPage = () => {
                   <ul className="list-disc list-inside space-y-1 text-gray-700">
                     <li><strong>General Information:</strong> Set basic product details like name, codes, category, and description</li>
                     <li><strong>Product Attributes:</strong> Define custom attributes and their values for the product</li>
-                    <li><strong>Bill of Materials (BOM):</strong> Specify fabric catalogs, metres per piece, and packaging materials</li>
+                    <li><strong>Bill of Materials (BOM):</strong> Specify fabric masters, pieces per meter, size, and packaging materials</li>
                     <li><strong>Manufacturing Processes:</strong> Define the production processes and their sequence</li>
                     <li><strong>Image Upload:</strong> Add product images for visual reference</li>
                   </ul>
@@ -713,6 +701,12 @@ const AddProductPage = () => {
                             required
                           />
                         </div>
+                        <MaterialCodeSelect
+                          inputId="materialCodeProduction"
+                          value={generalForm.materialCode}
+                          disabled={isLoading}
+                          onChange={(value) => handleGeneralChange('materialCode', value)}
+                        />
                       </div>
                     ) : isFinal ? (
                       // Final user: Production Type + Factory Code above Style Codes, then Style Codes + Description
@@ -742,6 +736,12 @@ const AddProductPage = () => {
                                 required
                               />
                             </div>
+                            <MaterialCodeSelect
+                              inputId="materialCodeFinal"
+                              value={generalForm.materialCode}
+                              disabled={isLoading}
+                              onChange={(value) => handleGeneralChange('materialCode', value)}
+                            />
                           </div>
                           <div>
                             <div className="flex justify-between items-center mb-4">
@@ -846,6 +846,11 @@ const AddProductPage = () => {
                                     onChange={(e) => handleGeneralChange('knittingCode', e.target.value)}
                                   />
                                 </div>
+                                <MaterialCodeSelect
+                                  value={generalForm.materialCode}
+                                  disabled={isLoading}
+                                  onChange={(value) => handleGeneralChange('materialCode', value)}
+                                />
                                 <div>
                                   <label className="form-label">Vendor Code *</label>
                                   <input 
@@ -1022,6 +1027,11 @@ const AddProductPage = () => {
                                     onChange={(e) => handleGeneralChange('knittingCode', e.target.value)}
                                   />
                                 </div>
+                                <MaterialCodeSelect
+                                  value={generalForm.materialCode}
+                                  disabled={isLoading}
+                                  onChange={(value) => handleGeneralChange('materialCode', value)}
+                                />
                                 <div>
                                   <label className="form-label">Vendor Code *</label>
                                   <input 
@@ -1174,11 +1184,11 @@ const AddProductPage = () => {
                       <div className="grid grid-cols-2 gap-6">
                         {attributeDefinitions
                           .filter((attrDef) => {
-                            // Brand and Pack are in Style Code section, not in Attributes form
+                            // Brand, Pack, and Material Code are not attribute-tab fields
                             const nameLower = attrDef.name.toLowerCase();
-                            if (nameLower === 'brand' || nameLower === 'pack') return false;
+                            if (nameLower === 'brand' || nameLower === 'pack' || nameLower === 'material code') return false;
                             if (isProduction) {
-                              return nameLower === 'needles';
+                              return isSharedItemAttribute(attrDef.name);
                             }
                             if (isFinal) {
                               return shouldShowAttributeForFinal(attrDef.name, isFinal);
