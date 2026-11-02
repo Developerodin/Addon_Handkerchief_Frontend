@@ -9,9 +9,10 @@ import { factoryRequest, PurchaseOrderRow, RollRow } from '@/shared/services/fac
 import { formatInr } from '@/app/store/purchase-orders/add/purchaseOrderFormModel';
 import { orderTotal } from '@/app/store/po-received/goodsReceivedModel';
 import { UiStatusBadge } from '@/shared/components/ui';
-import { activeReceivedLots, LotQcAction, receivedQuantity } from '../../fabricQcLots';
+import { activeReceivedLots, LotQcAction, receivedQuantity, visibleQcRolls } from '../../fabricQcLots';
 import { FabricQcHistorySection } from './FabricQcHistorySection';
 import { FabricQcLotCard } from './FabricQcLotCard';
+import { QcActionConfirm, QcPendingAction } from './QcActionConfirm';
 import { ScannedRollsSection } from './ScannedRollsSection';
 
 /**
@@ -31,12 +32,31 @@ function FabricQcProcessPage() {
   const orderId = params.orderId;
   const historyView = search.get('view') === 'history';
   const scanRef = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState<QcPendingAction | null>(null);
+
+  /**
+   * Puts the caret back in the scan box once the confirm dialog is gone.
+   */
+  const focusScan = useCallback(() => {
+    window.requestAnimationFrame(() => scanRef.current?.focus());
+  }, []);
+
+  /**
+   * Focuses the scan box as soon as it is in the document.
+   * Auth and the order fetch both mount this field after the page effect runs.
+   */
+  const bindScan = useCallback((node: HTMLInputElement | null) => {
+    scanRef.current = node;
+    if (!node || pending) return;
+    focusScan();
+  }, [focusScan, pending]);
+
   const [order, setOrder] = useState<PurchaseOrderRow | null>(null);
   const [rolls, setRolls] = useState<RollRow[]>([]);
   const [scanned, setScanned] = useState<RollRow[]>([]);
   const [scan, setScan] = useState('');
   const [deciding, setDeciding] = useState('');
-  const [rejecting, setRejecting] = useState('');
+  const [rollBusy, setRollBusy] = useState('');
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
@@ -44,7 +64,7 @@ function FabricQcProcessPage() {
     setOrder(data.order);
     const nextRolls = data.rolls || [];
     setRolls(nextRolls);
-    setScanned((current) => current.map((row) => nextRolls.find((roll) => roll.id === row.id) || row));
+    setScanned((current) => visibleQcRolls(nextRolls, current));
     document.title = `${historyView ? 'QC History' : 'QC'} ${data.order.number}`;
   }, [orderId, historyView]);
 
@@ -61,6 +81,12 @@ function FabricQcProcessPage() {
       cancelled = true;
     };
   }, [load]);
+
+  useEffect(() => {
+    if (historyView || !order || pending) return;
+    const frame = window.requestAnimationFrame(() => scanRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [historyView, order, pending]);
 
   const lots = useMemo(() => (order ? activeReceivedLots(order) : []), [order]);
   const rollsByLot = useMemo(() => {
@@ -79,47 +105,51 @@ function FabricQcProcessPage() {
    * Adds the scanned roll to the session list. A second scan of the same roll is ignored.
    */
   const onScan = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== 'Enter') return;
+    if (event.key !== 'Enter' || pending) return;
     const code = scan.trim();
     if (!code) return;
     const found = rolls.find((roll) => roll.barcode === code || roll.rollCode === code);
     if (!found) {
       toast.error('Scanned barcode is not on this order');
+      focusScan();
       return;
     }
     setScanned((current) => (current.some((roll) => roll.id === found.id) ? current : [...current, found]));
     setScan('');
     toast.success(found.rollCode || found.barcode);
+    focusScan();
   };
 
   /**
-   * Rejects one scanned roll and leaves the lot pending.
+   * Writes one roll's QC status and keeps it in the scanned list. The lot stays pending.
    */
-  const rejectRoll = async (roll: RollRow) => {
-    setRejecting(roll.barcode);
+  const saveRoll = async (roll: RollRow, action: 'pass' | 'reject'): Promise<boolean> => {
+    setRollBusy(roll.barcode);
     setError('');
     try {
-      const saved = await factoryRequest<RollRow>('/quality/rolls/reject', {
+      const saved = await factoryRequest<RollRow>(`/quality/rolls/${action}`, {
         method: 'POST',
         body: JSON.stringify({ poId: orderId, barcode: roll.barcode }),
       });
-      const next = { ...roll, ...saved, qcStatus: 'rejected' as const };
+      const next = { ...roll, ...saved, qcStatus: action === 'pass' ? 'passed' as const : 'rejected' as const };
       setRolls((current) => current.map((row) => (row.id === roll.id ? next : row)));
       setScanned((current) => current.map((row) => (row.id === roll.id ? next : row)));
-      toast.success(`${roll.rollCode || roll.barcode} rejected`);
+      toast.success(`${roll.rollCode || roll.barcode} ${action === 'pass' ? 'passed' : 'rejected'}`);
+      return true;
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Could not reject this roll';
+      const message = err instanceof Error ? err.message : `Could not ${action} this roll`;
       setError(message);
       toast.error(message);
+      return false;
     } finally {
-      setRejecting('');
+      setRollBusy('');
     }
   };
 
   /**
    * Pass approves every roll on the lot that is not already rejected. Reject and hold cover the lot.
    */
-  const decide = async (lotNumber: string, action: LotQcAction, remarks: string) => {
+  const decide = async (lotNumber: string, action: LotQcAction, remarks: string): Promise<boolean> => {
     setDeciding(lotNumber);
     setError('');
     try {
@@ -131,13 +161,38 @@ function FabricQcProcessPage() {
       toast.success(`Lot ${lotNumber} ${label}`);
       setScanned((current) => current.filter((roll) => roll.receivedLotNumber !== lotNumber));
       await load();
+      return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not save QC';
       setError(message);
       toast.error(message);
+      return false;
     } finally {
       setDeciding('');
     }
+  };
+
+  /**
+   * Runs the QC action that the operator just confirmed.
+   */
+  const confirmPending = async () => {
+    if (!pending) return;
+    const ok = pending.kind === 'pass-roll' || pending.kind === 'reject-roll'
+      ? await saveRoll(pending.roll, pending.kind === 'pass-roll' ? 'pass' : 'reject')
+      : await decide(
+        pending.lotNumber,
+        pending.kind === 'pass-lot' ? 'pass' : pending.kind === 'reject-lot' ? 'reject' : 'hold',
+        pending.remarks,
+      );
+    if (ok) setPending(null);
+  };
+
+  /**
+   * Opens the lot confirmation. The lot card does not save until this dialog is confirmed.
+   */
+  const askLot = (lotNumber: string, action: LotQcAction, remarks: string) => {
+    const kind = action === 'pass' ? 'pass-lot' : action === 'reject' ? 'reject-lot' : 'hold-lot';
+    setPending({ kind, lotNumber, remarks });
   };
 
   return (
@@ -179,7 +234,8 @@ function FabricQcProcessPage() {
                 <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-gray-500" htmlFor="qc-scan">Scan roll barcode</label>
                 <input
                   id="qc-scan"
-                  ref={scanRef}
+                  ref={bindScan}
+                  autoFocus
                   className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                   placeholder="Scan or enter roll barcode"
                   value={scan}
@@ -191,8 +247,9 @@ function FabricQcProcessPage() {
               <ScannedRollsSection
                 rolls={scanned}
                 lines={order.lines || []}
-                busyBarcode={rejecting}
-                onReject={rejectRoll}
+                busyBarcode={rollBusy}
+                onPass={(roll) => setPending({ kind: 'pass-roll', roll })}
+                onReject={(roll) => setPending({ kind: 'reject-roll', roll })}
                 onRemove={(roll) => setScanned((current) => current.filter((row) => row.id !== roll.id))}
               />
               <section className="space-y-3" aria-label="Received lots">
@@ -206,7 +263,7 @@ function FabricQcProcessPage() {
                       lines={order.lines || []}
                       rolls={rollsByLot.get(lot.lotNumber) || []}
                       deciding={deciding === lot.lotNumber}
-                      onDecide={decide}
+                      onDecide={askLot}
                     />
                   </div>
                 )) : <p className="text-sm text-gray-500">No received lots yet. Record them on PO received.</p>}
@@ -215,6 +272,15 @@ function FabricQcProcessPage() {
           ) : null}
         </div>
       </div>
+      <QcActionConfirm
+        action={pending}
+        busy={Boolean(deciding || rollBusy)}
+        onConfirm={confirmPending}
+        onClose={() => {
+          if (deciding || rollBusy) return;
+          setPending(null);
+        }}
+      />
     </RequireCrudPermission>
   );
 }

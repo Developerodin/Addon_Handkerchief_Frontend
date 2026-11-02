@@ -1,4 +1,4 @@
-import { PurchaseOrderRow, ReceivedLot } from '@/shared/services/factoryApi';
+import { PurchaseOrderRow, ReceivedLot, RollRow } from '@/shared/services/factoryApi';
 
 export type LotQcStatus = 'pending' | 'passed' | 'held' | 'rejected';
 export type LotQcAction = 'pass' | 'reject' | 'hold';
@@ -69,6 +69,22 @@ export function receivedQuantity(order: PurchaseOrderRow): number {
     (sum, lot) => sum + (lot.lines || []).reduce((inner, line) => inner + (Number(line.receivedQuantity) || 0), 0),
     0
   );
+}
+
+/**
+ * Passed and rejected rolls stay after a refresh. Pending rows are only the ones scanned this visit.
+ */
+export function visibleQcRolls(saved: RollRow[], session: RollRow[]): RollRow[] {
+  const byId = new Map<string, RollRow>();
+  saved.forEach((roll) => {
+    if (roll.qcStatus === 'passed' || roll.qcStatus === 'rejected') byId.set(roll.id, roll);
+  });
+  session.forEach((row) => {
+    const fresh = saved.find((roll) => roll.id === row.id) || row;
+    if (fresh.qcStatus === 'passed' || fresh.qcStatus === 'rejected' || byId.has(fresh.id)) return;
+    byId.set(fresh.id, fresh);
+  });
+  return [...byId.values()];
 }
 
 /**

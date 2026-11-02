@@ -73,9 +73,9 @@ export function ProcessLotTable({
   activeId,
   scrollKey,
   printing,
-  onActivate,
   onSaved,
   onPrint,
+  onScanFocus,
 }: {
   lotNumber: string;
   rolls: RollRow[];
@@ -83,9 +83,9 @@ export function ProcessLotTable({
   activeId: string;
   scrollKey: string;
   printing: boolean;
-  onActivate: (roll: RollRow) => void;
   onSaved: (roll: RollRow) => void;
   onPrint: () => void;
+  onScanFocus: () => void;
 }) {
   const weighed = rolls.filter((roll) => receivedComplete(roll)).length;
 
@@ -131,8 +131,8 @@ export function ProcessLotTable({
                 sortNo={rollSortNo(roll.lineId, lines)}
                 active={roll.id === activeId}
                 scrollKey={scrollKey}
-                onActivate={() => onActivate(roll)}
                 onSaved={onSaved}
+                onScanFocus={onScanFocus}
               />
             ))}
           </tbody>
@@ -143,24 +143,37 @@ export function ProcessLotTable({
 }
 
 /**
- * One roll. The active row accepts received gross, net, and meters.
+ * Focuses a weight box and selects its current value so the next key replaces it.
+ */
+function focusWeightField(node: HTMLInputElement | null) {
+  if (!node) return;
+  node.focus();
+  node.select();
+}
+
+/**
+ * One roll. Scan activates it, then Enter walks gross → net → meters and returns to the scan box.
  */
 function RollRowView({
   roll,
   sortNo,
   active,
   scrollKey,
-  onActivate,
   onSaved,
+  onScanFocus,
 }: {
   roll: RollRow;
   sortNo: string;
   active: boolean;
   scrollKey: string;
-  onActivate: () => void;
   onSaved: (roll: RollRow) => void;
+  onScanFocus: () => void;
 }) {
   const rowRef = useRef<HTMLTableRowElement>(null);
+  const grossRef = useRef<HTMLInputElement>(null);
+  const netRef = useRef<HTMLInputElement>(null);
+  const metersRef = useRef<HTMLInputElement>(null);
+  const skipBlurSave = useRef(false);
   const [gross, setGross] = useState(String(roll.grossWeight ?? ''));
   const [net, setNet] = useState(String(roll.netWeight ?? ''));
   const [meters, setMeters] = useState(String(roll.qtyMeters ?? ''));
@@ -180,11 +193,18 @@ function RollRowView({
     scrollRowIntoView(rowRef.current);
   }, [scrollKey, roll.id]);
 
+  useEffect(() => {
+    const [targetId] = scrollKey.split('|');
+    if (!active || locked || targetId !== roll.id) return;
+    const frame = window.requestAnimationFrame(() => focusWeightField(grossRef.current));
+    return () => window.cancelAnimationFrame(frame);
+  }, [active, locked, scrollKey, roll.id]);
+
   /**
    * Persists the weights typed on the active row.
    */
-  const save = async () => {
-    if (locked) return;
+  const save = async (): Promise<boolean> => {
+    if (locked) return false;
     setSaving(true);
     try {
       const saved = await factoryRequest<RollRow>(`/store/rolls/${roll.id}`, {
@@ -197,11 +217,50 @@ function RollRowView({
       });
       onSaved(saved);
       toast.success(`${roll.rollCode || roll.barcode} weighed`);
+      return true;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not save roll weight');
+      return false;
     } finally {
       setSaving(false);
     }
+  };
+
+  /**
+   * Enter moves gross → net → meters. Enter on meters saves and returns to the scan box.
+   * The blur that follows Enter must not save, or the response overwrites the next field.
+   */
+  const onWeightKeyDown = (field: 'gross' | 'net' | 'meters') => (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter' || saving) return;
+    event.preventDefault();
+    skipBlurSave.current = true;
+    if (field === 'gross') {
+      focusWeightField(netRef.current);
+      return;
+    }
+    if (field === 'net') {
+      focusWeightField(metersRef.current);
+      return;
+    }
+    void save().then((ok) => {
+      if (!ok) {
+        skipBlurSave.current = false;
+        focusWeightField(metersRef.current);
+        return;
+      }
+      onScanFocus();
+    });
+  };
+
+  /**
+   * Saves when the user leaves the row without pressing Enter through the meters field.
+   */
+  const onWeightBlur = () => {
+    if (skipBlurSave.current) {
+      skipBlurSave.current = false;
+      return;
+    }
+    void save();
   };
 
   return (
@@ -210,7 +269,6 @@ function RollRowView({
       id={`roll-row-${roll.id}`}
       className="group"
       aria-selected={active}
-      onClick={onActivate}
     >
       <td className={rollCellClass(active, `font-medium text-primary ${active ? 'shadow-[inset_4px_0_0_#6d28d9]' : ''}`)}>{roll.rollCode || roll.id}</td>
       <td className={rollCellClass(active, 'font-mono text-[11px] text-gray-700')}>{roll.barcode}</td>
@@ -220,17 +278,17 @@ function RollRowView({
       <td className={rollCellClass(active)}>{roll.receivedLotNumber || '—'}</td>
       <td className={rollCellClass(active)}>
         {active && !locked ? (
-          <input aria-label={`${roll.rollCode} gross weight`} inputMode="decimal" className="w-20 rounded border border-gray-300 px-1.5 py-1 text-xs" value={gross} onChange={(event) => setGross(event.target.value.replace(/[^\d.]/g, ''))} onBlur={save} disabled={saving} />
+          <input ref={grossRef} aria-label={`${roll.rollCode} gross weight`} inputMode="decimal" className="w-20 rounded border border-gray-300 px-1.5 py-1 text-xs" value={gross} onChange={(event) => setGross(event.target.value.replace(/[^\d.]/g, ''))} onKeyDown={onWeightKeyDown('gross')} onBlur={onWeightBlur} disabled={saving} />
         ) : (roll.grossWeight ?? 0)}
       </td>
       <td className={rollCellClass(active)}>
         {active && !locked ? (
-          <input aria-label={`${roll.rollCode} net weight`} inputMode="decimal" className="w-20 rounded border border-gray-300 px-1.5 py-1 text-xs" value={net} onChange={(event) => setNet(event.target.value.replace(/[^\d.]/g, ''))} onBlur={save} disabled={saving} />
+          <input ref={netRef} aria-label={`${roll.rollCode} net weight`} inputMode="decimal" className="w-20 rounded border border-gray-300 px-1.5 py-1 text-xs" value={net} onChange={(event) => setNet(event.target.value.replace(/[^\d.]/g, ''))} onKeyDown={onWeightKeyDown('net')} onBlur={onWeightBlur} disabled={saving} />
         ) : (roll.netWeight ?? 0)}
       </td>
       <td className={rollCellClass(active)}>
         {active && !locked ? (
-          <input aria-label={`${roll.rollCode} quantity in meters`} inputMode="decimal" className="w-20 rounded border border-gray-300 px-1.5 py-1 text-xs" value={meters} onChange={(event) => setMeters(event.target.value.replace(/[^\d.]/g, ''))} onBlur={save} disabled={saving} />
+          <input ref={metersRef} aria-label={`${roll.rollCode} quantity in meters`} inputMode="decimal" className="w-20 rounded border border-gray-300 px-1.5 py-1 text-xs" value={meters} onChange={(event) => setMeters(event.target.value.replace(/[^\d.]/g, ''))} onKeyDown={onWeightKeyDown('meters')} onBlur={onWeightBlur} disabled={saving} />
         ) : (roll.qtyMeters ?? 0)}
       </td>
       <td className={rollCellClass(active)}>

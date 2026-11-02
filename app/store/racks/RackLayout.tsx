@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { useNavigation } from '@/shared/contextapi/navigationContext';
 import { factoryRequest, RollRow } from '@/shared/services/factoryApi';
@@ -41,11 +41,30 @@ export function RackLayout() {
   const [rolls, setRolls] = useState<RollRow[]>([]);
   const [history, setHistory] = useState<RackMove[]>([]);
   const [loadingRack, setLoadingRack] = useState(false);
+  const [boardStatus, setBoardStatus] = useState<RackBoardStatus>('loading');
   const [error, setError] = useState('');
+  const scanInputRef = useRef<HTMLInputElement>(null);
+  const drawerOpen = Boolean(active || placing || addOpen || reportOpen || pickOpen || printRacks);
+
+  /**
+   * Keeps the barcode scanner in the roll field whenever no drawer is covering the page.
+   */
+  useEffect(() => {
+    if (drawerOpen) return undefined;
+    const frame = requestAnimationFrame(() => scanInputRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [drawerOpen]);
 
   const load = useCallback(async () => {
-    const data = await factoryRequest<{ results: StorageRackCard[] }>('/store/rack-board');
-    setRacks(data.results || []);
+    try {
+      const data = await factoryRequest<{ results: StorageRackCard[] }>('/store/rack-board');
+      setRacks(data.results || []);
+      setBoardStatus('ready');
+    } catch (err) {
+      // A refresh must keep the cards already on screen. Only the first fetch may fail closed.
+      setBoardStatus((status) => (status === 'loading' ? 'error' : status));
+      throw err;
+    }
   }, []);
 
   useEffect(() => {
@@ -67,6 +86,7 @@ export function RackLayout() {
   const safePage = Math.min(page, pageCount);
   const start = (safePage - 1) * PAGE_SIZE;
   const visible = filtered.slice(start, start + PAGE_SIZE);
+  const gridNotice = rackGridNotice(boardStatus, visible.length);
 
   /**
    * Looks up the scanned roll and asks which rack barcode it should sit on.
@@ -142,6 +162,7 @@ export function RackLayout() {
             <i className="ri-barcode-line pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden />
             <input
               id="scan-roll"
+              ref={scanInputRef}
               value={scan}
               placeholder="Scan QC-passed roll barcode"
               aria-label="Scan roll barcode"
@@ -202,8 +223,11 @@ export function RackLayout() {
           <button type="button" className="rounded border border-gray-200 px-2 py-1 disabled:opacity-40" aria-label="Next page" disabled={safePage >= pageCount} onClick={() => setPage(safePage + 1)}>›</button>
         </div>
       </div>
-      {visible.length === 0 ? <p className="py-10 text-center text-sm text-gray-500">No racks match.</p> : null}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      {gridNotice === 'loading' ? (
+        <p className="py-10 text-center text-sm text-gray-500" role="status" aria-live="polite">Loading racks…</p>
+      ) : null}
+      {gridNotice === 'empty' ? <p className="py-10 text-center text-sm text-gray-500">No racks match.</p> : null}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" aria-busy={boardStatus === 'loading'}>
         {visible.map((rack) => (
           <button
             key={rack.code}
@@ -291,6 +315,19 @@ function rackPrintItem(rack: StorageRackCard): RackPrintItem {
     floor: rack.floor,
     zone: rack.zone,
   };
+}
+
+type RackBoardStatus = 'loading' | 'ready' | 'error';
+
+/**
+ * Copy for the rack grid before cards render.
+ * `loading` is only the first board fetch. A later refresh stays `ready` so existing cards are not replaced by the empty line.
+ * `error` hides the empty-match line; the alert above the grid is the failure state. An empty `ready` list is a real zero result.
+ */
+function rackGridNotice(status: RackBoardStatus, matchCount: number): 'loading' | 'empty' | null {
+  if (status === 'loading') return 'loading';
+  if (status === 'ready' && matchCount === 0) return 'empty';
+  return null;
 }
 
 /**

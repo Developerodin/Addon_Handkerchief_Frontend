@@ -13,6 +13,7 @@ import {
   createFabricSupplier,
   deleteFabricSupplier,
   listFabricSuppliers,
+  parseTearWeightKg,
   updateFabricSupplier,
 } from '@/shared/services/fabricSupplierService';
 
@@ -30,6 +31,7 @@ interface ExcelRow {
   'GSTIN'?: string;
   'Payment Terms'?: string;
   'Fabric Mill'?: string;
+  'Tear Weight (kg)'?: string | number;
   'Bank Name'?: string;
   'Account Holder'?: string;
   'Account Number'?: string;
@@ -40,9 +42,22 @@ interface ExcelRow {
 const excelColWidths = [
   { wch: 24 }, { wch: 22 }, { wch: 18 }, { wch: 14 },
   { wch: 22 }, { wch: 28 }, { wch: 14 }, { wch: 14 }, { wch: 10 },
-  { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 18 },
+  { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 18 },
   { wch: 18 }, { wch: 16 }, { wch: 12 }, { wch: 10 },
 ];
+
+/**
+ * Reads a tear weight from an import cell. Blank is null. Bad values throw.
+ * @param value - Cell value such as 0.5, "1", or "1 kg"
+ * @returns Kilograms, or null when the cell is empty
+ */
+function parseImportedTearWeight(value: string | number | undefined): number | null {
+  if (value == null || value === '') return null;
+  const cleaned = String(value).replace(/kg/gi, '').trim();
+  const weight = parseTearWeightKg(cleaned);
+  if (weight === false) throw new Error('Invalid tear weight');
+  return weight;
+}
 
 const toExportRow = (supplier: FabricSupplier) => ({
   'ID': supplier.id,
@@ -58,6 +73,7 @@ const toExportRow = (supplier: FabricSupplier) => ({
   'GSTIN': supplier.gstin || '',
   'Payment Terms': supplier.paymentTerms || '',
   'Fabric Mill': supplier.fabricMill || '',
+  'Tear Weight (kg)': supplier.tearWeight == null ? '' : supplier.tearWeight,
   'Bank Name': supplier.bankDetails?.bankName || '',
   'Account Holder': supplier.bankDetails?.accountHolder || '',
   'Account Number': supplier.bankDetails?.accountNumber || '',
@@ -70,6 +86,11 @@ const dataColumns: UiTableColumn<FabricSupplier>[] = [
   { key: 'contactPerson', label: 'Contact Person', render: (row) => row.contactPerson },
   { key: 'city', label: 'City', render: (row) => row.city || '—' },
   { key: 'gstin', label: 'GSTIN', render: (row) => row.gstin || '—' },
+  {
+    key: 'tearWeight',
+    label: 'Tear Weight',
+    render: (row) => (row.tearWeight == null ? '—' : `${row.tearWeight} kg`),
+  },
 ];
 
 export default function FabricSuppliersPage() {
@@ -229,6 +250,7 @@ export default function FabricSuppliersPage() {
                 gstin: (row['GSTIN'] || '').toString().trim(),
                 paymentTerms: (row['Payment Terms'] || '').toString().trim(),
                 fabricMill: (row['Fabric Mill'] || '').toString().trim(),
+                tearWeight: parseImportedTearWeight(row['Tear Weight (kg)']),
                 bankDetails: {
                   bankName: (row['Bank Name'] || '').toString().trim(),
                   accountHolder: (row['Account Holder'] || '').toString().trim(),

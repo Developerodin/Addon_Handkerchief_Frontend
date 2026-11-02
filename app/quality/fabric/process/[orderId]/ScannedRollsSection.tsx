@@ -9,21 +9,22 @@ export interface ScannedRollsSectionProps {
   rolls: RollRow[];
   lines: PurchaseOrderLine[];
   busyBarcode: string;
+  onPass: (roll: RollRow) => void;
   onReject: (roll: RollRow) => void;
   onRemove: (roll: RollRow) => void;
 }
 
 /**
- * Rolls scanned in this QC session. Reject persists. Remove only drops it from the list.
+ * Saved pass and reject results, plus rolls scanned in this visit that are still pending.
  */
-export function ScannedRollsSection({ rolls, lines, busyBarcode, onReject, onRemove }: ScannedRollsSectionProps) {
+export function ScannedRollsSection({ rolls, lines, busyBarcode, onPass, onReject, onRemove }: ScannedRollsSectionProps) {
   return (
-    <section className="rounded border border-gray-200" aria-label="Scanned rolls">
+    <section className="rounded border border-gray-200" aria-label="Roll QC">
       <header className="border-b border-gray-200 px-4 py-3">
-        <h2 className="text-xs font-bold text-gray-800">Scanned rolls ({rolls.length})</h2>
+        <h2 className="text-xs font-bold text-gray-800">Roll QC ({rolls.length})</h2>
       </header>
       {rolls.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-gray-500">Scan a roll barcode. It stays in this list until you pass, reject, or hold the lot.</p>
+        <p className="px-4 py-6 text-sm text-gray-500">Scan a roll barcode. Passed and rejected rolls stay here after you leave this page.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse text-xs">
@@ -51,6 +52,15 @@ export function ScannedRollsSection({ rolls, lines, busyBarcode, onReject, onRem
                       <div className="flex gap-2">
                         <button
                           type="button"
+                          className="rounded bg-green-600 px-2 py-1 text-[10px] font-bold text-white disabled:opacity-50"
+                          disabled={busyBarcode === roll.barcode || status === 'passed' || status === 'rejected'}
+                          aria-label={`Pass roll ${roll.rollCode || roll.barcode}`}
+                          onClick={() => onPass(roll)}
+                        >
+                          Pass roll
+                        </button>
+                        <button
+                          type="button"
                           className="rounded bg-red-600 px-2 py-1 text-[10px] font-bold text-white disabled:opacity-50"
                           disabled={busyBarcode === roll.barcode || status === 'rejected'}
                           aria-label={`Reject roll ${roll.rollCode || roll.barcode}`}
@@ -58,14 +68,16 @@ export function ScannedRollsSection({ rolls, lines, busyBarcode, onReject, onRem
                         >
                           Reject roll
                         </button>
-                        <button
-                          type="button"
-                          className="rounded border border-gray-300 px-2 py-1 text-[10px] font-bold text-gray-600"
-                          aria-label={`Remove ${roll.rollCode || roll.barcode} from the scan list`}
-                          onClick={() => onRemove(roll)}
-                        >
-                          Remove
-                        </button>
+                        {status === 'pending' ? (
+                          <button
+                            type="button"
+                            className="rounded border border-gray-300 px-2 py-1 text-[10px] font-bold text-gray-600"
+                            aria-label={`Remove ${roll.rollCode || roll.barcode} from the scan list`}
+                            onClick={() => onRemove(roll)}
+                          >
+                            Remove
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

@@ -8,6 +8,7 @@ import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMaster
 import { UiFormFooter } from '@/shared/components/ui';
 import {
   createFabricSupplier,
+  parseTearWeightKg,
   FabricSupplierFabricDetail,
 } from '@/shared/services/fabricSupplierService';
 import { FabricSupplierDetailsSection } from '@/shared/components/catalog/FabricSupplierDetailsSection';
@@ -29,6 +30,7 @@ const AddFabricSupplierPage = () => {
     gstin: '',
     paymentTerms: '',
     fabricMill: '',
+    tearWeight: '',
     bankName: '',
     accountHolder: '',
     accountNumber: '',
@@ -56,6 +58,12 @@ const AddFabricSupplierPage = () => {
       return;
     }
 
+    const tearWeight = parseTearWeightKg(formData.tearWeight);
+    if (tearWeight === false) {
+      alert('Tear weight must be kilograms, like 0.5 or 1');
+      return;
+    }
+
     try {
       setIsLoading(true);
       await createFabricSupplier({
@@ -71,6 +79,7 @@ const AddFabricSupplierPage = () => {
         gstin: formData.gstin.trim(),
         paymentTerms: formData.paymentTerms.trim(),
         fabricMill: formData.fabricMill.trim(),
+        tearWeight,
         fabricDetails: fabricDetails.map((detail) => ({
           fabricCatalogId: detail.fabricCatalogId,
         })),
@@ -150,6 +159,25 @@ const AddFabricSupplierPage = () => {
           <div className="form-group">
             <label htmlFor="fabricMill" className="form-label">Fabric Mill</label>
             <input type="text" id="fabricMill" name="fabricMill" className="form-control" placeholder="Fabric mill name" value={formData.fabricMill} onChange={handleInputChange} />
+          </div>
+          <div className="form-group">
+            <label htmlFor="tearWeight" className="form-label">Tear Weight</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                id="tearWeight"
+                name="tearWeight"
+                className="form-control"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                placeholder="0.5"
+                aria-label="Tear weight in kilograms"
+                value={formData.tearWeight}
+                onChange={handleInputChange}
+              />
+              <span className="text-sm text-gray-600 shrink-0">kg</span>
+            </div>
           </div>
           <div className="form-group">
             <label htmlFor="status" className="form-label">Status</label>

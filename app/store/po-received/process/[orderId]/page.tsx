@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { toast, Toaster } from 'react-hot-toast';
@@ -63,6 +63,16 @@ export default function ProcessOrderPage() {
   const params = useParams<{ orderId: string }>();
   const orderId = params.orderId;
   const scanRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Puts the caret in the scan box as soon as the field is in the document.
+   * The permission gate mounts children after auth, so a page-load effect can miss it.
+   */
+  const bindScan = useCallback((node: HTMLInputElement | null) => {
+    scanRef.current = node;
+    if (!node) return;
+    window.requestAnimationFrame(() => node.focus());
+  }, []);
   const [order, setOrder] = useState<PurchaseOrderRow | null>(null);
   const [rolls, setRolls] = useState<RollRow[]>([]);
   const [activeId, setActiveId] = useState('');
@@ -100,8 +110,9 @@ export default function ProcessOrderPage() {
   }, [orderId]);
 
   useEffect(() => {
-    scanRef.current?.focus();
-  }, [rolls.length]);
+    const frame = window.requestAnimationFrame(() => scanRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [order, rolls.length]);
 
   const groups = useMemo(() => {
     const map = new Map<string, RollRow[]>();
@@ -161,6 +172,13 @@ export default function ProcessOrderPage() {
       toast.error(err instanceof Error ? err.message : 'Could not prepare labels');
     }
   };
+
+  /**
+   * Returns the caret to the scan box after meters are saved.
+   */
+  const focusScan = useCallback(() => {
+    window.requestAnimationFrame(() => scanRef.current?.focus());
+  }, []);
 
   /**
    * Activates the roll whose barcode was scanned.
@@ -286,7 +304,8 @@ export default function ProcessOrderPage() {
           <label className="block text-[10px] font-bold uppercase tracking-wide text-gray-500" htmlFor="roll-scan">Scan barcode</label>
           <input
             id="roll-scan"
-            ref={scanRef}
+            ref={bindScan}
+            autoFocus
             className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
             placeholder="Scan or enter barcode to activate the row"
             value={scan}
@@ -303,9 +322,9 @@ export default function ProcessOrderPage() {
               activeId={activeId}
               scrollKey={scrollKey}
               printing={false}
-              onActivate={(roll) => setActiveId(roll.id)}
               onSaved={(saved) => setRolls((current) => current.map((row) => (row.id === saved.id ? { ...row, ...saved } : row)))}
               onPrint={() => setPickRolls(rows)}
+              onScanFocus={focusScan}
             />
           )) : <p className="text-sm text-gray-500">No roll barcodes yet. Use Process on the PO received list.</p>}
         </section>

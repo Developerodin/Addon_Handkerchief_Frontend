@@ -29,6 +29,8 @@ export interface FabricSupplier {
   gstin?: string;
   paymentTerms?: string;
   fabricMill?: string;
+  /** Tear weight in kilograms, for example 0.5 or 1. */
+  tearWeight?: number | null;
   fabricDetails?: FabricSupplierFabricDetail[];
   bankDetails?: FabricSupplierBankDetails;
   status: 'active' | 'inactive';
@@ -59,6 +61,19 @@ export type CreateFabricSupplierPayload = Omit<
 >;
 
 export type UpdateFabricSupplierPayload = Partial<CreateFabricSupplierPayload>;
+
+/**
+ * Parses a tear-weight field into kilograms. Blank is null. Invalid input is false.
+ * @param value - Raw input such as "0.5" or "1"
+ * @returns Kilograms, null when blank, or false when the value is not a weight
+ */
+export function parseTearWeightKg(value: string): number | null | false {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const weight = Number(trimmed);
+  if (!Number.isFinite(weight) || weight < 0) return false;
+  return weight;
+}
 
 const BASE = `${API_BASE_URL}/fabric-suppliers`;
 
