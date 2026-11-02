@@ -13,22 +13,21 @@ export interface AddRacksDrawerProps {
 const control = 'w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary';
 
 /**
- * Creates missing fabric racks for a block. Codes look like ST-B-A01-U001.
+ * Creates missing fabric racks for a block. Codes look like ST-B-001-A01.
  */
 export function AddRacksDrawer({ existingCodes, onClose, onCreated }: AddRacksDrawerProps) {
   const [location, setLocation] = useState('ST');
   const [floor, setFloor] = useState('B');
-  const [block, setBlock] = useState('A');
-  const [sectionStart, setSectionStart] = useState('1');
+  const [block, setBlock] = useState('001');
+  const [sectionStart, setSectionStart] = useState('A');
   const [sectionCount, setSectionCount] = useState('1');
-  const [upperCount, setUpperCount] = useState('1');
-  const [lowerCount, setLowerCount] = useState('0');
+  const [rackCount, setRackCount] = useState('1');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const plan = useMemo(
-    () => planRackCodes({ location, floor, block, sectionStart, sectionCount, upperCount, lowerCount }),
-    [location, floor, block, sectionStart, sectionCount, upperCount, lowerCount],
+    () => planRackCodes({ location, floor, block, sectionStart, sectionCount, rackCount }),
+    [location, floor, block, sectionStart, sectionCount, rackCount],
   );
   const existing = useMemo(() => new Set(existingCodes.map((code) => code.toUpperCase())), [existingCodes]);
   const skipped = plan.codes.filter((code) => existing.has(code)).length;
@@ -54,8 +53,7 @@ export function AddRacksDrawer({ existingCodes, onClose, onCreated }: AddRacksDr
           block: plan.block,
           sectionStart: plan.sectionStart,
           sectionCount: plan.sectionCount,
-          upperCount: plan.upperCount,
-          lowerCount: plan.lowerCount,
+          rackCount: plan.rackCount,
         }),
       });
       onCreated(data.created || 0, data.skipped || 0);
@@ -89,23 +87,31 @@ export function AddRacksDrawer({ existingCodes, onClose, onCreated }: AddRacksDr
               <span className="mb-1 block text-sm font-medium text-gray-700">Block</span>
               <input
                 value={block}
-                maxLength={1}
+                maxLength={3}
+                inputMode="numeric"
                 aria-label="Block"
-                placeholder="A"
-                className={`${control} uppercase`}
-                onChange={(event) => setBlock(event.target.value.toUpperCase())}
+                placeholder="001"
+                className={control}
+                onChange={(event) => setBlock(event.target.value.replace(/\D/g, '').slice(0, 3))}
               />
-              <span className="mt-1 block text-xs text-gray-500">One letter. A01 is block A, section 01.</span>
+              <span className="mt-1 block text-xs text-gray-500">Three digits. 1 and 001 are both block 001.</span>
             </label>
             <div className="grid grid-cols-2 gap-3">
-              <NumberField label="First section" value={sectionStart} min={1} max={99} onChange={setSectionStart} />
-              <NumberField label="How many sections" value={sectionCount} min={1} max={99} onChange={setSectionCount} />
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-gray-700">First section</span>
+                <input
+                  value={sectionStart}
+                  maxLength={1}
+                  aria-label="First section"
+                  placeholder="A"
+                  className={`${control} uppercase`}
+                  onChange={(event) => setSectionStart(event.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 1))}
+                />
+              </label>
+              <NumberField label="How many sections" value={sectionCount} min={1} max={26} onChange={setSectionCount} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <NumberField label="Upper racks" value={upperCount} min={0} max={99} onChange={setUpperCount} />
-              <NumberField label="Lower racks" value={lowerCount} min={0} max={99} onChange={setLowerCount} />
-            </div>
-            <p className="text-xs text-gray-500">Upper 2 means U001 and U002. A later 5 adds only the missing codes. Lower racks use L001.</p>
+            <NumberField label="Racks per section" value={rackCount} min={1} max={99} onChange={setRackCount} />
+            <p className="text-xs text-gray-500">Block 001, sections A and B, 9 racks each is ST-B-001-A01 through A09, then B01 through B09. A later 12 adds only the missing codes.</p>
             {plan.error ? <p className="text-sm text-red-600" role="alert">{plan.error}</p> : <CodePreview codes={plan.codes} skipped={skipped} creating={creating} />}
             {error && error !== plan.error ? <p className="text-sm text-red-600" role="alert">{error}</p> : null}
           </div>

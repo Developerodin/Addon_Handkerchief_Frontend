@@ -1,5 +1,5 @@
 const TOKEN = /^[A-Z0-9]{1,6}$/;
-const BLOCK = /^[A-Z]$/;
+const SECTION = /^[A-Z]$/;
 const MAX_CODES = 500;
 
 export interface RackCodeInput {
@@ -8,8 +8,7 @@ export interface RackCodeInput {
   block: string;
   sectionStart: string;
   sectionCount: string;
-  upperCount: string;
-  lowerCount: string;
+  rackCount: string;
 }
 
 export interface RackCodePlan {
@@ -18,10 +17,9 @@ export interface RackCodePlan {
   location: string;
   floor: string;
   block: string;
-  sectionStart: number;
+  sectionStart: string;
   sectionCount: number;
-  upperCount: number;
-  lowerCount: number;
+  rackCount: number;
 }
 
 /**
@@ -33,61 +31,68 @@ function readInt(value: string): number {
 }
 
 /**
- * Zero-pads a section number or rack index.
+ * Zero-pads a block number or rack index.
  */
 function pad(value: number, width: number): string {
   return String(value).padStart(width, '0');
 }
 
 /**
- * Rejects a range that cannot be generated. Empty string when the numbers are valid.
+ * Block digits stored as three characters. "1" and "001" both become "001".
+ * Empty string when the text is not 001–999.
+ */
+function normalizeBlock(value: string): string {
+  const digits = value.trim();
+  if (!/^\d{1,3}$/.test(digits)) return '';
+  const number = Number(digits);
+  if (number < 1 || number > 999) return '';
+  return pad(number, 3);
+}
+
+/**
+ * Rejects a range that cannot be generated. Empty string when the values are valid.
  */
 function rangeError(
   location: string,
   floor: string,
   block: string,
-  sectionStart: number,
+  sectionStart: string,
   sectionCount: number,
-  upperCount: number,
-  lowerCount: number,
+  rackCount: number,
 ): string {
   if (!TOKEN.test(location)) return 'Location must be letters and numbers';
   if (!TOKEN.test(floor)) return 'Floor must be letters and numbers';
-  if (!BLOCK.test(block)) return 'Block must be one letter';
-  if (!Number.isInteger(sectionStart) || sectionStart < 1 || sectionStart > 99) return 'First section must be from 1 to 99';
+  if (!block) return 'Block must be from 001 to 999';
+  if (!SECTION.test(sectionStart)) return 'First section must be one letter';
   if (!Number.isInteger(sectionCount) || sectionCount < 1) return 'Enter how many sections';
-  if (sectionStart + sectionCount - 1 > 99) return 'Section numbers must stay within 01–99';
-  if (!Number.isInteger(upperCount) || upperCount < 0 || upperCount > 99) return 'Upper racks must be from 0 to 99';
-  if (!Number.isInteger(lowerCount) || lowerCount < 0 || lowerCount > 99) return 'Lower racks must be from 0 to 99';
-  if (!upperCount && !lowerCount) return 'Enter upper racks, lower racks, or both';
-  if (sectionCount * (upperCount + lowerCount) > MAX_CODES) return 'Add at most 500 racks at once';
+  const last = sectionStart.charCodeAt(0) + sectionCount - 1;
+  if (last > 'Z'.charCodeAt(0)) return 'Section letters must stay within A–Z';
+  if (!Number.isInteger(rackCount) || rackCount < 1 || rackCount > 99) return 'Racks per section must be from 1 to 99';
+  if (sectionCount * rackCount > MAX_CODES) return 'Add at most 500 racks at once';
   return '';
 }
 
 /**
- * ST-B-A01-U001 codes for one block. Upper and lower each start at 001.
- * Counts are how many of that kind should exist.
+ * ST-B-001-A01 codes for one block. Section letters run from the first letter.
+ * Rack indexes start at 01 and the count is how many should exist in each section.
  */
 export function planRackCodes(input: RackCodeInput): RackCodePlan {
   const location = input.location.trim().toUpperCase().replace(/\s+/g, '');
   const floor = input.floor.trim().toUpperCase().replace(/\s+/g, '');
-  const block = input.block.trim().toUpperCase();
-  const sectionStart = readInt(input.sectionStart);
+  const block = normalizeBlock(input.block);
+  const sectionStart = input.sectionStart.trim().toUpperCase();
   const sectionCount = readInt(input.sectionCount);
-  const upperCount = readInt(input.upperCount);
-  const lowerCount = readInt(input.lowerCount);
-  const error = rangeError(location, floor, block, sectionStart, sectionCount, upperCount, lowerCount);
+  const rackCount = readInt(input.rackCount);
+  const error = rangeError(location, floor, block, sectionStart, sectionCount, rackCount);
   const codes: string[] = [];
   if (!error) {
+    const start = sectionStart.charCodeAt(0);
     for (let offset = 0; offset < sectionCount; offset += 1) {
-      const section = `${block}${pad(sectionStart + offset, 2)}`;
-      for (let index = 1; index <= upperCount; index += 1) {
-        codes.push(`${location}-${floor}-${section}-U${pad(index, 3)}`);
-      }
-      for (let index = 1; index <= lowerCount; index += 1) {
-        codes.push(`${location}-${floor}-${section}-L${pad(index, 3)}`);
+      const section = String.fromCharCode(start + offset);
+      for (let index = 1; index <= rackCount; index += 1) {
+        codes.push(`${location}-${floor}-${block}-${section}${pad(index, 2)}`);
       }
     }
   }
-  return { codes, error, location, floor, block, sectionStart, sectionCount, upperCount, lowerCount };
+  return { codes, error, location, floor, block, sectionStart, sectionCount, rackCount };
 }
