@@ -172,7 +172,6 @@ export function MarkInTransitDrawer({ order, onClose, onSaved }: MarkInTransitDr
         const selected = (order.lines || []).filter((line) => entry.lineIds.includes(line.lineId));
         const uploaded = await uploadEntryFiles(entry.files);
         const cartonNames = Array.from(new Set(entry.cartons.map((row) => row.fabricName).filter(Boolean)));
-        const pdfQuantity = cartonQuantity(entry.cartons);
         const body = {
           lotId: savedLotId,
           packingListCode: entry.packingNumber.trim(),
@@ -181,7 +180,7 @@ export function MarkInTransitDrawer({ order, onClose, onSaved }: MarkInTransitDr
           fabricName: cartonNames.length ? cartonNames.join(', ') : selected.map((line) => line.fabricName).filter(Boolean).join(', '),
           rolls: Number(entry.rolls),
           boxes: Number(entry.rolls),
-          quantity: entry.cartons.length && pdfQuantity > 0 ? pdfQuantity : selected.reduce((sum, line) => sum + (line.quantity || 0), 0),
+          quantity: Number(entry.quantity) || 0,
           weight: Number(entry.weight),
           courierName: entry.courierName.trim(),
           courierNumber: entry.courierNumber.trim(),
@@ -298,7 +297,14 @@ export function MarkInTransitDrawer({ order, onClose, onSaved }: MarkInTransitDr
                   readingPdf={readingPdf}
                   onCartons={(cartons) => {
                     const totals = totalsFromCartons(cartons);
-                    patch(entry.key, { cartons, rolls: totals.rolls, weight: totals.weight, lineIds: totals.lineIds });
+                    const packed = cartonQuantity(cartons);
+                    patch(entry.key, {
+                      cartons,
+                      rolls: totals.rolls,
+                      weight: totals.weight,
+                      quantity: packed > 0 ? String(packed) : entry.quantity,
+                      lineIds: totals.lineIds.length ? totals.lineIds : entry.lineIds,
+                    });
                   }}
                 />
               ))
@@ -497,8 +503,8 @@ function PacklistEntry({
         <table className="min-w-full border-collapse">
           <thead>
             <tr>
-              {['PO items', 'Packing #', 'Courier', 'Courier #', 'Vehicle #', 'Challan #', 'Dispatch', 'Est. delivery', 'Rolls', 'Wt (kg)'].map((label, column) => (
-                <th key={label} className={cell}>{label}{column === 0 || column === 1 || column === 2 || column >= 6 ? ' *' : ''}</th>
+              {['PO items', 'Packing #', 'Courier', 'Courier #', 'Vehicle #', 'Challan #', 'Dispatch', 'Est. delivery', 'Rolls', 'Wt (kg)', 'Total qty'].map((label, column) => (
+                <th key={label} className={cell}>{label}{column === 0 || column === 1 || column === 2 || (column >= 6 && column <= 9) ? ' *' : ''}</th>
               ))}
             </tr>
           </thead>
@@ -547,16 +553,17 @@ function PacklistEntry({
               <td className="border border-gray-300 p-0"><input aria-label="Estimated delivery" type="date" className={inputClass} value={entry.estimatedDelivery} onChange={(event) => onChange({ estimatedDelivery: event.target.value })} /></td>
               <td className="border border-gray-300 p-0"><input aria-label="Rolls" inputMode="numeric" readOnly={entry.cartons.length > 0} className={inputClass} value={entry.rolls} onChange={(event) => onChange({ rolls: event.target.value.replace(/[^\d]/g, '') })} /></td>
               <td className="border border-gray-300 p-0"><input aria-label="Weight" inputMode="decimal" readOnly={entry.cartons.length > 0} className={inputClass} value={entry.weight} onChange={(event) => onChange({ weight: event.target.value.replace(/[^\d.]/g, '') })} /></td>
+              <td className="border border-gray-300 p-0"><input aria-label="Total quantity" inputMode="decimal" className={inputClass} value={entry.quantity} onChange={(event) => onChange({ quantity: event.target.value.replace(/[^\d.]/g, '') })} /></td>
             </tr>
             <tr>
               <td className="border border-gray-300 bg-gray-50 px-2 py-1 text-[10px] font-bold uppercase text-gray-600">Notes</td>
-              <td className="border border-gray-300 p-0" colSpan={9}>
+              <td className="border border-gray-300 p-0" colSpan={10}>
                 <textarea aria-label="Packlist notes" rows={2} placeholder="Optional remarks..." className={`${inputClass} resize-y`} value={entry.notes} onChange={(event) => onChange({ notes: event.target.value })} />
               </td>
             </tr>
             <tr>
               <td className="border border-gray-300 bg-gray-50 px-2 py-1 text-[10px] font-bold uppercase text-gray-600">Selected</td>
-              <td className="border border-gray-300 px-2 py-1.5" colSpan={9}>
+              <td className="border border-gray-300 px-2 py-1.5" colSpan={10}>
                 {selected.length ? (
                   <>
                     <ul className="list-disc space-y-0.5 pl-4 text-xs text-gray-800">

@@ -3,7 +3,7 @@
 import React from 'react';
 import { PurchaseOrderLine, PurchaseOrderRow } from '@/shared/services/factoryApi';
 import { PackingCarton, TransitPackEntry } from './markInTransitModel';
-import { ParsedPackingList, measurementName, sameMeasurement, totalsFromCartons } from './packingListPdf';
+import { cartonQuantity, ParsedPackingList, measurementName, sameMeasurement, totalsFromCartons } from './packingListPdf';
 
 const cell = 'border border-gray-300 px-2 py-1.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-700';
 const inputClass = 'w-full min-w-[4.5rem] border-0 bg-transparent px-1.5 py-1 text-xs text-gray-900 focus:bg-primary/5 focus:outline-none';
@@ -144,6 +144,7 @@ export function PackingListPdfPreview({
 
   const apply = () => {
     const totals = totalsFromCartons(cartons);
+    const packed = cartonQuantity(cartons);
     const lineIds = totals.lineIds.length ? totals.lineIds : entry.lineIds;
     onApply({
       packingNumber: parsed.packingNumber || entry.packingNumber,
@@ -164,6 +165,7 @@ export function PackingListPdfPreview({
       lineIds,
       rolls: totals.rolls,
       weight: totals.weight,
+      quantity: packed > 0 ? String(packed) : entry.quantity,
     });
   };
 
