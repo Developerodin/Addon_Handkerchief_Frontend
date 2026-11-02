@@ -319,6 +319,7 @@ export default function ProcessOrderPage() {
               lotNumber={lotNumber}
               rolls={rows}
               lines={order?.lines || []}
+              tearWeight={typeof order?.supplierTearWeight === 'number' ? order.supplierTearWeight : null}
               activeId={activeId}
               scrollKey={scrollKey}
               printing={false}

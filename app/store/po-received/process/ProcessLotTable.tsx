@@ -24,6 +24,21 @@ function receivedComplete(roll: RollRow): boolean {
 }
 
 /**
+ * Net kilograms from gross minus the supplier tear weight.
+ * A blank gross, or a supplier with no tear weight, stays blank so the cell is not typed.
+ * @param gross - Gross weight as typed or stored
+ * @param tearKg - Supplier tear weight in kilograms
+ */
+export function netFromGross(gross: string, tearKg: number | null): string {
+  if (tearKg == null || !Number.isFinite(tearKg)) return '';
+  const trimmed = gross.trim();
+  if (!trimmed) return '';
+  const grossN = Number(trimmed);
+  if (!Number.isFinite(grossN) || grossN <= 0) return '';
+  return String(Math.round((grossN - tearKg) * 1000) / 1000);
+}
+
+/**
  * Finds the nearest ancestor that actually scrolls vertically.
  * `overflow-x-auto` computes overflow-y to auto, so height must exceed the box.
  */
@@ -70,6 +85,7 @@ export function ProcessLotTable({
   lotNumber,
   rolls,
   lines,
+  tearWeight,
   activeId,
   scrollKey,
   printing,
@@ -80,6 +96,7 @@ export function ProcessLotTable({
   lotNumber: string;
   rolls: RollRow[];
   lines: PurchaseOrderLine[];
+  tearWeight: number | null;
   activeId: string;
   scrollKey: string;
   printing: boolean;
@@ -129,6 +146,7 @@ export function ProcessLotTable({
                 key={roll.id}
                 roll={roll}
                 sortNo={rollSortNo(roll.lineId, lines)}
+                tearWeight={tearWeight}
                 active={roll.id === activeId}
                 scrollKey={scrollKey}
                 onSaved={onSaved}
@@ -152,11 +170,13 @@ function focusWeightField(node: HTMLInputElement | null) {
 }
 
 /**
- * One roll. Scan activates it, then Enter walks gross → net → meters and returns to the scan box.
+ * One roll. Scan activates it, then Enter walks gross → qty and returns to the scan box.
+ * Net weight is gross minus the supplier tear weight.
  */
 function RollRowView({
   roll,
   sortNo,
+  tearWeight,
   active,
   scrollKey,
   onSaved,
@@ -164,6 +184,7 @@ function RollRowView({
 }: {
   roll: RollRow;
   sortNo: string;
+  tearWeight: number | null;
   active: boolean;
   scrollKey: string;
   onSaved: (roll: RollRow) => void;
@@ -171,21 +192,19 @@ function RollRowView({
 }) {
   const rowRef = useRef<HTMLTableRowElement>(null);
   const grossRef = useRef<HTMLInputElement>(null);
-  const netRef = useRef<HTMLInputElement>(null);
   const metersRef = useRef<HTMLInputElement>(null);
   const skipBlurSave = useRef(false);
   const [gross, setGross] = useState(String(roll.grossWeight ?? ''));
-  const [net, setNet] = useState(String(roll.netWeight ?? ''));
   const [meters, setMeters] = useState(String(roll.qtyMeters ?? ''));
   const [saving, setSaving] = useState(false);
   const locked = !rollEditable(roll);
   const done = receivedComplete(roll);
+  const net = netFromGross(active && !locked ? gross : String(roll.grossWeight ?? ''), tearWeight);
 
   useEffect(() => {
     setGross(String(roll.grossWeight ?? ''));
-    setNet(String(roll.netWeight ?? ''));
     setMeters(String(roll.qtyMeters ?? ''));
-  }, [roll.id, roll.grossWeight, roll.netWeight, roll.qtyMeters]);
+  }, [roll.id, roll.grossWeight, roll.qtyMeters]);
 
   useEffect(() => {
     const [targetId] = scrollKey.split('|');
@@ -201,17 +220,21 @@ function RollRowView({
   }, [active, locked, scrollKey, roll.id]);
 
   /**
-   * Persists the weights typed on the active row.
+   * Persists gross, the calculated net, and meters on the active row.
    */
   const save = async (): Promise<boolean> => {
     if (locked) return false;
+    if (net !== '' && Number(net) < 0) {
+      toast.error('Gross weight is below the supplier tear weight');
+      return false;
+    }
     setSaving(true);
     try {
       const saved = await factoryRequest<RollRow>(`/store/rolls/${roll.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
           grossWeight: Number(gross) || 0,
-          netWeight: Number(net) || 0,
+          ...(net !== '' ? { netWeight: Number(net) } : {}),
           qtyMeters: Number(meters) || 0,
         }),
       });
@@ -227,18 +250,14 @@ function RollRowView({
   };
 
   /**
-   * Enter moves gross → net → meters. Enter on meters saves and returns to the scan box.
-   * The blur that follows Enter must not save, or the response overwrites the next field.
+   * Enter moves gross → qty. Enter on qty saves and returns to the scan box.
+   * The blur that follows Enter must not save, or the response overwrites the qty field.
    */
-  const onWeightKeyDown = (field: 'gross' | 'net' | 'meters') => (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const onWeightKeyDown = (field: 'gross' | 'meters') => (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== 'Enter' || saving) return;
     event.preventDefault();
     skipBlurSave.current = true;
     if (field === 'gross') {
-      focusWeightField(netRef.current);
-      return;
-    }
-    if (field === 'net') {
       focusWeightField(metersRef.current);
       return;
     }
@@ -282,9 +301,7 @@ function RollRowView({
         ) : (roll.grossWeight ?? 0)}
       </td>
       <td className={rollCellClass(active)}>
-        {active && !locked ? (
-          <input ref={netRef} aria-label={`${roll.rollCode} net weight`} inputMode="decimal" className="w-20 rounded border border-gray-300 px-1.5 py-1 text-xs" value={net} onChange={(event) => setNet(event.target.value.replace(/[^\d.]/g, ''))} onKeyDown={onWeightKeyDown('net')} onBlur={onWeightBlur} disabled={saving} />
-        ) : (roll.netWeight ?? 0)}
+        <span aria-label={`${roll.rollCode || roll.barcode} net weight`}>{net === '' ? '—' : net}</span>
       </td>
       <td className={rollCellClass(active)}>
         {active && !locked ? (

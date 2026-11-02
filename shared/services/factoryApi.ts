@@ -58,6 +58,8 @@ export interface PurchaseOrderRow {
   id: string;
   number: string;
   supplierName: string;
+  /** Kilograms from the fabric supplier catalog. Null when that supplier has no tear weight. */
+  supplierTearWeight?: number | null;
   supplierAddress?: string;
   supplierTerms?: string;
   status: string;
