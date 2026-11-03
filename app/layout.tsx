@@ -1,29 +1,39 @@
-
-"use client"
+import type { ReactNode } from "react";
+import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "./globals.scss";
-import { Provider } from "react-redux";
-import store from "@/shared/redux/store";
-import PrelineScript from "./PrelineScript";
-import {   useState } from "react";
-import { Initialload } from "@/shared/contextapi";
-import AuthProvider from "@/shared/providers/AuthProvider";
+import Providers from "./providers";
 
+export const metadata: Metadata = {
+  title: "Addon Handkerchief",
+  description: "Addon Handkerchief",
+  applicationName: "Addon Handkerchief",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Addon",
+    statusBarStyle: "default",
+  },
+  icons: {
+    apple: "/icons/apple-touch-icon.png",
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+  },
+};
 
-const RootLayout = ({children}:any) =>{
-  const [pageloading , setpageloading] = useState(false)
-    return(
-      <html lang="en">
-        <body>
-          <Provider store={store}>
-            <AuthProvider>
-            <Initialload.Provider value={{ pageloading , setpageloading }}>
-              {children}
-            </Initialload.Provider>
-            </AuthProvider>
-          </Provider>
-          <PrelineScript/>
-        </body>
-      </html>
-    )
-  }
-  export default RootLayout
+export const viewport: Viewport = {
+  themeColor: "#845ADF",
+};
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <Script src="/pwa-capture.js" strategy="beforeInteractive" />
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
+}

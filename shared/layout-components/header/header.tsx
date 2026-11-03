@@ -7,6 +7,7 @@ import { connect, useDispatch, useSelector } from "react-redux";
 import store from "@/shared/redux/store";
 import Modalsearch from "../modal-search/modalsearch";
 import TaskNotificationsBell from "./TaskNotificationsBell";
+import PwaInstallButton from "@/shared/pwa/PwaInstallButton";
 import { useRouter } from "next/navigation";
 import { authActions } from "@/shared/redux/actions/authActions";
 
@@ -279,6 +280,7 @@ const Header = ({ local_varaiable, ThemeChanger }: any) => {
                   <i className="bx bx-download header-link-icon" aria-hidden="true"></i>
                 </a>
               </div>
+              <PwaInstallButton />
               <div className="header-element header-fullscreen py-[1rem] md:px-[0.65rem] px-2">
                 <button
                   aria-label="anchor"
