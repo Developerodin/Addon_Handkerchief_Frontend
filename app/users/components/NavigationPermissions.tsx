@@ -98,6 +98,7 @@ const FABRIC_GROUPS: { title: string; rows: { key: FactoryScreenKey; label: stri
   {
     title: 'Purchase management',
     rows: [
+      { key: 'Fabric / Requisitions', label: 'Requisition list' },
       { key: 'Fabric / Purchase orders', label: 'All PO' },
       { key: 'Fabric / Receipts', label: 'PO received' },
       { key: 'Fabric / Drafts', label: 'Drafts PO' },
@@ -122,12 +123,14 @@ const FABRIC_GROUPS: { title: string; rows: { key: FactoryScreenKey; label: stri
       { key: 'Fabric / Stock report', label: 'Fabric stock report' },
       { key: 'Fabric / PO analytics', label: 'PO analytics' },
       { key: 'Fabric / Fabric analytics', label: 'Fabric analytics' },
+      { key: 'Fabric / Consumption report', label: 'Consumption report' },
+      { key: 'Fabric / Suppliers report', label: 'Suppliers report' },
     ],
   },
 ];
 
 const STORE_GROUPS: Record<'Store / Purchase orders' | 'Store / Receipt' | 'Store / Racks and issue', FactoryScreenKey[]> = {
-  'Store / Purchase orders': ['Fabric / Purchase orders', 'Fabric / Drafts'],
+  'Store / Purchase orders': ['Fabric / Requisitions', 'Fabric / Purchase orders', 'Fabric / Drafts'],
   'Store / Receipt': [
     'Fabric / Receipts',
     'Fabric / GRN history',

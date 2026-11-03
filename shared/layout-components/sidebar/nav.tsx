@@ -265,6 +265,7 @@ const BaseMenuItems: any = [
         selected: false,
         path: "/store/purchase",
         children: [
+          { icon: <i className="bx bx-list-ul side-menu__icon"></i>, title: "Requisition list", type: "link", path: "/store/requisitions", active: false, selected: false },
           { icon: <i className="bx bx-file side-menu__icon"></i>, title: "All PO", type: "link", path: "/store/purchase-orders", active: false, selected: false },
           { icon: <i className="bx bx-download side-menu__icon"></i>, title: "PO received", type: "link", path: "/store/po-received", active: false, selected: false },
           { icon: <i className="bx bx-edit side-menu__icon"></i>, title: "Drafts PO", type: "link", path: "/store/purchase-orders/drafts", active: false, selected: false },
@@ -289,6 +290,8 @@ const BaseMenuItems: any = [
           { icon: <i className="bx bx-table side-menu__icon"></i>, title: "Fabric stock report", type: "link", path: "/store/reports/stock", active: false, selected: false },
           { icon: <i className="bx bx-line-chart side-menu__icon"></i>, title: "PO analytics", type: "link", path: "/store/reports/po", active: false, selected: false },
           { icon: <i className="bx bx-pie-chart-alt side-menu__icon"></i>, title: "Fabric analytics", type: "link", path: "/store/reports/fabric", active: false, selected: false },
+          { icon: <i className="bx bx-calculator side-menu__icon"></i>, title: "Consumption report", type: "link", path: "/store/reports/consumption", active: false, selected: false },
+          { icon: <i className="bx bx-store side-menu__icon"></i>, title: "Suppliers report", type: "link", path: "/store/reports/suppliers", active: false, selected: false },
         ],
       },
     ],

@@ -50,6 +50,8 @@ export interface FabricMasterExcelRow {
   Rate?: string | number;
   GST?: string;
   'HSN Code'?: string;
+  'Min Quantity in Meter'?: string | number;
+  /** Previous export header. Still accepted so older sheets import. */
   'Min Quantity in Kg'?: string | number;
   Status?: string;
   Remarks?: string;
@@ -227,7 +229,7 @@ export async function importFabricMasterRows(
         rate: parseNumber(row.Rate),
         gst: (row.GST || '').toString().trim(),
         hsnCode: (row['HSN Code'] || '').toString().trim(),
-        minQuantity: parseNumber(row['Min Quantity in Kg']),
+        minQuantity: parseNumber(row['Min Quantity in Meter'] ?? row['Min Quantity in Kg']),
         status: (row.Status?.toString()?.toLowerCase() === 'inactive' ? 'inactive' : 'active') as
           | 'active'
           | 'inactive',

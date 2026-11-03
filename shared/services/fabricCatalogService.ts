@@ -39,6 +39,7 @@ export interface FabricCatalog {
   rate?: number;
   gst?: string;
   hsnCode?: string;
+  /** Minimum quantity in meters. */
   minQuantity?: number;
   status?: 'active' | 'inactive';
   remark?: string;

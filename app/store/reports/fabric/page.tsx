@@ -1,49 +1,116 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
-import { FabricStatGrid, StatItem } from '@/shared/components/factory/FabricStatGrid';
-import { factoryRequest, PageResult } from '@/shared/services/factoryApi';
+import { FabricAnalyticsTable } from './FabricAnalyticsTable';
+import { FabricKpiStrip } from './FabricKpiStrip';
+import {
+  FabricAnalyticsQuery,
+  FabricAnalyticsReport,
+  FabricAnalyticsSort,
+  loadFabricAnalytics,
+} from './fabricAnalytics';
+
+const EMPTY_QUERY: FabricAnalyticsQuery = {
+  page: 1,
+  limit: 20,
+  search: '',
+  sortBy: 'fabricName',
+  sortOrder: 'asc',
+};
 
 /**
- * Reads the total row count from a list endpoint.
+ * Fabric analytics. Search is debounced; sort and pages hit one report API.
  */
-async function resultCount(path: string): Promise<number> {
-  const data = await factoryRequest<PageResult<unknown>>(`${path}${path.includes('?') ? '&' : '?'}limit=1`);
-  return data.totalResults || 0;
-}
-
 export default function FabricAnalyticsPage() {
-  const [items, setItems] = useState<StatItem[]>([]);
+  const [draftSearch, setDraftSearch] = useState('');
+  const [query, setQuery] = useState<FabricAnalyticsQuery>(EMPTY_QUERY);
+  const [report, setReport] = useState<FabricAnalyticsReport | null>(null);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      resultCount('/store/lots?qcStatus=pending'),
-      resultCount('/store/lots?qcStatus=passed'),
-      resultCount('/store/lots?qcStatus=held'),
-      resultCount('/store/receipts'),
-      resultCount('/store/vendor-returns'),
-    ])
-      .then(([pending, passed, held, received, returns]) => {
-        setItems([
-          { label: 'QC pending', value: pending },
-          { label: 'QC passed', value: passed },
-          { label: 'QC held', value: held },
-          { label: 'PO received', value: received },
-          { label: 'Vendor returns', value: returns },
-        ]);
+    const timer = window.setTimeout(() => {
+      const next = draftSearch.trim();
+      setQuery((current) => (current.search === next ? current : { ...current, search: next, page: 1 }));
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [draftSearch]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    loadFabricAnalytics(query)
+      .then((data) => {
+        if (cancelled) return;
+        setReport(data);
+        setError('');
       })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Could not load fabric analytics'));
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Could not load fabric analytics');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [query]);
+
+  const patch = useCallback((next: Partial<FabricAnalyticsQuery>) => {
+    setQuery((current) => ({ ...current, ...next }));
   }, []);
+
+  /**
+   * Toggles a column. A new column starts descending for quantities and ascending for name.
+   * @param field - Server sort field
+   */
+  function sortBy(field: FabricAnalyticsSort) {
+    const starting = field === 'fabricName' ? 'asc' : 'desc';
+    patch({
+      sortBy: field,
+      sortOrder: query.sortBy === field && query.sortOrder === 'asc' ? 'desc' : query.sortBy === field ? 'asc' : starting,
+      page: 1,
+    });
+  }
 
   return (
     <RequireCrudPermission path="Fabric / Fabric analytics" action="read">
-      <CatalogMasterFormPage seoTitle="Fabric analytics" title="Fabric analytics" listHref="/store/reports/stock" listLabel="Fabric stock report" currentLabel="Fabric analytics">
-        <div className="p-4">
-          {error ? <p className="text-sm text-red-600" role="alert">{error}</p> : null}
-          <FabricStatGrid items={items} />
+      <CatalogMasterFormPage
+        seoTitle="Fabric analytics"
+        title="Fabric analytics"
+        listHref="/store/reports/live-inventory"
+        listLabel="Live inventory"
+        currentLabel="Fabric analytics"
+      >
+        <div className="grid gap-4 p-4">
+          {error ? (
+            <p className="text-sm text-red-600" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <FabricKpiStrip summary={report?.summary || null} loading={loading} />
+          <FabricAnalyticsTable
+            rows={report?.results || []}
+            loading={loading}
+            page={report?.page || query.page}
+            limit={query.limit}
+            totalPages={report?.totalPages || 0}
+            totalResults={report?.totalResults || 0}
+            search={draftSearch}
+            sortBy={query.sortBy}
+            sortOrder={query.sortOrder}
+            onSearchChange={setDraftSearch}
+            onLimitChange={(limit) => patch({ limit, page: 1 })}
+            onPageChange={(page) => patch({ page })}
+            onSort={sortBy}
+            onClear={() => {
+              setDraftSearch('');
+              setQuery(EMPTY_QUERY);
+            }}
+          />
         </div>
       </CatalogMasterFormPage>
     </RequireCrudPermission>

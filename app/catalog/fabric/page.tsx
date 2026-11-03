@@ -41,7 +41,7 @@ const toExportRow = (fabric: FabricCatalog) => ({
   'Rate': fabric.rate ?? '',
   'GST': fabric.gst || '',
   'HSN Code': fabric.hsnCode || '',
-  'Min Quantity in Kg': fabric.minQuantity ?? '',
+  'Min Quantity in Meter': fabric.minQuantity ?? '',
   'Status': fabric.status,
   'Remarks': fabric.remark || '',
 });
@@ -136,7 +136,7 @@ const FabricMasterPage = () => {
           Rate: 85,
           GST: '5',
           'HSN Code': '52082100',
-          'Min Quantity in Kg': 50,
+          'Min Quantity in Meter': 50,
           Status: 'active',
           Remarks: 'Handkerchief base fabric',
         },

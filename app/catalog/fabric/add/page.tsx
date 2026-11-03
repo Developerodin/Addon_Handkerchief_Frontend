@@ -338,7 +338,7 @@ const AddFabricPage = () => {
               <input name="hsnCode" className="form-control" value={formData.hsnCode} onChange={handleInputChange} />
             </div>
             <div className="form-group">
-              <label className="form-label">Min Quantity in Kg</label>
+              <label className="form-label">Min Quantity in Meter</label>
               <input name="minQuantity" className="form-control" inputMode="decimal" value={formData.minQuantity} onChange={handleDecimalChange} />
             </div>
             <div className="form-group">

@@ -301,7 +301,7 @@ function EditFabricPage({ params }: { params: { id: string } }) {
             <div><label className="form-label">Rate</label><input name="rate" className="form-control" inputMode="decimal" value={formData.rate} onChange={handleDecimalChange} /></div>
             <div><label className="form-label">GST</label><input name="gst" className="form-control" value={formData.gst} onChange={handleInputChange} /></div>
             <div><label className="form-label">HSN Code</label><input name="hsnCode" className="form-control" value={formData.hsnCode} onChange={handleInputChange} /></div>
-            <div><label className="form-label">Min Quantity in Kg</label><input name="minQuantity" className="form-control" inputMode="decimal" value={formData.minQuantity} onChange={handleDecimalChange} /></div>
+            <div><label className="form-label">Min Quantity in Meter</label><input name="minQuantity" className="form-control" inputMode="decimal" value={formData.minQuantity} onChange={handleDecimalChange} /></div>
             <div><label className="form-label">Status</label><select name="status" className="form-control" value={formData.status} onChange={handleInputChange}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
             <div className="md:col-span-2"><label className="form-label">Remarks</label><textarea name="remark" className="form-control" rows={3} value={formData.remark} onChange={handleInputChange} /></div>
           <UiFormFooter

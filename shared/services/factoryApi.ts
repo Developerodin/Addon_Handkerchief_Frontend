@@ -54,6 +54,36 @@ export interface StatusHistoryRow {
   remarks?: string;
 }
 
+export interface RequisitionSupplierOption {
+  id: string;
+  name: string;
+}
+
+export type RequisitionWorkflow = 'in_requisition' | 'sent_to_draft' | 'order_placed' | 'dismissed';
+
+export interface FabricRequisitionRow {
+  id: string;
+  fabricCatalogId: string;
+  fabricName: string;
+  fabricSortNo?: string;
+  colourName?: string;
+  minQty: number;
+  onHandMeters: number;
+  preferredSupplierId?: string;
+  preferredSupplierName?: string;
+  suppliers: RequisitionSupplierOption[];
+  workflowStage: RequisitionWorkflow;
+  attachedDraftPoId?: string;
+  draftPoNumber?: string;
+  linkedPurchaseOrderId?: string;
+}
+
+export interface DraftPoFromRequisition {
+  purchaseOrder: PurchaseOrderRow;
+  merged: boolean;
+  alreadyStaged: boolean;
+}
+
 export interface PurchaseOrderRow {
   id: string;
   number: string;

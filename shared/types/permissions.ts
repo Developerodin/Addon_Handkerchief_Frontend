@@ -127,6 +127,7 @@ const normalizeHelpSupportTab = (value: unknown): CrudPermissions => {
 
 export const FABRIC_SCREEN_KEYS = [
   'Fabric / Purchase orders',
+  'Fabric / Requisitions',
   'Fabric / Drafts',
   'Fabric / Receipts',
   'Fabric / GRN history',
@@ -139,6 +140,8 @@ export const FABRIC_SCREEN_KEYS = [
   'Fabric / Stock report',
   'Fabric / PO analytics',
   'Fabric / Fabric analytics',
+  'Fabric / Consumption report',
+  'Fabric / Suppliers report',
 ] as const;
 
 export const FACTORY_SCREEN_KEYS = [
@@ -176,6 +179,7 @@ export type FactoryScreenKey = (typeof FACTORY_SCREEN_KEYS)[number];
 /** Older Store grants fill a Fabric screen the first time that screen has no saved flags. */
 export const FABRIC_FROM_LEGACY: Partial<Record<FactoryScreenKey, FactoryScreenKey>> = {
   'Fabric / Purchase orders': 'Store / Purchase orders',
+  'Fabric / Requisitions': 'Store / Purchase orders',
   'Fabric / Drafts': 'Store / Purchase orders',
   'Fabric / Receipts': 'Store / Receipt',
   'Fabric / GRN history': 'Store / Receipt',
@@ -199,10 +203,13 @@ export const FABRIC_FROM_LEGACY: Partial<Record<FactoryScreenKey, FactoryScreenK
   'Fabric / Stock report': 'Reports',
   'Fabric / PO analytics': 'Reports',
   'Fabric / Fabric analytics': 'Reports',
+  'Fabric / Consumption report': 'Reports',
+  'Fabric / Suppliers report': 'Reports',
 };
 
 export const FACTORY_ROUTES: Record<string, FactoryScreenKey> = {
   '/sync': 'Sync',
+  '/store/requisitions': 'Fabric / Requisitions',
   '/store/purchase-orders/drafts': 'Fabric / Drafts',
   '/store/purchase-orders': 'Fabric / Purchase orders',
   '/store/po-received': 'Fabric / Receipts',
@@ -217,6 +224,8 @@ export const FACTORY_ROUTES: Record<string, FactoryScreenKey> = {
   '/store/reports/stock': 'Fabric / Stock report',
   '/store/reports/po': 'Fabric / PO analytics',
   '/store/reports/fabric': 'Fabric / Fabric analytics',
+  '/store/reports/consumption': 'Fabric / Consumption report',
+  '/store/reports/suppliers': 'Fabric / Suppliers report',
   '/production/orders': 'Production / Orders',
   '/production/floor/cut': 'Production / Cut',
   '/production/floor/selvage': 'Production / Selvage',

@@ -30,7 +30,7 @@ interface NavigationContextType {
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
-const CACHE_VERSION = '7';
+const CACHE_VERSION = '8';
 
 interface NavigationProviderProps {
   children: ReactNode;
