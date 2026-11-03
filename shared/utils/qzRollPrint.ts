@@ -281,12 +281,21 @@ function barcodeModule(value: string, requested: number): number {
 }
 
 /**
- * One half-width cell: field name, then the value. No box around it.
+ * Field title in bold. Font 0 has no bold flag, so the same glyphs are printed one dot apart.
+ */
+function zplLabelFont(x: number, y: number, size: number, text: string): string {
+  const label = zplText(text);
+  const font = `^A0N,${size},${size}^FD${label}^FS`;
+  return [`^FO${x},${y}${font}`, `^FO${x + 1},${y}${font}`].join('\n');
+}
+
+/**
+ * One half-width cell: bold field name, then a normal-weight value. No box around it.
  */
 function detailCell(x: number, y: number, title: string, value: string | undefined, settings: RollPrintSettings): string {
   const valueY = y + settings.nameFontSize + 6;
   return [
-    `^FO${x},${y}^A0N,${settings.nameFontSize},${settings.nameFontSize}^FD${zplText(title)}^FS`,
+    zplLabelFont(x, y, settings.nameFontSize, title),
     `^FO${x},${valueY}^A0N,${settings.valueFontSize},${settings.valueFontSize}^FB360,2,0,L^FD${zplText(value)}^FS`,
   ].join('\n');
 }
@@ -301,17 +310,98 @@ function fullValueWidth(title: string, settings: RollPrintSettings): number {
 }
 
 /**
- * Two lines when the fabric name fits, three when it does not. Never a blank third line.
+ * Dots used by a field title in Zebra font 0, so the value starts after the title.
  */
-function fabricLines(value: string | undefined, settings: RollPrintSettings): number {
-  const charWidth = Math.max(1, settings.valueFontSize * 0.5);
-  const perLine = Math.max(1, Math.floor(fullValueWidth('Fabric name', settings) / charWidth));
-  const needed = Math.ceil(zplText(value).length / perLine);
-  return Math.min(3, Math.max(2, needed));
+function titleWidth(title: string, fontSize: number): number {
+  let width = 0;
+  for (const char of title) {
+    if (char === ' ') width += fontSize * 0.35;
+    else if (char >= 'A' && char <= 'Z') width += fontSize * 0.62;
+    else if (char >= '0' && char <= '9') width += fontSize * 0.55;
+    else width += fontSize * 0.5;
+  }
+  return Math.ceil(width);
 }
 
 /**
- * Field name and value on one full-width line. Fabric name may wrap onto two or three lines.
+ * Where the fabric name value starts, to the right of its title.
+ */
+function fabricValueOrigin(settings: RollPrintSettings): number {
+  return 24 + titleWidth('Fabric name', settings.nameFontSize) + 8;
+}
+
+/**
+ * Space from one fabric line to the next. The font height plus a gap, so the lines cannot sit on each other.
+ */
+function fabricLinePitch(settings: RollPrintSettings): number {
+  return settings.valueFontSize + Math.max(10, Math.round(settings.valueFontSize * 0.35));
+}
+
+/**
+ * Dot width of one fabric-name character in Zebra font 0.
+ * Uppercase is wide enough that a long name fills the sticker instead of sitting in a short column.
+ */
+function valueCharDots(char: string, fontSize: number): number {
+  if (char === ' ') return fontSize * 0.33;
+  if ("'-.,:;|/!".includes(char)) return fontSize * 0.3;
+  if (char >= '0' && char <= '9') return fontSize * 0.58;
+  if (char >= 'A' && char <= 'Z') return fontSize * 0.8;
+  return fontSize * 0.55;
+}
+
+function valueTextWidth(text: string, fontSize: number): number {
+  let width = 0;
+  for (const char of text) width += valueCharDots(char, fontSize);
+  return width;
+}
+
+/**
+ * Takes the longest prefix that fits, breaking at a space or hyphen when one is in the line.
+ */
+function takeFabricLine(text: string, widthDots: number, fontSize: number): { line: string; rest: string } {
+  if (valueTextWidth(text, fontSize) <= widthDots) return { line: text, rest: '' };
+  let fit = 1;
+  let width = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const next = width + valueCharDots(text[index], fontSize);
+    if (next > widthDots && index > 0) break;
+    width = next;
+    fit = index + 1;
+  }
+  const slice = text.slice(0, fit);
+  const soft = Math.max(slice.lastIndexOf(' '), slice.lastIndexOf('-'));
+  let breakAt = fit;
+  if (soft >= 4) breakAt = slice[soft] === '-' ? soft + 1 : soft;
+  const line = text.slice(0, breakAt).trimEnd();
+  const rest = text.slice(breakAt).trimStart();
+  if (!line) return { line: slice, rest: text.slice(fit).trimStart() };
+  return { line, rest };
+}
+
+/**
+ * First line sits beside the Fabric name label. Later lines use the full sticker width.
+ * A second line is added only when the name does not fit beside the label, and a third only when that full line is still not enough.
+ */
+export function fabricNameLayout(
+  value: string | undefined,
+  settings: RollPrintSettings = DEFAULT_ROLL_PRINT_SETTINGS,
+): { lines: string[] } {
+  const clean = zplText(value);
+  const fontSize = Math.max(1, settings.valueFontSize);
+  const beside = Math.max(80, ROLL_DOTS - fabricValueOrigin(settings) - 16);
+  const full = Math.max(beside, ROLL_DOTS - 24 - 16);
+  const lines: string[] = [];
+  let rest = clean;
+  for (let index = 0; index < 3 && rest; index += 1) {
+    const taken = takeFabricLine(rest, index === 0 ? beside : full, fontSize);
+    lines.push(taken.line);
+    rest = taken.rest;
+  }
+  return { lines: lines.length ? lines : ['—'] };
+}
+
+/**
+ * Bold field name and a normal-weight value on one full-width line. The fabric name is printed separately.
  */
 function fullLine(y: number, title: string, value: string | undefined, settings: RollPrintSettings, maxLines = 1): string {
   const titleDots = Math.ceil(title.length * settings.nameFontSize * 0.5);
@@ -319,7 +409,7 @@ function fullLine(y: number, title: string, value: string | undefined, settings:
   const valueWidth = fullValueWidth(title, settings);
   const nameY = y + Math.max(0, settings.valueFontSize - settings.nameFontSize);
   return [
-    `^FO24,${nameY}^A0N,${settings.nameFontSize},${settings.nameFontSize}^FD${zplText(title)}^FS`,
+    zplLabelFont(24, nameY, settings.nameFontSize, title),
     `^FO${valueX},${y}^A0N,${settings.valueFontSize},${settings.valueFontSize}^FB${valueWidth},${maxLines},2,L^FD${zplText(value)}^FS`,
   ].join('\n');
 }
@@ -344,7 +434,16 @@ function rollZpl(label: RollLabel, settings: RollPrintSettings = DEFAULT_ROLL_PR
     detailsY += settings.valueFontSize * lines + 14;
   };
   pushFull('Roll id', label.rollCode);
-  pushFull('Fabric name', label.fabricName, fabricLines(label.fabricName, settings));
+  const fabric = fabricNameLayout(label.fabricName, settings);
+  const originX = fabricValueOrigin(settings);
+  const pitch = fabricLinePitch(settings);
+  const nameY = detailsY + Math.max(0, settings.valueFontSize - settings.nameFontSize);
+  details.push(zplLabelFont(24, nameY, settings.nameFontSize, 'Fabric name'));
+  fabric.lines.forEach((line, index) => {
+    const x = index === 0 ? originX : 24;
+    details.push(`^FO${x},${detailsY + index * pitch}^A0N,${settings.valueFontSize},${settings.valueFontSize}^FD${zplText(line)}^FS`);
+  });
+  detailsY += pitch * fabric.lines.length + 10;
   pushFull('Supplier', label.supplierName);
   pushFull('PO No', label.poNumber);
   pushFull('Lot no', label.lotNumber);

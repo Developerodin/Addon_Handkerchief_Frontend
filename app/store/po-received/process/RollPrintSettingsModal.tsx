@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast';
 import { listQzPrinters } from '@/shared/utils/qzRackPrint';
 import {
   DEFAULT_ROLL_PRINT_SETTINGS,
+  fabricNameLayout,
   printRollLabels,
   RollLabel,
   RollPrintSettings,
@@ -229,12 +230,12 @@ function LabelPreview({
 }) {
   const namePx = Math.max(8, Math.round(settings.nameFontSize * 0.45));
   const valuePx = Math.max(10, Math.round(settings.valueFontSize * 0.45));
-  const before: Array<[string, string | undefined, boolean]> = [
-    ['Roll id', label.rollCode, false],
-    ['Fabric name', label.fabricName, true],
-    ['Supplier', label.supplierName, false],
-    ['PO No', label.poNumber, false],
-    ['Lot no', label.lotNumber, false],
+  const fabricLinePx = Math.round(valuePx * 1.35);
+  const fabricLines = fabricNameLayout(label.fabricName, settings).lines;
+  const before: Array<[string, string | undefined]> = [
+    ['Supplier', label.supplierName],
+    ['PO No', label.poNumber],
+    ['Lot no', label.lotNumber],
   ];
   const pairs: Array<[string, string | undefined]> = [
     ['Sort no.', label.sortNo],
@@ -242,13 +243,10 @@ function LabelPreview({
     ['Count', label.countName],
     ['Color', label.colourName],
   ];
-  const line = (title: string, value: string | undefined, wrap: boolean) => (
-    <div key={title} className="flex items-start gap-0.5" style={{ minHeight: wrap ? valuePx * 2.4 : undefined }}>
-      <span className="shrink-0 text-gray-500" style={{ fontSize: namePx, lineHeight: 1.2 }}>{title}</span>
-      <span
-        className={wrap ? 'line-clamp-3 min-w-0 font-semibold text-gray-900' : 'min-w-0 truncate font-semibold text-gray-900'}
-        style={{ fontSize: valuePx, lineHeight: 1.2 }}
-      >
+  const line = (title: string, value: string | undefined) => (
+    <div key={title} className="flex items-start gap-0.5">
+      <span className="shrink-0 font-bold text-gray-900" style={{ fontSize: namePx, lineHeight: 1.2 }}>{title}</span>
+      <span className="min-w-0 truncate font-normal text-gray-900" style={{ fontSize: valuePx, lineHeight: 1.2 }}>
         {value || '—'}
       </span>
     </div>
@@ -260,13 +258,25 @@ function LabelPreview({
         <svg ref={barcodeRef} role="img" aria-label={`Barcode ${label.barcode}`} />
       </div>
       <div className="mb-1 space-y-0.5">
-        {before.map(([title, value, wrap]) => line(title, value, wrap))}
+        {line('Roll id', label.rollCode)}
+        <div>
+          <div className="flex items-start gap-0.5">
+            <span className="shrink-0 font-bold text-gray-900" style={{ fontSize: namePx, lineHeight: `${fabricLinePx}px` }}>Fabric name</span>
+            <span className="min-w-0 flex-1 overflow-hidden font-normal text-gray-900" style={{ fontSize: valuePx, height: fabricLinePx, lineHeight: `${fabricLinePx}px` }}>
+              {fabricLines[0]}
+            </span>
+          </div>
+          {fabricLines.slice(1).map((row, index) => (
+            <span key={`${index}-${row}`} className="block overflow-hidden font-normal text-gray-900" style={{ fontSize: valuePx, height: fabricLinePx, lineHeight: `${fabricLinePx}px` }}>{row}</span>
+          ))}
+        </div>
+        {before.map(([title, value]) => line(title, value))}
       </div>
       <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
         {pairs.map(([title, value]) => (
           <div key={title}>
-            <div className="text-gray-500" style={{ fontSize: namePx, lineHeight: 1.1 }}>{title}</div>
-            <div className="truncate font-semibold text-gray-900" style={{ fontSize: valuePx, lineHeight: 1.15 }}>{value || '—'}</div>
+            <div className="font-bold text-gray-900" style={{ fontSize: namePx, lineHeight: 1.1 }}>{title}</div>
+            <div className="truncate font-normal text-gray-900" style={{ fontSize: valuePx, lineHeight: 1.15 }}>{value || '—'}</div>
           </div>
         ))}
       </div>
