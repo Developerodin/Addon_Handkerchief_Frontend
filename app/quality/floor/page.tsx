@@ -1,11 +1,21 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
+import { EmptyQueue, QueueTabs } from '@/app/production/floor/shared/QueueTabs';
 import { useFactoryList } from '@/shared/hooks/useFactoryList';
 import { BundleRow, factoryRequest, ProductionOrderRow, RollRow } from '@/shared/services/factoryApi';
 import { listStorageRacks, StorageRack } from '@/shared/services/phase3CatalogService';
+
+interface UpcomingBundle {
+  id: string;
+  barcode: string;
+  orderId: string;
+  orderNumber: string;
+  qty: number;
+  rackCode: string;
+}
 
 export default function FloorChecksPage() {
   const orders = useFactoryList<ProductionOrderRow>('/production/orders');
@@ -22,6 +32,38 @@ export default function FloorChecksPage() {
   const [racks, setRacks] = useState<StorageRack[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [upcoming, setUpcoming] = useState<UpcomingBundle[]>([]);
+
+  /**
+   * Bundles single piece cutting put on a rack that this floor has not checked.
+   */
+  const loadUpcoming = useCallback(async () => {
+    const data = await factoryRequest<{ results: UpcomingBundle[] }>('/quality/floor/upcoming');
+    setUpcoming(data.results || []);
+  }, []);
+
+  useEffect(() => {
+    loadUpcoming().catch((err) => setError(err instanceof Error ? err.message : 'Could not load upcoming bundles'));
+  }, [loadUpcoming]);
+
+  /**
+   * Selects an upcoming bundle and loads that order's bundles into the check form.
+   */
+  const takeBundle = async (row: UpcomingBundle) => {
+    setOrderId(row.orderId);
+    setBundleId(row.id);
+    setError('');
+    try {
+      const detail = await factoryRequest<{ bundles: BundleRow[] }>(`/production/orders/${row.orderId}`);
+      const list = detail.bundles || [];
+      if (!list.some((bundle) => bundle.id === row.id)) {
+        list.unshift({ id: row.id, number: 0, qty: row.qty, closed: true, barcode: row.barcode });
+      }
+      setBundles(list);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load bundles');
+    }
+  };
 
   useEffect(() => {
     listStorageRacks({ limit: 200, page: 1 })
@@ -40,9 +82,12 @@ export default function FloorChecksPage() {
     try {
       await factoryRequest(path, { method: 'POST', body: JSON.stringify(body) });
       setMessage('Saved');
+      if (path === '/quality/bundle-checks') await loadUpcoming();
+      return true;
     } catch (err) {
       setMessage('');
       setError(err instanceof Error ? err.message : 'Save failed');
+      return false;
     }
   };
 
@@ -50,6 +95,36 @@ export default function FloorChecksPage() {
     <RequireCrudPermission path="Quality / Floor checks" action="read">
       <CatalogMasterFormPage seoTitle="Floor checks" title="Floor checks" listHref="/dashboards/main" listLabel="Dashboard" currentLabel="Floor checks">
         <div className="grid gap-6 p-4">
+          <QueueTabs
+            upcomingCount={upcoming.length}
+            receivedCount={0}
+            upcoming={(
+              <table className="w-full border-collapse border border-gray-200">
+                <thead>
+                  <tr className="bg-gray-50/30">
+                    {['Bundle', 'Order', 'Qty', 'Rack'].map((label) => (
+                      <th key={label} className="border border-gray-200 px-1.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-[#495057]">{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {upcoming.length ? upcoming.map((row) => (
+                    <tr key={row.id}>
+                      <td className="border border-gray-200 px-1.5 py-2.5 text-[12px]">
+                        <button type="button" className="font-mono font-medium text-purple-600 hover:text-purple-700" onClick={() => { takeBundle(row).catch(() => undefined); }}>{row.barcode}</button>
+                      </td>
+                      <td className="border border-gray-200 px-1.5 py-2.5 text-[12px]">{row.orderNumber || row.orderId.slice(-6)}</td>
+                      <td className="border border-gray-200 px-1.5 py-2.5 text-[12px]">{row.qty}</td>
+                      <td className="border border-gray-200 px-1.5 py-2.5 text-[12px]">{row.rackCode || '—'}</td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan={4} className="border border-gray-200 py-16 text-center text-[11px] text-gray-400">No bundle is on a rack for floor checks.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            )}
+            received={<EmptyQueue text="A bundle leaves Upcoming after the check is saved." />}
+          />
           <form
             className="grid gap-3"
             onSubmit={(event) => {
@@ -87,7 +162,7 @@ export default function FloorChecksPage() {
               <option value="">Select order</option>
               {orders.rows.map((order) => (
                 <option key={order.id} value={order.id}>
-                  {order.productionType} · {order.revisionId}
+                  {order.orderNumber || order.productionType} · {order.revisionId}
                 </option>
               ))}
             </select>
@@ -118,7 +193,7 @@ export default function FloorChecksPage() {
               <option value="">Select order</option>
               {orders.rows.map((order) => (
                 <option key={order.id} value={order.id}>
-                  {order.productionType} · {order.revisionId}
+                  {order.orderNumber || order.productionType} · {order.revisionId}
                 </option>
               ))}
             </select>

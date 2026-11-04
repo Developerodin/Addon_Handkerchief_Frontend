@@ -151,19 +151,24 @@ export const FACTORY_SCREEN_KEYS = [
   'Store / Racks and issue',
   'Production / Orders',
   'Production / Floor',
-  'Production / Cut',
-  'Production / Selvage',
-  'Production / Half moon',
-  'Production / Vertical hem',
-  'Production / Bundle',
-  'Production / Horizontal hem',
-  'Production / Thread cut',
-  'Production / Iron',
+  'Production / Vertical cutting',
+  'Production / Selvage cutting',
+  'Production / Half moon cutting',
+  'Production / Vertical hemming',
+  'Production / Single piece cutting',
+  'Production / Horizontal hemming',
+  'Production / Thread cutting',
+  'Production / Move to ground',
+  'Production / Ironing',
   'Production / Route split',
   'Production / Embroidery',
   'Production / Sticker',
+  'Production / Thread cutting after embroidery',
+  'Production / Ironing after route',
   'Quality / Fabric QC',
   'Quality / Floor checks',
+  'Quality / Final QC',
+  'Quality / Final checking',
   'Quality / Grades',
   'Warehouse / Packing',
   'Warehouse / Boxes',
@@ -188,17 +193,20 @@ export const FABRIC_FROM_LEGACY: Partial<Record<FactoryScreenKey, FactoryScreenK
   'Fabric / Issue': 'Store / Racks and issue',
   'Fabric / Return': 'Store / Racks and issue',
   'Fabric / Storage': 'Store / Racks and issue',
-  'Production / Cut': 'Production / Floor',
-  'Production / Selvage': 'Production / Floor',
-  'Production / Half moon': 'Production / Floor',
-  'Production / Vertical hem': 'Production / Floor',
-  'Production / Bundle': 'Production / Floor',
-  'Production / Horizontal hem': 'Production / Floor',
-  'Production / Thread cut': 'Production / Floor',
-  'Production / Iron': 'Production / Floor',
+  'Production / Vertical cutting': 'Production / Floor',
+  'Production / Selvage cutting': 'Production / Floor',
+  'Production / Half moon cutting': 'Production / Floor',
+  'Production / Vertical hemming': 'Production / Floor',
+  'Production / Single piece cutting': 'Production / Floor',
+  'Production / Horizontal hemming': 'Production / Floor',
+  'Production / Thread cutting': 'Production / Floor',
+  'Production / Move to ground': 'Production / Floor',
+  'Production / Ironing': 'Production / Floor',
   'Production / Route split': 'Production / Floor',
   'Production / Embroidery': 'Production / Floor',
   'Production / Sticker': 'Production / Floor',
+  'Production / Thread cutting after embroidery': 'Production / Floor',
+  'Production / Ironing after route': 'Production / Floor',
   'Fabric / Live inventory': 'Reports',
   'Fabric / Stock report': 'Reports',
   'Fabric / PO analytics': 'Reports',
@@ -227,20 +235,27 @@ export const FACTORY_ROUTES: Record<string, FactoryScreenKey> = {
   '/store/reports/consumption': 'Fabric / Consumption report',
   '/store/reports/suppliers': 'Fabric / Suppliers report',
   '/production/orders': 'Production / Orders',
-  '/production/floor/cut': 'Production / Cut',
-  '/production/floor/selvage': 'Production / Selvage',
-  '/production/floor/half-moon': 'Production / Half moon',
-  '/production/floor/vertical-hem': 'Production / Vertical hem',
-  '/production/floor/bundle': 'Production / Bundle',
-  '/production/floor/horizontal-hem': 'Production / Horizontal hem',
-  '/production/floor/thread-cut': 'Production / Thread cut',
-  '/production/floor/iron': 'Production / Iron',
+  '/production/floor/vertical-cutting': 'Production / Vertical cutting',
+  '/production/floor/cut': 'Production / Vertical cutting',
+  '/production/floor/selvage-cutting': 'Production / Selvage cutting',
+  '/production/floor/selvage': 'Production / Selvage cutting',
+  '/production/floor/half-moon': 'Production / Half moon cutting',
+  '/production/floor/vertical-hem': 'Production / Vertical hemming',
+  '/production/floor/bundle': 'Production / Single piece cutting',
+  '/production/floor/horizontal-hem': 'Production / Horizontal hemming',
+  '/production/floor/thread-cut': 'Production / Thread cutting',
+  '/production/floor/to-ground': 'Production / Move to ground',
+  '/production/floor/iron': 'Production / Ironing',
   '/production/floor/route-split': 'Production / Route split',
   '/production/floor/embroidery': 'Production / Embroidery',
   '/production/floor/sticker': 'Production / Sticker',
+  '/production/floor/embroidery-thread-cut': 'Production / Thread cutting after embroidery',
+  '/production/floor/iron-after': 'Production / Ironing after route',
   '/production/floor': 'Production / Floor',
   '/quality/fabric': 'Quality / Fabric QC',
   '/quality/floor': 'Quality / Floor checks',
+  '/quality/final-qc': 'Quality / Final QC',
+  '/quality/final-checking': 'Quality / Final checking',
   '/quality/grades': 'Quality / Grades',
   '/warehouse/packing': 'Warehouse / Packing',
   '/warehouse/boxes': 'Warehouse / Boxes',
@@ -408,9 +423,29 @@ export const mergeNavigationWithDefaults = (
   }
 
   const factory = factoryDefaults();
+  const saved = partial as (Partial<NavigationPermissions> & Record<string, unknown>) | undefined;
   for (const key of FACTORY_SCREEN_KEYS) {
+    const legacyGrant =
+      key === 'Production / Vertical cutting'
+        ? saved?.['Production / Cut']
+        : key === 'Production / Selvage cutting'
+          ? saved?.['Production / Selvage']
+          : key === 'Production / Half moon cutting'
+            ? saved?.['Production / Half moon']
+            : key === 'Production / Vertical hemming'
+              ? saved?.['Production / Vertical hem']
+              : key === 'Production / Single piece cutting'
+                ? saved?.['Production / Bundle']
+                : key === 'Production / Horizontal hemming'
+                  ? saved?.['Production / Horizontal hem']
+                  : key === 'Production / Thread cutting'
+                    ? saved?.['Production / Thread cut']
+                    : key === 'Production / Ironing'
+                      ? saved?.['Production / Iron']
+                      : undefined;
     const legacy = FABRIC_FROM_LEGACY[key];
-    const raw = partial?.[key] != null ? partial[key] : legacy ? partial?.[legacy] : undefined;
+    const raw =
+      partial?.[key] != null ? partial[key] : legacyGrant != null ? legacyGrant : legacy ? partial?.[legacy] : undefined;
     factory[key] = applyCrudDependencies(normalizeCrud(raw));
   }
 

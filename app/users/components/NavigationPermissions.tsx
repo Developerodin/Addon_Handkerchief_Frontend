@@ -36,17 +36,20 @@ const CRUD_ACTIONS = [
 type TopKey = 'Dashboard' | 'Users' | 'Revision review' | FactoryScreenKey;
 
 const PRODUCTION_FLOORS: FactoryScreenKey[] = [
-  'Production / Cut',
-  'Production / Selvage',
-  'Production / Half moon',
-  'Production / Vertical hem',
-  'Production / Bundle',
-  'Production / Horizontal hem',
-  'Production / Thread cut',
-  'Production / Iron',
+  'Production / Vertical cutting',
+  'Production / Selvage cutting',
+  'Production / Half moon cutting',
+  'Production / Vertical hemming',
+  'Production / Single piece cutting',
+  'Production / Horizontal hemming',
+  'Production / Thread cutting',
+  'Production / Move to ground',
+  'Production / Ironing',
   'Production / Route split',
   'Production / Embroidery',
   'Production / Sticker',
+  'Production / Thread cutting after embroidery',
+  'Production / Ironing after route',
 ];
 
 const SIDEBAR_SECTIONS: { title: string; icon: string; rows: { key: TopKey; label: string }[] }[] = [
@@ -74,6 +77,8 @@ const SIDEBAR_SECTIONS: { title: string; icon: string; rows: { key: TopKey; labe
     icon: 'ri-shield-check-line',
     rows: [
       { key: 'Quality / Floor checks', label: 'Floor checks' },
+      { key: 'Quality / Final QC', label: 'Final QC' },
+      { key: 'Quality / Final checking', label: 'Final checking' },
       { key: 'Quality / Grades', label: 'Grades' },
     ],
   },

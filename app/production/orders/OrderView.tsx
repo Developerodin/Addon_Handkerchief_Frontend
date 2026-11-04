@@ -17,6 +17,8 @@ export function OrderView({ detail, onChanged }: { detail: OrderDetail; onChange
   const [revisions, setRevisions] = useState<ScopeRevision[]>([]);
   const [remainingQty, setRemainingQty] = useState('');
   const [error, setError] = useState('');
+  const [issuedRoll, setIssuedRoll] = useState('');
+  const [issuing, setIssuing] = useState(false);
 
   /**
    * Published revisions for the line being amended.
@@ -97,6 +99,34 @@ export function OrderView({ detail, onChanged }: { detail: OrderDetail; onChange
             </tbody>
           </table>
         </DrawerSection>
+      ) : null}
+      {order.status === 'released' || order.status === 'in-progress' ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <UiButton
+            type="button"
+            variant="secondary"
+            disabled={issuing}
+            onClick={async () => {
+              setIssuing(true);
+              setError('');
+              try {
+                const data = await factoryRequest<{ rollBarcode: string }>(`/production/orders/${order.id}/assume-issued`, {
+                  method: 'POST',
+                  body: JSON.stringify({}),
+                });
+                setIssuedRoll(data.rollBarcode);
+                onChanged();
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'Could not treat fabric as issued');
+              } finally {
+                setIssuing(false);
+              }
+            }}
+          >
+            {issuing ? 'Issuing…' : 'Treat fabric as issued'}
+          </UiButton>
+          {issuedRoll ? <p className="font-mono text-xs text-gray-700">Roll {issuedRoll}</p> : null}
+        </div>
       ) : null}
       <DrawerSection title="Floors">
         <table>
