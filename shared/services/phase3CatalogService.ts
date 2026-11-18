@@ -40,7 +40,6 @@ function createCatalogApi<T extends IdRow>(resourcePath: string) {
     if (params.search?.trim()) searchParams.set('search', params.search.trim());
     if (params.sortBy) searchParams.set('sortBy', params.sortBy);
     if (params.status) searchParams.set('status', params.status);
-
     const query = searchParams.toString();
     const response = await fetch(`${BASE}${query ? `?${query}` : ''}`, {
       headers: { Accept: 'application/json' },
@@ -141,8 +140,19 @@ export interface StorageRack {
   name: string;
   floor?: string;
   zone?: string;
+  stockType?: 'fabric';
+  capacity?: number;
+  barcode?: string;
+  status?: 'active' | 'inactive';
+}
+
+export interface ProductionRack {
+  id: string;
+  code: string;
+  name: string;
+  floor?: string;
+  zone?: string;
   stockType?:
-    | 'fabric'
     | 'wip-bundle'
     | 'finished-carton'
     | 'floor-roll'
@@ -208,6 +218,7 @@ export interface LabelTemplate {
 const machineApi = createCatalogApi<Machine>('/machines');
 const workerApi = createCatalogApi<Worker>('/workers');
 const storageRackApi = createCatalogApi<StorageRack>('/storage-racks');
+const productionRackApi = createCatalogApi<ProductionRack>('/production-racks');
 const containerApi = createCatalogApi<Container>('/containers');
 const labelTemplateApi = createCatalogApi<LabelTemplate>('/label-templates');
 const deviceRegistryApi = createCatalogApi<DeviceRegistry>('/device-registry');
@@ -229,6 +240,12 @@ export const getStorageRack = storageRackApi.get;
 export const createStorageRack = storageRackApi.create;
 export const updateStorageRack = storageRackApi.update;
 export const deleteStorageRack = storageRackApi.remove;
+
+export const listProductionRacks = productionRackApi.list;
+export const getProductionRack = productionRackApi.get;
+export const createProductionRack = productionRackApi.create;
+export const updateProductionRack = productionRackApi.update;
+export const deleteProductionRack = productionRackApi.remove;
 
 export const listContainers = containerApi.list;
 export const getContainer = containerApi.get;

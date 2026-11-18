@@ -21,13 +21,17 @@ export interface HemBundle {
   sewingThread: SewingThreadHint;
 }
 
+import type { CompletedRow } from '../shared/CompletedQueueTable';
+
 export interface HemBoard {
   results: HemBundle[];
   active: HemBundle[];
+  completed?: CompletedRow[];
   counts: {
     waiting: number;
     onMachine: number;
     doneToday: number;
     onRack: number;
+    completed?: number;
   };
 }

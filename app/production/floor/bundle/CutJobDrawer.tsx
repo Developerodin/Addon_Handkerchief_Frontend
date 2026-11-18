@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { FactoryDrawer, DrawerSection } from '@/shared/components/factory/FactoryDrawer';
 import { factoryRequest } from '@/shared/services/factoryApi';
-import { listMachines, listStorageRacks, Machine, StorageRack } from '@/shared/services/phase3CatalogService';
+import { listMachines, listProductionRacks, Machine, ProductionRack } from '@/shared/services/phase3CatalogService';
 import { BundleLabel } from './BundleLabel';
 import { BundleRow, CutPieceRow, CutResult } from './types';
 
@@ -39,7 +39,7 @@ export function CutJobDrawer({
   const [destRack, setDestRack] = useState('');
   const [printId, setPrintId] = useState('');
   const [machines, setMachines] = useState<Machine[]>([]);
-  const [racks, setRacks] = useState<StorageRack[]>([]);
+  const [racks, setRacks] = useState<ProductionRack[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -61,7 +61,7 @@ export function CutJobDrawer({
 
   useEffect(() => {
     if (!jobKey) return;
-    Promise.all([listMachines({ page: 1, limit: 200, status: 'active' }), listStorageRacks({ page: 1, limit: 200, status: 'active' })])
+    Promise.all([listMachines({ page: 1, limit: 200, status: 'active' }), listProductionRacks({ page: 1, limit: 200, status: 'active' })])
       .then(([machinePage, rackPage]) => {
         setMachines(machinePage.results || []);
         setRacks(rackPage.results || []);
@@ -352,7 +352,7 @@ export function CutJobDrawer({
                 ))}
               </select>
               {bundleRacks.length ? null : (
-                <a className="text-[11px] font-bold text-purple-600 hover:text-purple-700" href="/catalog/storage-racks">
+                <a className="text-[11px] font-bold text-purple-600 hover:text-purple-700" href="/catalog/production-racks">
                   Bundle racks
                 </a>
               )}

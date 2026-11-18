@@ -27,22 +27,29 @@ export default function HorizontalHemmingPage() {
   const [scan, setScan] = useState('');
   const [job, setJob] = useState<HemBundle | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     try {
       const data = await factoryRequest<HemBoard>('/production/horizontal-hem/upcoming');
       setBoard({
         results: data.results || [],
         active: data.active || [],
-        counts: { ...EMPTY_COUNTS, ...(data.counts || {}) },
+        completed: data.completed || [],
+        counts: {
+          ...EMPTY_COUNTS,
+          ...(data.counts || {}),
+          completed: data.counts?.completed ?? (data.completed?.length || 0),
+        },
       });
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load bundles');
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, []);
+
+  const refreshBoard = useCallback(() => load({ silent: true }), [load]);
 
   useEffect(() => {
     load().catch(() => undefined);
@@ -56,7 +63,9 @@ export default function HorizontalHemmingPage() {
     const needle = code.trim().toLowerCase();
     const match = [...board.results, ...board.active].find((row) => row.barcode.toLowerCase() === needle);
     if (!match) {
-      setError('This bundle is not on a rack for horizontal hemming');
+      setError(
+        'Bundle not in the hem queue. On Floor checks it must show Ready, or finish Single piece: close bundle, place on bundles rack, save floor check, then refresh here.'
+      );
       return;
     }
     setJob(match);
@@ -128,11 +137,13 @@ export default function HorizontalHemmingPage() {
                 <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">Loading Data</p>
               </div>
             ) : (
-              <HemBundleTable bundles={board.results} active={board.active} onOpen={setJob} />
+              <HemBundleTable bundles={board.results} active={board.active} completed={board.completed} onOpen={setJob} />
             )}
           </div>
         </div>
-        <HemJobDrawer bundle={job} waiting={board.results} onClose={() => setJob(null)} onChanged={load} />
+        {job ? (
+          <HemJobDrawer bundle={job} waiting={board.results} onClose={() => setJob(null)} onChanged={refreshBoard} />
+        ) : null}
       </div>
     </RequireCrudPermission>
   );

@@ -1,11 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { UiStatusBadge } from '@/shared/components/ui';
 
 /**
- * Right-hand drawer matching the reference GRN and activity panels:
- * gray header bar, icon close, gray body, bordered sections.
+ * Right-hand sheet for floor work: calm header, scroll body, optional sticky footer.
  */
 export function FactoryDrawer({
   title,
@@ -15,6 +14,7 @@ export function FactoryDrawer({
   wide,
   onClose,
   children,
+  footer,
 }: {
   title: string;
   subtitle?: string;
@@ -23,61 +23,85 @@ export function FactoryDrawer({
   wide?: boolean;
   onClose: () => void;
   children: React.ReactNode;
+  footer?: React.ReactNode;
 }) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/50" role="presentation" onClick={onClose}>
+    <div
+      className="ui-factory-drawer__backdrop fixed inset-0 z-50 flex justify-end"
+      role="presentation"
+      onClick={onClose}
+    >
       <aside
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`ui-panel flex h-full w-full flex-col overflow-hidden border-l-2 border-gray-300 bg-white shadow-xl ${wide ? 'max-w-4xl' : 'max-w-3xl'}`}
+        className={`ui-factory-drawer__panel ui-panel flex h-full w-full max-w-md flex-col overflow-hidden bg-white sm:max-w-lg ${wide ? 'md:max-w-3xl' : 'md:max-w-xl'}`}
         onClick={(event) => event.stopPropagation()}
       >
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b-2 border-gray-300 bg-gray-50 px-3 py-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="ui-page-accent" aria-hidden />
-            <div className="min-w-0">
-              <h2 className="truncate text-sm font-bold text-gray-800">{title}</h2>
-              {subtitle ? <p className="truncate text-[11px] text-gray-500">{subtitle}</p> : null}
-            </div>
-            {status ? <UiStatusBadge status={status} /> : null}
+        <div className="ui-factory-drawer__grabber hidden sm:block" aria-hidden />
+        <header className="ui-factory-drawer__header flex shrink-0 items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-base font-semibold tracking-tight text-[#1d1d1f]">{title}</h2>
+            {subtitle ? <p className="mt-0.5 truncate text-sm font-medium text-[#6e6e73]">{subtitle}</p> : null}
+            {status ? (
+              <div className="mt-2">
+                <UiStatusBadge status={status} />
+              </div>
+            ) : null}
           </div>
           <button
             type="button"
-            className="rounded border-2 border-gray-300 p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#6e6e73] transition hover:bg-[#f2f2f7] hover:text-[#1d1d1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgb(var(--primary))]"
             aria-label="Close"
             onClick={onClose}
           >
-            <i className="ri-close-line text-lg leading-none" aria-hidden />
+            <i className="ri-close-line text-xl leading-none" aria-hidden />
           </button>
         </header>
-        <div className="flex-1 overflow-y-auto bg-gray-50 p-3">{children}</div>
+        <div className="ui-factory-drawer__body flex-1 overflow-y-auto">{children}</div>
+        {footer ? <div className="ui-drawer-footer">{footer}</div> : null}
       </aside>
     </div>
   );
 }
 
 /**
- * White card with the gray section bar used inside reference drawers.
+ * Grouped card section inside a floor drawer.
  */
 export function DrawerSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mb-4 overflow-hidden rounded-md border-2 border-gray-300 bg-white">
-      <h3 className="border-b-2 border-gray-300 bg-gray-200 px-3 py-1.5 text-[11px] font-bold uppercase text-gray-800">{title}</h3>
-      {children}
+    <section className="ui-drawer-section">
+      <h3 className="ui-drawer-section__title">{title}</h3>
+      <div className="ui-drawer-section__body">{children}</div>
     </section>
   );
 }
 
 /**
- * One metric tile in a drawer overview.
+ * Metric tile in a drawer overview grid.
  */
 export function DrawerStat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-md border-2 border-gray-300 bg-white px-3 py-2">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">{label}</p>
-      <p className="text-sm font-bold text-gray-800">{value}</p>
+    <div className="ui-floor-stat">
+      <p className="ui-floor-stat__label">{label}</p>
+      <p className="ui-floor-stat__value">{value}</p>
     </div>
   );
+}
+
+/**
+ * Sticky action row at the bottom of a drawer.
+ */
+export function DrawerFooter({ children }: { children: React.ReactNode }) {
+  return <div className="ui-drawer-footer">{children}</div>;
 }

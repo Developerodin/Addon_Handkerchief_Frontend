@@ -11,13 +11,17 @@ export interface CutBundle {
   status: string;
 }
 
+import type { CompletedRow } from '../shared/CompletedQueueTable';
+
 export interface CutBoard {
   results: CutBundle[];
   active: CutBundle[];
+  completed?: CompletedRow[];
   counts: {
     waiting: number;
     onTable: number;
     doneToday: number;
     onRack: number;
+    completed?: number;
   };
 }

@@ -5,6 +5,7 @@ import { ScopeRevision } from '@/shared/services/factoryApi';
 
 export interface OrderArticleLine {
   key: string;
+  itemId?: string;
   articleCode: string;
   articleName: string;
   productionType: string;
@@ -21,6 +22,10 @@ export interface OrderArticleLine {
 /** Same 32px box for every order field. Theme form-control padding was stretching inputs past the selects. */
 export const orderFieldClass =
   '!box-border !h-8 !min-h-8 !max-h-8 !w-full !rounded !border !border-gray-200 !bg-white !px-2 !py-0 !text-[11px] !font-medium !leading-[30px] !text-gray-900 outline-none focus:!border-purple-400 disabled:!cursor-not-allowed disabled:!bg-gray-50 disabled:!text-gray-700';
+
+function articleSelected(line: Pick<OrderArticleLine, 'itemId' | 'articleCode'>): boolean {
+  return Boolean(line.itemId || line.articleCode.trim());
+}
 
 /**
  * Dense article grid matching the reference production-order editor.
@@ -78,7 +83,7 @@ export function OrderArticleTable({
                       aria-label="Article number"
                       readOnly
                       className={`${orderFieldClass} cursor-pointer bg-gray-50`}
-                      value={line.articleCode}
+                      value={line.articleCode || (line.itemId ? line.articleName : '')}
                       placeholder="Click search"
                       onClick={() => {
                         if (!pickLocked) onPick(index);
@@ -112,7 +117,7 @@ export function OrderArticleTable({
                     aria-label="Quantity"
                     type="number"
                     min={1}
-                    disabled={locked || !line.articleCode}
+                    disabled={locked || !articleSelected(line)}
                     className={orderFieldClass}
                     value={line.quantity}
                     placeholder="0"
@@ -122,7 +127,7 @@ export function OrderArticleTable({
                 <td className="px-2 py-2 align-top">
                   <select
                     aria-label="Pieces per cut"
-                    disabled={locked || !line.articleCode}
+                    disabled={locked || !articleSelected(line)}
                     className={`${orderFieldClass} !pr-7`}
                     value={line.piecesPerCut}
                     onChange={(event) => onChange(index, { piecesPerCut: Number(event.target.value) })}
@@ -134,7 +139,7 @@ export function OrderArticleTable({
                 <td className="px-2 py-2 align-top">
                   <select
                     aria-label="Article priority"
-                    disabled={!line.articleCode && locked}
+                    disabled={!articleSelected(line) && locked}
                     className={`${orderFieldClass} !pr-7`}
                     value={line.priority}
                     onChange={(event) => onChange(index, { priority: event.target.value })}
@@ -147,12 +152,14 @@ export function OrderArticleTable({
                 <td className="px-2 py-2 align-top">
                   <select
                     aria-label="Revision"
-                    disabled={locked || !line.articleCode}
+                    disabled={locked || !articleSelected(line)}
                     className={`${orderFieldClass} !pr-7`}
                     value={line.revisionId}
                     onChange={(event) => onChange(index, { revisionId: event.target.value })}
                   >
-                    <option value="">{line.unpublished ? 'Publish the item first' : 'Select revision'}</option>
+                    <option value="">
+                      {line.unpublished ? 'Current item (live, not published)' : 'Latest revision on release'}
+                    </option>
                     {line.revisions.map((revision) => (
                       <option key={revision.id} value={revision.id}>
                         {revision.sequence} · {revision.reason || 'Published'}

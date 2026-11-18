@@ -26,13 +26,17 @@ export interface ActiveCut {
   pieces: CutPieceRow[];
 }
 
+import type { CompletedRow } from '../shared/CompletedQueueTable';
+
 export interface CutBoard {
   results: UpcomingRoll[];
   active: ActiveCut[];
+  completed?: CompletedRow[];
   counts: {
     waiting: number;
     onMachine: number;
     cutToday: number;
     onRack: number;
+    completed?: number;
   };
 }

@@ -8,13 +8,17 @@ export interface HalfMoonPiece {
   status: 'on-rack' | 'in-work';
 }
 
+import type { CompletedRow } from '../shared/CompletedQueueTable';
+
 export interface HalfMoonBoard {
   results: HalfMoonPiece[];
   active: HalfMoonPiece[];
+  completed?: CompletedRow[];
   counts: {
     waiting: number;
     onTable: number;
     doneToday: number;
     onRack: number;
+    completed?: number;
   };
 }

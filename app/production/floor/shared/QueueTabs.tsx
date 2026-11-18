@@ -5,37 +5,78 @@ import React, { useState } from 'react';
 const onClass = 'rounded bg-purple-600 px-3 py-1.5 text-[11px] font-bold text-white';
 const offClass = 'rounded border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-bold text-[#495057] hover:bg-gray-50';
 
+export type QueueTab = 'upcoming' | 'received' | 'completed';
+
 /**
- * Switches a floor between work still on a rack and work already received here.
+ * Switches a floor between waiting, on-station, and completed/transferred work.
  */
 export function QueueTabs({
   upcomingCount,
   receivedCount,
+  completedCount = 0,
+  upcomingLabel = 'Upcoming',
+  receivedLabel = 'Received',
+  completedLabel = 'Completed',
   upcoming,
   received,
+  completed,
+  onTabChange,
 }: {
   upcomingCount: number;
   receivedCount: number;
+  completedCount?: number;
+  upcomingLabel?: string;
+  receivedLabel?: string;
+  completedLabel?: string;
   upcoming: React.ReactNode;
   received: React.ReactNode;
+  completed?: React.ReactNode;
+  onTabChange?: (tab: QueueTab) => void;
 }) {
-  const [tab, setTab] = useState<'upcoming' | 'received'>('upcoming');
-  const upcomingOn = tab === 'upcoming';
+  const [tab, setTab] = useState<QueueTab>('upcoming');
+  const selectTab = (key: QueueTab) => {
+    setTab(key);
+    onTabChange?.(key);
+  };
+
+  const panels: Record<QueueTab, { id: string; label: string; count: number; body: React.ReactNode }> = {
+    upcoming: { id: 'upcoming', label: upcomingLabel, count: upcomingCount, body: upcoming },
+    received: { id: 'received', label: receivedLabel, count: receivedCount, body: received },
+    completed: {
+      id: 'completed',
+      label: completedLabel,
+      count: completedCount,
+      body: completed ?? <EmptyQueue text="Nothing completed on this floor yet." />,
+    },
+  };
 
   return (
     <div>
-      <div className="mb-3 flex gap-2" role="tablist" aria-label="Floor queue">
-        <button type="button" role="tab" id="floor-tab-upcoming" aria-selected={upcomingOn} aria-controls="floor-panel-upcoming" className={upcomingOn ? onClass : offClass} onClick={() => setTab('upcoming')}>
-          Upcoming
-          <span className="ml-1.5 rounded bg-white/20 px-1.5 py-0.5 text-[10px]">{upcomingCount}</span>
-        </button>
-        <button type="button" role="tab" id="floor-tab-received" aria-selected={!upcomingOn} aria-controls="floor-panel-received" className={upcomingOn ? offClass : onClass} onClick={() => setTab('received')}>
-          Received
-          <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">{receivedCount}</span>
-        </button>
+      <div className="mb-3 flex flex-wrap gap-2" role="tablist" aria-label="Floor queue">
+        {(Object.keys(panels) as QueueTab[]).map((key) => {
+          const panel = panels[key];
+          const selected = tab === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              id={`floor-tab-${panel.id}`}
+              aria-selected={selected}
+              aria-controls={`floor-panel-${panel.id}`}
+              className={selected ? onClass : offClass}
+              onClick={() => selectTab(key)}
+            >
+              {panel.label}
+              <span className={`ml-1.5 rounded px-1.5 py-0.5 text-[10px] ${selected ? 'bg-white/20' : 'bg-gray-100 text-gray-500'}`}>
+                {panel.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
-      <div role="tabpanel" id={upcomingOn ? 'floor-panel-upcoming' : 'floor-panel-received'} aria-labelledby={upcomingOn ? 'floor-tab-upcoming' : 'floor-tab-received'}>
-        {upcomingOn ? upcoming : received}
+      <div role="tabpanel" id={`floor-panel-${panels[tab].id}`} aria-labelledby={`floor-tab-${panels[tab].id}`}>
+        {panels[tab].body}
       </div>
     </div>
   );

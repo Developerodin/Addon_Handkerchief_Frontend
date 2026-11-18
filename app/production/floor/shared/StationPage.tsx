@@ -1,13 +1,16 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Seo from '@/shared/layout-components/seo/seo';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { FactoryDrawer, DrawerSection } from '@/shared/components/factory/FactoryDrawer';
 import { factoryRequest } from '@/shared/services/factoryApi';
-import { listContainers, listMachines, listStorageRacks, Container, Machine, StorageRack } from '@/shared/services/phase3CatalogService';
+import { Container, Machine, ProductionRack } from '@/shared/services/phase3CatalogService';
+import { loadFloorBundleContainers, loadFloorMachines, loadFloorStorageRacks } from './floorCatalogCache';
+import { CompletedQueueTable, CompletedRow } from './CompletedQueueTable';
 import { EmptyQueue, QueueTabs } from './QueueTabs';
+import { BundleLabel, triggerBundleLabelPrint } from '@/shared/components/factory/BundleLabel';
 
 export interface FloorBundle {
   id: string;
@@ -28,10 +31,11 @@ export interface FloorBundle {
 interface FloorBoard {
   results: FloorBundle[];
   active: FloorBundle[];
-  counts: { waiting: number; onStation: number; doneToday: number; onRack: number };
+  completed?: CompletedRow[];
+  counts: { waiting: number; onStation: number; doneToday: number; onRack: number; completed?: number };
 }
 
-const EMPTY = { waiting: 0, onStation: 0, doneToday: 0, onRack: 0 };
+const EMPTY = { waiting: 0, onStation: 0, doneToday: 0, onRack: 0, completed: 0 };
 const fieldClass = 'w-full rounded border border-gray-200 px-3 py-1.5 text-[11px] font-medium text-[#495057] focus:border-purple-300 focus:ring-0';
 const headClass = 'border border-gray-200 px-1.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-[#495057]';
 const cellClass = 'border border-gray-200 px-1.5 py-2.5 text-[12px] text-gray-900';
@@ -69,16 +73,25 @@ export function StationPage({
   const [scan, setScan] = useState('');
   const [job, setJob] = useState<FloorBundle | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     try {
       const data = await factoryRequest<FloorBoard>(`${base}/upcoming`);
-      setBoard({ results: data.results || [], active: data.active || [], counts: { ...EMPTY, ...(data.counts || {}) } });
+      setBoard({
+        results: data.results || [],
+        active: data.active || [],
+        completed: data.completed || [],
+        counts: {
+          ...EMPTY,
+          ...(data.counts || {}),
+          completed: data.counts?.completed ?? (data.completed?.length || 0),
+        },
+      });
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load bundles');
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, [base]);
 
@@ -101,15 +114,23 @@ export function StationPage({
     setError('');
   };
 
-  const tiles = [
-    ['waiting', 'Bundles waiting'],
-    ['onStation', start === 'none' ? 'In progress' : `On the ${stationLabel.toLowerCase()}`],
-    ['doneToday', 'Done today'],
-    ['onRack', 'Put away'],
-  ] as const;
+  const tiles = useMemo(
+    () =>
+      [
+        ['waiting', 'Bundles waiting'],
+        ['onStation', start === 'none' ? 'In progress' : `On the ${stationLabel.toLowerCase()}`],
+        ['doneToday', 'Done today'],
+        ['onRack', 'Put away'],
+      ] as const,
+    [start, stationLabel]
+  );
+
+  const openJob = useCallback((row: FloorBundle) => setJob(row), []);
+  const refreshBoard = useCallback(() => load({ silent: true }), [load]);
 
   return (
     <RequireCrudPermission path={permission} action="read">
+      <style>{'@media print { body * { visibility: hidden; } #bundle-label, #bundle-label * { visibility: visible; } #bundle-label { position: absolute; left: 0; top: 0; } }'}</style>
       <div className="main-content !p-[10px]">
         <Seo title={title} />
         <div className="relative border border-gray-100 bg-white shadow-sm">
@@ -148,11 +169,25 @@ export function StationPage({
             {loading && !board.results.length && !board.active.length ? (
               <p className="py-16 text-center text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400">Loading Data</p>
             ) : (
-              <BundleTable rows={board.results} active={board.active} empty={empty} onOpen={setJob} />
+              <BundleTable rows={board.results} active={board.active} completed={board.completed || []} empty={empty} onOpen={openJob} />
             )}
           </div>
         </div>
-        <JobDrawer bundle={job} waiting={board.results} base={base} title={title} start={start} place={place} stationLabel={stationLabel} thread={thread} miss={miss} onClose={() => setJob(null)} onChanged={load} />
+        {job ? (
+          <JobDrawer
+            bundle={job}
+            waiting={board.results}
+            base={base}
+            title={title}
+            start={start}
+            place={place}
+            stationLabel={stationLabel}
+            thread={thread}
+            miss={miss}
+            onClose={() => setJob(null)}
+            onChanged={refreshBoard}
+          />
+        ) : null}
       </div>
     </RequireCrudPermission>
   );
@@ -161,11 +196,24 @@ export function StationPage({
 /**
  * Waiting bundles and bundles already on the station.
  */
-function BundleTable({ rows, active, empty, onOpen }: { rows: FloorBundle[]; active: FloorBundle[]; empty: string; onOpen: (row: FloorBundle) => void }) {
+const BundleTable = memo(function BundleTable({
+  rows,
+  active,
+  completed,
+  empty,
+  onOpen,
+}: {
+  rows: FloorBundle[];
+  active: FloorBundle[];
+  completed: CompletedRow[];
+  empty: string;
+  onOpen: (row: FloorBundle) => void;
+}) {
   return (
     <QueueTabs
       upcomingCount={rows.length}
       receivedCount={active.length}
+      completedCount={completed.length}
       upcoming={(
       <div className="min-h-[240px] overflow-x-auto">
         <table className="w-full border-collapse border border-gray-200">
@@ -209,9 +257,10 @@ function BundleTable({ rows, active, empty, onOpen }: { rows: FloorBundle[]; act
       ) : (
         <EmptyQueue text="Nothing has been received on this floor yet." />
       )}
+      completed={<CompletedQueueTable rows={completed} codeLabel="Bundle" qtyIsTransferable />}
     />
   );
-}
+});
 
 /**
  * Start and put-away for one bundle.
@@ -238,9 +287,10 @@ function JobDrawer({
   const [destination, setDestination] = useState('');
   const [count, setCount] = useState('');
   const [threadQty, setThreadQty] = useState('');
+  const [printBarcode, setPrintBarcode] = useState('');
   const [extra, setExtra] = useState('');
   const [machines, setMachines] = useState<Machine[]>([]);
-  const [racks, setRacks] = useState<StorageRack[]>([]);
+  const [racks, setRacks] = useState<ProductionRack[]>([]);
   const [containers, setContainers] = useState<Container[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -258,19 +308,36 @@ function JobDrawer({
     setError('');
   }, [jobKey, bundle, start]);
 
+  const needsMachines = start !== 'none';
+  const needsRacks = place === 'bundles' || place === 'packing' || start === 'rack-machine';
+  const needsContainers = place === 'container';
+
   useEffect(() => {
-    if (!jobKey) return;
-    Promise.all([
-      listMachines({ page: 1, limit: 200, status: 'active' }),
-      listStorageRacks({ page: 1, limit: 200, status: 'active' }),
-      listContainers({ page: 1, limit: 200, status: 'active' }),
-    ]).then(([machinePage, rackPage, containerPage]) => {
-      setMachines(machinePage.results || []);
+    if (!bundle) return;
+    let cancelled = false;
+    const tasks: Promise<void>[] = [];
+    if (needsMachines) {
+      tasks.push(loadFloorMachines().then((rows) => { if (!cancelled) setMachines(rows); }));
+    }
+    if (needsRacks) {
       const stock = place === 'packing' ? 'packing' : 'bundles';
-      setRacks((rackPage.results || []).filter((rack) => rack.stockType === stock));
-      setContainers((containerPage.results || []).filter((row) => row.type === 'bundle'));
-    }).catch((err: unknown) => setError(err instanceof Error ? err.message : 'Could not load the catalog'));
-  }, [jobKey, place]);
+      tasks.push(
+        loadFloorStorageRacks().then((rows) => {
+          if (!cancelled) setRacks(rows.filter((rack) => rack.stockType === stock));
+        })
+      );
+    }
+    if (needsContainers) {
+      tasks.push(loadFloorBundleContainers().then((rows) => { if (!cancelled) setContainers(rows); }));
+    }
+    if (!tasks.length) return;
+    Promise.all(tasks).catch((err: unknown) => {
+      if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load the catalog');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [bundle, needsContainers, needsMachines, needsRacks, place]);
 
   if (!bundle) return null;
 
@@ -342,12 +409,35 @@ function JobDrawer({
       <DrawerSection title="Bundles">
         <ul className="grid gap-2 p-3">
           {bundles.map((row) => (
-            <li key={row.barcode} className="text-[12px] text-gray-900">
+            <li key={row.barcode} className="flex flex-wrap items-center gap-2 text-[12px] text-gray-900">
               <span className="font-mono font-bold">{row.barcode}</span>
               <span className="text-gray-600"> · {row.finalGood || row.qty} pcs</span>
+              {row.barcode ? (
+                <button
+                  type="button"
+                  className="rounded border border-gray-200 px-2 py-0.5 text-[10px] font-bold text-[#495057] hover:bg-gray-50"
+                  onClick={() => {
+                    setPrintBarcode(row.barcode);
+                    window.setTimeout(() => triggerBundleLabelPrint(), 0);
+                  }}
+                >
+                  Print label
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>
+        {printBarcode ? (
+          <BundleLabel
+            printing
+            bundle={{
+              barcode: printBarcode,
+              orderId: bundle.orderId,
+              orderNumber: bundle.orderNumber,
+              qty: bundles.find((row) => row.barcode === printBarcode)?.qty || bundle.qty,
+            }}
+          />
+        ) : null}
       </DrawerSection>
       {showStart ? (
         <DrawerSection title="Start">
@@ -356,6 +446,14 @@ function JobDrawer({
               <>
                 <label className="text-[11px] font-bold text-[#495057]" htmlFor="stRack">Current rack</label>
                 <input id="stRack" aria-label="Current rack" className={fieldClass} value={rackCode} onChange={(event) => setRackCode(event.target.value)} required />
+                <select aria-label="Bundles rack list" className={fieldClass} value={rackCode} onChange={(event) => setRackCode(event.target.value)}>
+                  <option value="">Select rack</option>
+                  {racks.map((rack) => (
+                    <option key={rack.id} value={rack.code}>
+                      {rack.name} · {rack.code}
+                    </option>
+                  ))}
+                </select>
               </>
             ) : null}
             <label className="text-[11px] font-bold text-[#495057]" htmlFor="stExtra">Another bundle</label>
@@ -406,7 +504,7 @@ function JobDrawer({
                   <option value="">Select rack</option>
                   {racks.map((rack) => <option key={rack.id} value={rack.code}>{rack.name} · {rack.code}</option>)}
                 </select>
-                {!racks.length ? <p className="text-[12px] text-gray-600"><Link className="font-bold text-purple-600" href="/catalog/storage-racks">Storage racks</Link></p> : null}
+                {!racks.length ? <p className="text-[12px] text-gray-600"><Link className="font-bold text-purple-600" href="/catalog/production-racks">Production racks</Link></p> : null}
               </>
             ) : null}
             <button type="submit" className="rounded bg-purple-600 px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-60" disabled={loading}>{place === 'count' ? 'Break bundle' : 'Put away'}</button>

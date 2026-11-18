@@ -135,9 +135,11 @@ export function FabricRequirementTable({
       )}
       {canComplete ? (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-[#F5F5F7] px-3 py-2">
-          <p className="text-sm text-[#4B5563]">Mark fabric issue complete when this article has the rolls it needs.</p>
+          <p className="text-sm text-[#4B5563]">
+            Mark this article fabric-complete. Rolls are optional when using the order-level bypass above.
+          </p>
           <UiButton type="button" variant="primary" icon="ri-check-line" loading={completing} onClick={onComplete}>
-            Mark fabric issue complete
+            Mark article issued
           </UiButton>
         </div>
       ) : null}

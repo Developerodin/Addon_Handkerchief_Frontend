@@ -1,4 +1,5 @@
 import React from 'react';
+import { CompletedQueueTable, CompletedRow } from '../shared/CompletedQueueTable';
 import { EmptyQueue, QueueTabs } from '../shared/QueueTabs';
 import { SelvagePiece } from './types';
 
@@ -11,16 +12,19 @@ const cellClass = 'border border-gray-200 px-1.5 py-2.5 text-[12px] text-gray-90
 export function SelvagePieceTable({
   pieces,
   active,
+  completed = [],
   onOpen,
 }: {
   pieces: SelvagePiece[];
   active: SelvagePiece[];
+  completed?: CompletedRow[];
   onOpen: (piece: SelvagePiece) => void;
 }) {
   return (
     <QueueTabs
       upcomingCount={pieces.length}
       receivedCount={active.length}
+      completedCount={completed.length}
       upcoming={(
       <div className="min-h-[300px] overflow-x-auto">
         <table className="w-full border-collapse border border-gray-200">
@@ -93,6 +97,7 @@ export function SelvagePieceTable({
       ) : (
         <EmptyQueue text="Nothing has been received on this floor yet." />
       )}
+      completed={<CompletedQueueTable rows={completed} codeLabel="Piece" getCode={(row) => row.barcode || ''} />}
     />
   );
 }

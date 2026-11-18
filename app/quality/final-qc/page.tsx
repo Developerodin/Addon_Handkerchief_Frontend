@@ -5,7 +5,9 @@ import Seo from '@/shared/layout-components/seo/seo';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { FactoryDrawer, DrawerSection } from '@/shared/components/factory/FactoryDrawer';
 import { factoryRequest } from '@/shared/services/factoryApi';
+import { listProductionRacks, ProductionRack } from '@/shared/services/phase3CatalogService';
 import { FloorBundle } from '@/app/production/floor/shared/StationPage';
+import { CompletedQueueTable, CompletedRow } from '@/app/production/floor/shared/CompletedQueueTable';
 import { EmptyQueue, QueueTabs } from '@/app/production/floor/shared/QueueTabs';
 
 const GRADES = ['long', 'hemming', 'sporting', 'diving', 'rejection'] as const;
@@ -13,7 +15,8 @@ const fieldClass = 'w-full rounded border border-gray-200 px-3 py-1.5 text-[11px
 
 interface Board {
   results: FloorBundle[];
-  counts: { waiting: number; doneToday: number; onRack: number };
+  completed?: CompletedRow[];
+  counts: { waiting: number; doneToday: number; onRack: number; completed?: number };
 }
 
 /**
@@ -21,7 +24,8 @@ interface Board {
  */
 export default function FinalQcPage() {
   const [rows, setRows] = useState<FloorBundle[]>([]);
-  const [counts, setCounts] = useState({ waiting: 0, doneToday: 0, onRack: 0 });
+  const [completed, setCompleted] = useState<CompletedRow[]>([]);
+  const [counts, setCounts] = useState({ waiting: 0, doneToday: 0, onRack: 0, completed: 0 });
   const [error, setError] = useState('');
   const [scan, setScan] = useState('');
   const [job, setJob] = useState<FloorBundle | null>(null);
@@ -29,7 +33,13 @@ export default function FinalQcPage() {
   const load = useCallback(async () => {
     const data = await factoryRequest<Board>('/quality/final-qc/upcoming');
     setRows(data.results || []);
-    setCounts({ waiting: data.counts?.waiting || 0, doneToday: data.counts?.doneToday || 0, onRack: data.counts?.onRack || 0 });
+    setCompleted(data.completed || []);
+    setCounts({
+      waiting: data.counts?.waiting || 0,
+      doneToday: data.counts?.doneToday || 0,
+      onRack: data.counts?.onRack || 0,
+      completed: data.counts?.completed ?? (data.completed?.length || 0),
+    });
   }, []);
 
   useEffect(() => {
@@ -74,6 +84,7 @@ export default function FinalQcPage() {
           <QueueTabs
             upcomingCount={rows.length}
             receivedCount={0}
+            completedCount={completed.length}
             upcoming={(
           <table className="w-full border-collapse border border-gray-200">
             <thead>
@@ -92,6 +103,7 @@ export default function FinalQcPage() {
           </table>
             )}
             received={<EmptyQueue text="A bundle leaves Upcoming after final QC is saved." />}
+            completed={<CompletedQueueTable rows={completed} codeLabel="Bundle" showGood showDefectGrades />}
           />
         </div>
         <QcDrawer bundle={job} onClose={() => setJob(null)} onChanged={load} />
@@ -121,6 +133,7 @@ function QcDrawer({ bundle, onClose, onChanged }: { bundle: FloorBundle | null; 
   const [racks, setRacks] = useState<Record<string, string>>({ long: '', hemming: '', sporting: '', diving: '', rejection: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [rackOptions, setRackOptions] = useState<ProductionRack[]>([]);
 
   useEffect(() => {
     if (!bundle) return;
@@ -128,6 +141,9 @@ function QcDrawer({ bundle, onClose, onChanged }: { bundle: FloorBundle | null; 
     setGrades({ long: '0', hemming: '0', sporting: '0', diving: '0', rejection: '0' });
     setRacks({ long: '', hemming: '', sporting: '', diving: '', rejection: '' });
     setError('');
+    listProductionRacks({ page: 1, limit: 200, status: 'active' })
+      .then((page) => setRackOptions(page.results || []))
+      .catch(() => setRackOptions([]));
   }, [bundle]);
 
   if (!bundle) return null;
@@ -166,10 +182,31 @@ function QcDrawer({ bundle, onClose, onChanged }: { bundle: FloorBundle | null; 
               </div>
               <div>
                 <label className="text-[11px] font-bold text-[#495057]" htmlFor={`fq-rack-${grade}`}>Rack</label>
-                <input id={`fq-rack-${grade}`} aria-label={`${grade} rack`} className={fieldClass} value={racks[grade]} onChange={(event) => setRacks((current) => ({ ...current, [grade]: event.target.value }))} />
+                <input
+                  id={`fq-rack-${grade}`}
+                  aria-label={`${grade} rack`}
+                  className={fieldClass}
+                  value={racks[grade]}
+                  autoComplete="off"
+                  onChange={(event) => setRacks((current) => ({ ...current, [grade]: event.target.value }))}
+                />
+                <select
+                  aria-label={`${grade} rack list`}
+                  className={`${fieldClass} mt-1`}
+                  value={racks[grade]}
+                  onChange={(event) => setRacks((current) => ({ ...current, [grade]: event.target.value }))}
+                >
+                  <option value="">Select rack</option>
+                  {rackOptions.map((rack) => (
+                    <option key={rack.id} value={rack.code}>
+                      {rack.name} · {rack.code}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           ))}
+          <p className="text-[11px] text-gray-600">After save, good bundles stay on their rack and show under Production → Ironing → Upcoming.</p>
           <button type="submit" className="rounded bg-purple-600 px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-60" disabled={loading}>Save</button>
           {error ? <p className="text-[12px] text-red-600" role="alert">{error}</p> : null}
         </form>

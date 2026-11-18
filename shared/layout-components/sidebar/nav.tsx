@@ -209,11 +209,11 @@ const BaseMenuItems: any = [
       },
       {
         icon: RackIcon,
-        path: "/catalog/storage-racks",
+        path: "/catalog/production-racks",
         type: "link",
         active: false,
         selected: false,
-        title: "Storage Racks",
+        title: "Production Racks",
       },
       {
         icon: ContainerIcon,
@@ -314,14 +314,14 @@ const BaseMenuItems: any = [
       { title: "Horizontal hemming", type: "link", path: "/production/floor/horizontal-hem", active: false, selected: false },
       { title: "Thread cutting", type: "link", path: "/production/floor/thread-cut", active: false, selected: false },
       { title: "Final QC", type: "link", path: "/quality/final-qc", active: false, selected: false },
-      { title: "Move to ground", type: "link", path: "/production/floor/to-ground", active: false, selected: false },
       { title: "Ironing", type: "link", path: "/production/floor/iron", active: false, selected: false },
-      { title: "Route split", type: "link", path: "/production/floor/route-split", active: false, selected: false },
       { title: "Embroidery", type: "link", path: "/production/floor/embroidery", active: false, selected: false },
       { title: "Thread cutting after embroidery", type: "link", path: "/production/floor/embroidery-thread-cut", active: false, selected: false },
       { title: "Sticker", type: "link", path: "/production/floor/sticker", active: false, selected: false },
       { title: "Ironing after route", type: "link", path: "/production/floor/iron-after", active: false, selected: false },
       { title: "Final checking", type: "link", path: "/quality/final-checking", active: false, selected: false },
+      // Packing is under sidebar "Packing & Dispatch" (same screen as /warehouse/packing).
+      // { title: "Packing floor", type: "link", path: "/warehouse/packing", active: false, selected: false },
     ],
   },
   {
@@ -337,13 +337,12 @@ const BaseMenuItems: any = [
   },
   {
     icon: <i className="bx bx-package side-menu__icon"></i>,
-    title: "Warehouse",
+    title: "Packing & Dispatch",
     type: "sub",
     active: false,
     selected: false,
-    path: "/warehouse",
+    path: "/warehouse/packing",
     children: [
-      { title: "Client orders", type: "link", path: "/warehouse/orders", active: false, selected: false },
       { title: "Packing", type: "link", path: "/warehouse/packing", active: false, selected: false },
       { title: "Boxes", type: "link", path: "/warehouse/boxes", active: false, selected: false },
       { title: "Dispatch", type: "link", path: "/warehouse/dispatch", active: false, selected: false },

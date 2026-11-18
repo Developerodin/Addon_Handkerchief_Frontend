@@ -6,8 +6,9 @@ import Seo from '@/shared/layout-components/seo/seo';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { FactoryDrawer, DrawerSection } from '@/shared/components/factory/FactoryDrawer';
 import { factoryRequest } from '@/shared/services/factoryApi';
-import { listStorageRacks, StorageRack } from '@/shared/services/phase3CatalogService';
+import { listProductionRacks, ProductionRack } from '@/shared/services/phase3CatalogService';
 import { FloorBundle } from '@/app/production/floor/shared/StationPage';
+import { CompletedQueueTable, CompletedRow } from '@/app/production/floor/shared/CompletedQueueTable';
 import { EmptyQueue, QueueTabs } from '@/app/production/floor/shared/QueueTabs';
 
 const fieldClass = 'w-full rounded border border-gray-200 px-3 py-1.5 text-[11px] font-medium text-[#495057] focus:border-purple-300 focus:ring-0';
@@ -17,14 +18,16 @@ const fieldClass = 'w-full rounded border border-gray-200 px-3 py-1.5 text-[11px
  */
 export default function FinalCheckingPage() {
   const [rows, setRows] = useState<FloorBundle[]>([]);
+  const [completed, setCompleted] = useState<CompletedRow[]>([]);
   const [waiting, setWaiting] = useState(0);
   const [error, setError] = useState('');
   const [scan, setScan] = useState('');
   const [job, setJob] = useState<FloorBundle | null>(null);
 
   const load = useCallback(async () => {
-    const data = await factoryRequest<{ results: FloorBundle[]; counts: { waiting: number } }>('/quality/final-checking/upcoming');
+    const data = await factoryRequest<{ results: FloorBundle[]; completed?: CompletedRow[]; counts: { waiting: number; completed?: number } }>('/quality/final-checking/upcoming');
     setRows(data.results || []);
+    setCompleted(data.completed || []);
     setWaiting(data.counts?.waiting || 0);
   }, []);
 
@@ -57,6 +60,7 @@ export default function FinalCheckingPage() {
           <QueueTabs
             upcomingCount={rows.length}
             receivedCount={0}
+            completedCount={completed.length}
             upcoming={(
           <table className="w-full border-collapse border border-gray-200">
             <thead><tr className="bg-gray-50/30">{['Bundle', 'Order', 'Good', 'Rack'].map((label) => <th key={label} className="border border-gray-200 px-1.5 py-3 text-left text-[11px] font-bold uppercase text-[#495057]">{label}</th>)}</tr></thead>
@@ -73,6 +77,15 @@ export default function FinalCheckingPage() {
           </table>
             )}
             received={<EmptyQueue text="A bundle leaves Upcoming after final checking is saved." />}
+            completed={
+              <CompletedQueueTable
+                rows={completed}
+                codeLabel="Bundle"
+                qtyIsTransferable
+                showDefect
+                qtyColumnLabel="Packed"
+              />
+            }
           />
         </div>
         <CheckDrawer bundle={job} onClose={() => setJob(null)} onChanged={load} />
@@ -88,7 +101,7 @@ function CheckDrawer({ bundle, onClose, onChanged }: { bundle: FloorBundle | nul
   const [good, setGood] = useState('');
   const [defect, setDefect] = useState('0');
   const [rackCode, setRackCode] = useState('');
-  const [racks, setRacks] = useState<StorageRack[]>([]);
+  const [racks, setRacks] = useState<ProductionRack[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -96,10 +109,13 @@ function CheckDrawer({ bundle, onClose, onChanged }: { bundle: FloorBundle | nul
     if (!bundle) return;
     setGood(String(bundle.finalGood || 0));
     setDefect('0');
-    setRackCode('');
+    setRackCode(bundle.rackCode || '');
     setError('');
-    listStorageRacks({ page: 1, limit: 200, status: 'active' })
-      .then((page) => setRacks((page.results || []).filter((rack) => rack.stockType === 'packing')))
+    listProductionRacks({ page: 1, limit: 200, status: 'active' })
+      .then((page) => {
+        const packing = (page.results || []).filter((rack) => rack.stockType === 'packing');
+        setRacks(packing.length ? packing : page.results || []);
+      })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Could not load racks'));
   }, [bundle]);
 
@@ -135,13 +151,45 @@ function CheckDrawer({ bundle, onClose, onChanged }: { bundle: FloorBundle | nul
           <label className="text-[11px] font-bold text-[#495057]" htmlFor="fcDefect">Defect</label>
           <input id="fcDefect" aria-label="Defect quantity" className={fieldClass} inputMode="numeric" value={defect} onChange={(event) => setDefect(event.target.value)} required />
           <label className="text-[11px] font-bold text-[#495057]" htmlFor="fcRack">Packing rack</label>
-          <input id="fcRack" aria-label="Packing rack" className={fieldClass} value={rackCode} onChange={(event) => setRackCode(event.target.value)} />
-          <select aria-label="Packing rack list" className={fieldClass} value={rackCode} onChange={(event) => setRackCode(event.target.value)}>
-            <option value="">Select rack</option>
-            {racks.map((rack) => <option key={rack.id} value={rack.code}>{rack.name} · {rack.code}</option>)}
+          <input
+            id="fcRack"
+            aria-label="Packing rack code or scan"
+            className={fieldClass}
+            value={rackCode}
+            placeholder="Scan or type rack code"
+            autoComplete="off"
+            onChange={(event) => setRackCode(event.target.value)}
+          />
+          <select
+            aria-label="Production packing racks"
+            className={fieldClass}
+            value={rackCode}
+            onChange={(event) => setRackCode(event.target.value)}
+          >
+            <option value="">Select production rack</option>
+            {racks.map((rack) => (
+              <option key={rack.id} value={rack.code}>
+                {rack.name} · {rack.code}
+                {rack.stockType ? ` (${rack.stockType})` : ''}
+              </option>
+            ))}
           </select>
-          {!racks.length ? <p className="text-[12px] text-gray-600"><Link className="font-bold text-purple-600" href="/catalog/storage-racks">Storage racks</Link></p> : null}
-          <button type="submit" className="rounded bg-purple-600 px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-60" disabled={loading}>Save</button>
+          {!racks.length ? (
+            <p className="text-[12px] text-gray-600">
+              No packing racks loaded. Add racks under{' '}
+              <Link className="font-bold text-purple-600" href="/catalog/production-racks">
+                Production racks
+              </Link>{' '}
+              (stock type: packing).
+            </p>
+          ) : null}
+          <button
+            type="submit"
+            className="rounded bg-purple-600 px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-60"
+            disabled={loading || (Number(good) > 0 && !rackCode.trim())}
+          >
+            Save final checking
+          </button>
           {error ? <p className="text-[12px] text-red-600" role="alert">{error}</p> : null}
         </form>
       </DrawerSection>

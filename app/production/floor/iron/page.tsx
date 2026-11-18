@@ -4,7 +4,7 @@ import React from 'react';
 import { StationPage } from '../shared/StationPage';
 
 /**
- * Ground-floor iron. Bundles arrive in a container and go back on a bundles rack.
+ * Iron after final QC. Bundles come from a bundles rack (physical move to iron is offline).
  */
 export default function IroningPage() {
   return (
@@ -12,9 +12,9 @@ export default function IroningPage() {
       title="Ironing"
       permission="Production / Ironing"
       base="/production/iron"
-      empty="No bundle is in a container."
-      miss="This bundle is not in a container for ironing"
-      start="machine"
+      empty="No bundle is waiting on a rack after final QC."
+      miss="This bundle is not ready for ironing after final QC"
+      start="rack-machine"
       place="bundles"
       stationLabel="Iron"
     />

@@ -277,8 +277,9 @@ export function OrderForm({ orderId }: { orderId?: string }) {
             </p>
           ) : null}
           {missingBom ? (
-            <p className="mt-3 text-xs font-medium text-red-600" role="alert">
-              Fabric BOM is missing for one or more articles. Save and release stay off until the item has a fabric BOM.
+            <p className="mt-3 text-xs font-medium text-amber-700" role="status">
+              Fabric BOM is missing for one or more articles. You can still save and release; fabric issue may need estimates until BOM
+              is added on the item.
             </p>
           ) : null}
 
@@ -318,8 +319,7 @@ export function OrderForm({ orderId }: { orderId?: string }) {
               <button
                 type="button"
                 className="rounded bg-purple-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-purple-700 disabled:opacity-60"
-                disabled={loading || missingBom}
-                title={missingBom ? 'Fabric BOM is missing for one or more articles' : undefined}
+                disabled={loading}
                 onClick={() => openRelease().catch(() => undefined)}
               >
                 Release
@@ -328,8 +328,7 @@ export function OrderForm({ orderId }: { orderId?: string }) {
             <button
               type="submit"
               className="rounded bg-purple-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-purple-700 disabled:opacity-60"
-              disabled={loading || missingBom}
-              title={missingBom ? 'Fabric BOM is missing for one or more articles' : undefined}
+              disabled={loading}
             >
               {loading ? 'Saving...' : locked ? 'Save' : 'Save draft'}
             </button>

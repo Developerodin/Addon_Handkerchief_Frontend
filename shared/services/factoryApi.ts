@@ -176,10 +176,61 @@ export interface OrderLogRow {
   orderId?: string;
 }
 
+export interface PackingBundleSummaryRow {
+  id: string;
+  barcode: string;
+  qty: number;
+  pieceBundleBarcode?: string;
+  boxBarcode?: string;
+  onPackingRack?: boolean;
+  scaleWeight?: number;
+  updatedAt?: string;
+}
+
+export interface DispatchBoxSummaryRow {
+  id: string;
+  barcode: string;
+  status: string;
+  pieceQty?: number;
+  bundleCount?: number;
+  scaleWeight?: number;
+  rackCode?: string;
+  vehicleNumber?: string;
+  updatedAt?: string;
+}
+
+export interface OrderDispatchPackDetail {
+  order: {
+    id: string;
+    orderNumber: string;
+    buyer?: string;
+    targetQty: number;
+    dispatchedQty: number;
+    dispatchStatus: string;
+  } | null;
+  onRack: DispatchBoxSummaryRow[];
+  pipeline: DispatchBoxSummaryRow[];
+  dispatched: DispatchBoxSummaryRow[];
+}
+
+export interface OrderFloorProgressRow {
+  floor: string;
+  name: string;
+  workedQty: number;
+  receivedQty: number;
+  completedQty: number;
+  transferredQty: number;
+}
+
 export interface OrderDetail {
   order: ProductionOrderRow;
+  finalCheckingGood?: number;
+  packingShortfall?: number;
+  floorProgress?: OrderFloorProgressRow[];
   completions: { id: string; stage: string; qty: number; operatorId?: string; machineBarcode?: string }[];
   bundles: BundleRow[];
+  packingBundles?: PackingBundleSummaryRow[];
+  dispatch?: OrderDispatchPackDetail;
 }
 
 export interface VendorReturnRow {
@@ -263,6 +314,8 @@ export interface ProductionOrderRow {
   productionType: string;
   revisionId: string;
   targetQty: number;
+  dispatchedQty?: number;
+  dispatchStatus?: 'none' | 'partial' | 'complete';
   status: string;
   priority?: string;
   orderNote?: string;
@@ -339,6 +392,7 @@ export interface BundleRow {
   qty: number;
   closed: boolean;
   barcode?: string;
+  rackCode?: string;
   fromFloor?: string;
   toFloor?: string;
   status?: string;

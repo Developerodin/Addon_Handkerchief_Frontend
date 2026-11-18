@@ -2,16 +2,29 @@
 
 import React, { useState } from 'react';
 import { UiButton } from '@/shared/components/ui';
+import { BundleLabel, triggerBundleLabelPrint } from '@/shared/components/factory/BundleLabel';
 import { DrawerSection, DrawerStat } from '@/shared/components/factory/FactoryDrawer';
 import { factoryRequest, itemScopeId, listScopeRevisions, OrderDetail, ScopeRevision } from '@/shared/services/factoryApi';
 import { getProductById } from '@/shared/services/productService';
-import { orderDateLabel } from './orderLabels';
+import { dispatchStatusLabel, orderDateLabel, orderStatusLabel } from './orderLabels';
+import { OrderPackingDispatch } from './OrderPackingDispatch';
 
 /**
  * Header, lines, pinned snapshot, segments, and floors for one order.
  */
 export function OrderView({ detail, onChanged }: { detail: OrderDetail; onChanged: () => void }) {
   const order = detail.order;
+  const floorRows =
+    detail.floorProgress?.length
+      ? detail.floorProgress
+      : (order.floors || []).map((step) => ({
+          floor: step.floor,
+          name: step.name || step.floor,
+          workedQty: 0,
+          receivedQty: step.receivedQty || 0,
+          completedQty: step.completedQty || 0,
+          transferredQty: step.transferredQty || 0,
+        }));
   const [lineId, setLineId] = useState(order.lines?.[0]?.id || '');
   const [revisionId, setRevisionId] = useState('');
   const [revisions, setRevisions] = useState<ScopeRevision[]>([]);
@@ -19,6 +32,7 @@ export function OrderView({ detail, onChanged }: { detail: OrderDetail; onChange
   const [error, setError] = useState('');
   const [issuedRoll, setIssuedRoll] = useState('');
   const [issuing, setIssuing] = useState(false);
+  const [printBarcode, setPrintBarcode] = useState('');
 
   /**
    * Published revisions for the line being amended.
@@ -49,6 +63,17 @@ export function OrderView({ detail, onChanged }: { detail: OrderDetail; onChange
         <DrawerStat label="Required by" value={orderDateLabel(order.requiredBy)} />
         <DrawerStat label="Target" value={order.totalQty || order.targetQty} />
         <DrawerStat label="Floor" value={order.currentFloor || '—'} />
+        <DrawerStat label="Packed good" value={detail.finalCheckingGood ?? 0} />
+        <DrawerStat label="Production" value={orderStatusLabel(order.status)} />
+        <DrawerStat
+          label="Factory dispatch"
+          value={
+            order.dispatchedQty != null
+              ? `${order.dispatchedQty}/${order.totalQty || order.targetQty} pcs · ${dispatchStatusLabel(order.dispatchStatus)}`
+              : '—'
+          }
+        />
+        <DrawerStat label="Shortfall" value={detail.packingShortfall ? `${detail.packingShortfall} pcs` : '—'} />
         <DrawerStat label="Priority" value={order.priority || 'Medium'} />
       </div>
       <DrawerSection title="Items">
@@ -128,27 +153,78 @@ export function OrderView({ detail, onChanged }: { detail: OrderDetail; onChange
           {issuedRoll ? <p className="font-mono text-xs text-gray-700">Roll {issuedRoll}</p> : null}
         </div>
       ) : null}
-      <DrawerSection title="Floors">
+      {(detail.bundles || []).some((row) => row.barcode) ? (
+        <>
+          <style>{'@media print { body * { visibility: hidden; } #bundle-label, #bundle-label * { visibility: visible; } #bundle-label { position: absolute; left: 0; top: 0; } }'}</style>
+          <DrawerSection title="Bundle labels">
+            <ul className="grid gap-2 p-3">
+              {detail.bundles
+                .filter((row) => row.barcode)
+                .map((row) => (
+                  <li key={row.id} className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-mono text-[12px] font-bold text-gray-900">{row.barcode}</span>
+                    <span className="text-[11px] text-gray-600">qty {row.qty}</span>
+                    <button
+                      type="button"
+                      className="rounded border border-gray-200 bg-white px-2 py-1 text-[11px] font-bold text-[#495057] hover:bg-gray-50"
+                      onClick={() => {
+                        setPrintBarcode(row.barcode || '');
+                        window.setTimeout(() => triggerBundleLabelPrint(), 0);
+                      }}
+                    >
+                      Print
+                    </button>
+                  </li>
+                ))}
+            </ul>
+            {printBarcode ? (
+              <BundleLabel
+                printing
+                bundle={{
+                  barcode: printBarcode,
+                  orderId: order.id,
+                  orderNumber: order.orderNumber,
+                  qty: detail.bundles.find((row) => row.barcode === printBarcode)?.qty || 0,
+                }}
+              />
+            ) : null}
+          </DrawerSection>
+        </>
+      ) : null}
+      <DrawerSection title="Floor progress">
+        <p className="border-b border-gray-100 px-3 py-2 text-[10px] leading-snug text-gray-500">
+          <span className="font-bold text-gray-700">Worked</span> comes from floor scan logs (how the factory actually runs).
+          <span className="font-bold text-gray-700"> Received / completed / transferred</span> are legacy order counters — they update
+          mainly on manual bundle transfer; they often stay 0 even when work is done.
+        </p>
         <table>
           <thead>
             <tr>
               <th>Floor</th>
+              <th>Worked (logs)</th>
               <th>Received</th>
               <th>Completed</th>
               <th>Transferred</th>
             </tr>
           </thead>
           <tbody>
-            {(order.floors || []).map((floor) => (
-              <tr key={`${floor.sortOrder}-${floor.floor}`}>
+            {floorRows.map((floor) => (
+              <tr key={`${floor.floor}-${floor.name}`}>
                 <td>{floor.name || floor.floor}</td>
+                <td className={floor.workedQty ? 'font-semibold text-gray-900' : ''}>{floor.workedQty}</td>
                 <td>{floor.receivedQty || 0}</td>
-                <td>{floor.completedQty}</td>
+                <td>{floor.completedQty || 0}</td>
                 <td>{floor.transferredQty || 0}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        {detail.finalCheckingGood != null ? (
+          <p className="px-3 py-2 text-[11px] text-gray-600">
+            Final checking good (quality): <span className="font-bold text-gray-900">{detail.finalCheckingGood}</span> pcs
+            {detail.packingShortfall ? ` · shortfall ${detail.packingShortfall} before close` : ''}
+          </p>
+        ) : null}
       </DrawerSection>
       <DrawerSection title="Segments">
         <table>
@@ -170,6 +246,7 @@ export function OrderView({ detail, onChanged }: { detail: OrderDetail; onChange
           </tbody>
         </table>
       </DrawerSection>
+      <OrderPackingDispatch detail={detail} />
       {order.status !== 'pending' && order.status !== 'closed' ? (
         <form
           className="mt-3 grid gap-2"

@@ -34,6 +34,8 @@ export default function IssuePage() {
   const [activeKey, setActiveKey] = useState('');
   const [completing, setCompleting] = useState(false);
   const [completeError, setCompleteError] = useState('');
+  const [bypassing, setBypassing] = useState(false);
+  const [bypassError, setBypassError] = useState('');
 
   const openOrders = orders.rows;
   const selected = openOrders.find((order) => order.id === selectedId) || null;
@@ -106,6 +108,9 @@ export default function IssuePage() {
   const selectedArticle = (selected?.lines || []).find((line) => line.id === articleId) || null;
   const activeLine = fabricLines.find((line) => line.key === activeKey) || null;
   const logRows = selected ? issues.filter((row) => row.orderId === selected.id) : issues;
+  const canBypassOrder = Boolean(
+    selected && (selected.lines || []).some((line) => line.fabricIssueStatus !== 'completed')
+  );
 
   /**
    * Another order opens on All, so every fabric line for that order is visible.
@@ -115,6 +120,27 @@ export default function IssuePage() {
     setArticleId('all');
     setActiveKey('');
     setCompleteError('');
+    setBypassError('');
+  }
+
+  /**
+   * Marks every article on the order fabric-complete without scanning rolls. Temporary bypass for floor testing.
+   */
+  async function bypassOrderIssue() {
+    if (!selected) return;
+    if (!window.confirm('Mark this order as fabric-issued without scanning rolls? No stock movements will be recorded.')) return;
+    setBypassing(true);
+    setBypassError('');
+    setCompleteError('');
+    try {
+      await factoryRequest(`/production/orders/${selected.id}/fabric-issue-bypass`, { method: 'POST' });
+      setActiveKey('');
+      await orders.reload();
+    } catch (err) {
+      setBypassError(err instanceof Error ? err.message : 'Could not bypass fabric issue');
+    } finally {
+      setBypassing(false);
+    }
   }
 
   /**
@@ -147,9 +173,23 @@ export default function IssuePage() {
               <span className="h-5 w-[3px] rounded bg-primary" aria-hidden />
               <h1 className="text-sm font-bold text-[#111827]">Fabric issue</h1>
             </div>
-            <UiButton type="button" variant="secondary" icon="ri-file-list-3-line" onClick={() => setLogsOpen(true)}>
-              Issue log
-            </UiButton>
+            <div className="flex flex-wrap items-center gap-2">
+              {canBypassOrder ? (
+                <UiButton
+                  type="button"
+                  variant="secondary"
+                  icon="ri-skip-forward-line"
+                  loading={bypassing}
+                  title="Skip roll scans and mark fabric issue complete for every article on this order"
+                  onClick={() => bypassOrderIssue().catch(() => undefined)}
+                >
+                  Mark as issued (bypass)
+                </UiButton>
+              ) : null}
+              <UiButton type="button" variant="secondary" icon="ri-file-list-3-line" onClick={() => setLogsOpen(true)}>
+                Issue log
+              </UiButton>
+            </div>
           </header>
           <div className="grid lg:grid-cols-[18rem_minmax(0,1fr)]">
             <OrderRail
@@ -184,6 +224,7 @@ export default function IssuePage() {
                       setArticleId(id);
                       setActiveKey('');
                       setCompleteError('');
+                      setBypassError('');
                     }}
                   />
                   {!articleId ? <p className="text-sm text-[#4B5563]">Select an article to see its fabric and issue rolls.</p> : null}
@@ -198,13 +239,26 @@ export default function IssuePage() {
                       {issueError}
                     </p>
                   ) : null}
+                  {bypassError ? (
+                    <p className="text-sm text-red-700" role="alert">
+                      {bypassError}
+                    </p>
+                  ) : null}
+                  {canBypassOrder ? (
+                    <p className="text-xs text-amber-800" role="status">
+                      Need to move on without basement scans? Use <strong>Mark as issued (bypass)</strong> above. Roll
+                      issue can stay strict later.
+                    </p>
+                  ) : null}
                   {articleId && !estimating ? (
                     <FabricRequirementTable
                       lines={visibleLines}
                       issues={issues.filter((row) => row.orderId === selected.id)}
                       showArticle={articleId === 'all'}
                       activeKey={activeKey}
-                      canComplete={Boolean(selectedArticle) && selectedArticle?.fabricIssueStatus !== 'completed' && visibleLines.length > 0}
+                      canComplete={Boolean(
+                        selectedArticle && selectedArticle.fabricIssueStatus !== 'completed' && articleId !== 'all'
+                      )}
                       completing={completing}
                       completeError={completeError}
                       onIssue={(line) => setActiveKey(line.key)}

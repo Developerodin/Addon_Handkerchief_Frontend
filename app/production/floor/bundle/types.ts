@@ -29,12 +29,15 @@ export interface SinglePieceCounts {
   closedToday: number;
 }
 
+import type { CompletedRow } from '../shared/CompletedQueueTable';
+
 export interface SinglePieceBoard {
   results: CutPieceRow[];
   active: CutPieceRow[];
   openBundles: BundleRow[];
   ready: BundleRow[];
-  counts: SinglePieceCounts;
+  completed?: CompletedRow[];
+  counts: SinglePieceCounts & { completed?: number };
 }
 
 export interface CutResult {

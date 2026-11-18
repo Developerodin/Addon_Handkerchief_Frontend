@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FactoryDrawer, DrawerSection } from '@/shared/components/factory/FactoryDrawer';
 import { factoryRequest } from '@/shared/services/factoryApi';
-import { Container, listContainers, listMachines, listStorageRacks, Machine, StorageRack } from '@/shared/services/phase3CatalogService';
+import { Container, listContainers, listMachines, listProductionRacks, Machine, ProductionRack } from '@/shared/services/phase3CatalogService';
 import { PieceLabel } from './PieceLabel';
 import { ActiveCut, CutPieceRow, UpcomingRoll } from './types';
 
@@ -30,7 +30,7 @@ export function CutJobDrawer({
   const [machineBarcode, setMachineBarcode] = useState('');
   const [machines, setMachines] = useState<Machine[]>([]);
   const [containers, setContainers] = useState<Container[]>([]);
-  const [racks, setRacks] = useState<StorageRack[]>([]);
+  const [racks, setRacks] = useState<ProductionRack[]>([]);
   const [pieces, setPieces] = useState<CutPieceRow[]>([]);
   const [containerBarcode, setContainerBarcode] = useState('');
   const [rackCode, setRackCode] = useState('');
@@ -47,7 +47,7 @@ export function CutJobDrawer({
     Promise.all([
       listMachines({ page: 1, limit: 200, status: 'active' }),
       listContainers({ page: 1, limit: 200, status: 'active' }),
-      listStorageRacks({ page: 1, limit: 200, status: 'active' }),
+      listProductionRacks({ page: 1, limit: 200, status: 'active' }),
     ])
       .then(([machinePage, containerPage, rackPage]) => {
         setMachines((machinePage.results || []).filter((row) => row.barcode));
@@ -234,7 +234,7 @@ export function CutJobDrawer({
                 {mastersMissing ? (
                   <p className="text-[12px] text-gray-600">
                     No pieces racks or pieces containers are in the catalog.{' '}
-                    <Link className="text-purple-600 hover:text-purple-700" href="/catalog/storage-racks">
+                    <Link className="text-purple-600 hover:text-purple-700" href="/catalog/production-racks">
                       Add a rack
                     </Link>{' '}
                     or{' '}

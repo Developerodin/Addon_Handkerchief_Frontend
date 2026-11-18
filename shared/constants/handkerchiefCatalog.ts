@@ -36,6 +36,9 @@ export const STOCK_TYPE_OPTIONS = [
   { value: 'box', label: 'Box' },
 ];
 
+/** Floor / production racks (bundles, pieces, QC, packing). Fabric rolls use Store → Fabric storage. */
+export const PRODUCTION_STOCK_TYPE_OPTIONS = STOCK_TYPE_OPTIONS.filter((opt) => opt.value !== 'fabric');
+
 export const CONTAINER_TYPE_OPTIONS = [
   { value: 'bundle', label: 'Bundle' },
   { value: 'carton', label: 'Carton' },

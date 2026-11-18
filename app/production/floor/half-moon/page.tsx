@@ -34,7 +34,12 @@ export default function HalfMoonCuttingPage() {
       setBoard({
         results: data.results || [],
         active: data.active || [],
-        counts: { ...EMPTY_COUNTS, ...(data.counts || {}) },
+        completed: data.completed || [],
+        counts: {
+          ...EMPTY_COUNTS,
+          ...(data.counts || {}),
+          completed: data.counts?.completed ?? (data.completed?.length || 0),
+        },
       });
       setError('');
     } catch (err) {
@@ -127,7 +132,7 @@ export default function HalfMoonCuttingPage() {
                 <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">Loading Data</p>
               </div>
             ) : (
-              <HalfMoonPieceTable pieces={board.results} active={board.active} onOpen={setJob} />
+              <HalfMoonPieceTable pieces={board.results} active={board.active} completed={board.completed} onOpen={setJob} />
             )}
           </div>
         </div>

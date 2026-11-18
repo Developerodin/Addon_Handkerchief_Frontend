@@ -74,8 +74,8 @@ export function metresPreview(line: DraftLine): string[] {
 }
 
 /**
- * Blocks save and release the same way the knitting order form does.
- * An item with no fabric BOM cannot be raised. Qty must be above 0 and at most 100,000.
+ * Blocks save and release when required fields are missing. Qty must be above 0 and at most 100,000.
+ * Fabric BOM is optional; orders without BOM can still be saved and released.
  */
 export function validateDraft(lines: DraftLine[]): string {
   const filled = lines.filter((line) => line.itemId || line.quantity || line.articleCode);
@@ -85,7 +85,6 @@ export function validateDraft(lines: DraftLine[]): string {
     const qty = Number(line.quantity);
     if (!(qty > 0)) return 'Qty must be greater than 0';
     if (qty > 100000) return 'Qty cannot exceed 100,000';
-    if (!line.bom.length) return 'Fabric BOM is missing for this article. An order cannot be raised for it.';
   }
   return '';
 }
@@ -109,7 +108,7 @@ export function duplicateCodes(lines: DraftLine[]): string[] {
 export function statusTone(label: string): string {
   if (label === 'Pending' || label === 'Draft') return 'bg-yellow-100 text-yellow-800';
   if (label === 'In progress') return 'bg-blue-100 text-blue-800';
-  if (label === 'Completed') return 'bg-green-100 text-green-800';
+  if (label === 'Production complete') return 'bg-green-100 text-green-800';
   if (label === 'On hold') return 'bg-red-100 text-red-800';
   return 'bg-gray-100 text-gray-800';
 }
@@ -145,7 +144,7 @@ export async function applyItem(
   }
   updateLine(setLines, index, {
     itemId,
-    articleCode: product.factoryCode || '',
+    articleCode: product.factoryCode || product.articleName || product.name || '',
     articleName: product.articleName || product.name || '',
     productionType: route,
     piecesPerCut: Number(product.piecesPerCut) === 4 ? 4 : 3,
@@ -163,7 +162,7 @@ export async function hydrateLine(line: NonNullable<OrderDetail['order']['lines'
   const draft = emptyLine();
   draft.id = line.id;
   draft.itemId = line.itemId || '';
-  draft.articleCode = line.factoryCode || '';
+  draft.articleCode = line.factoryCode || line.articleName || '';
   draft.articleName = line.articleName || '';
   draft.productionType = line.productionType;
   draft.piecesPerCut = line.piecesPerCut === 4 ? 4 : 3;
@@ -174,7 +173,7 @@ export async function hydrateLine(line: NonNullable<OrderDetail['order']['lines'
   if (!line.itemId) return draft;
   const product = (await getProductById(line.itemId)) as ItemDetail | null;
   if (!product) return draft;
-  if (!draft.articleCode) draft.articleCode = product.factoryCode || '';
+  if (!draft.articleCode) draft.articleCode = product.factoryCode || product.articleName || product.name || '';
   if (!draft.articleName) draft.articleName = product.articleName || product.name || '';
   draft.bom = product.bom || [];
   try {

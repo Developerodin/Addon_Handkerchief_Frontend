@@ -19,13 +19,17 @@ export interface HemPiece {
   sewingThread: SewingThreadHint;
 }
 
+import type { CompletedRow } from '../shared/CompletedQueueTable';
+
 export interface HemBoard {
   results: HemPiece[];
   active: HemPiece[];
+  completed?: CompletedRow[];
   counts: {
     waiting: number;
     onTable: number;
     doneToday: number;
     onRack: number;
+    completed?: number;
   };
 }

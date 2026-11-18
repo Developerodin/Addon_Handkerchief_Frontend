@@ -37,7 +37,12 @@ export default function SinglePiecePage() {
         active: data.active || [],
         openBundles: data.openBundles || [],
         ready: data.ready || [],
-        counts: { ...EMPTY_COUNTS, ...(data.counts || {}) },
+        completed: data.completed || [],
+        counts: {
+          ...EMPTY_COUNTS,
+          ...(data.counts || {}),
+          completed: data.counts?.completed ?? (data.completed?.length || 0),
+        },
       });
       setError('');
     } catch (err) {
@@ -137,6 +142,7 @@ export default function SinglePiecePage() {
                 pieces={board.results}
                 active={board.active}
                 ready={board.ready}
+                completed={board.completed}
                 onOpen={(row) => {
                   setPlaceBundle(null);
                   setJob(row);

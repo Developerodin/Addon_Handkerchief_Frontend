@@ -13,7 +13,7 @@ import { ArticleViewTab, FabricEstimationTab, UpcomingTab } from './OrderExtraTa
 import { FabricIssueFigures } from '@/app/store/issue/FabricIssueFigures';
 import { issueBadge } from '@/app/store/issue/fabricIssueMath';
 import { IssueStatusBadge } from '@/app/store/issue/IssueStatusBadge';
-import { orderDateLabel, orderStatusLabel, priorityTone } from './orderLabels';
+import { dispatchStatusLabel, orderDateLabel, orderStatusLabel, priorityTone } from './orderLabels';
 import { OrderView } from './OrderView';
 
 const TABS = [
@@ -25,7 +25,7 @@ const TABS = [
 
 const TILES = [
   ['in-progress', 'In progress', 'bg-blue-50 border-blue-100 text-blue-700', 'text-blue-900'],
-  ['completed', 'Completed', 'bg-green-50 border-green-100 text-green-700', 'text-green-900'],
+  ['completed', 'Production complete', 'bg-green-50 border-green-100 text-green-700', 'text-green-900'],
   ['pending', 'Pending', 'bg-yellow-50 border-yellow-100 text-yellow-700', 'text-yellow-900'],
   ['on-hold', 'On hold', 'bg-red-50 border-red-100 text-red-700', 'text-red-900'],
 ] as const;
@@ -234,7 +234,7 @@ export default function ProductionOrdersPage() {
                 <option value="released">Pending</option>
                 <option value="in-progress">In progress</option>
                 <option value="on-hold">On hold</option>
-                <option value="closed">Completed</option>
+                <option value="closed">Production complete</option>
               </select>
               <select
                 aria-label="Priority"
@@ -297,7 +297,32 @@ export default function ProductionOrdersPage() {
                       );
                     },
                   },
-                  { key: 'status', label: 'Status', render: (row) => <UiStatusBadge status={orderStatusLabel(row.status)} /> },
+                  {
+                    key: 'status',
+                    label: 'Production',
+                    render: (row) => (
+                      <span>
+                        <UiStatusBadge status={orderStatusLabel(row.status)} />
+                        {row.status === 'closed' && row.dispatchStatus !== 'complete' ? (
+                          <span className="mt-0.5 block text-[10px] font-medium text-amber-700">Awaiting dispatch</span>
+                        ) : null}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'dispatch',
+                    label: 'Factory dispatch',
+                    render: (row) => {
+                      const dispatched = row.dispatchedQty ?? 0;
+                      const target = row.targetQty || row.totalQty || 0;
+                      return (
+                        <span className="text-[11px] text-gray-700">
+                          {dispatched}/{target} pcs
+                          <span className="block text-[10px] text-gray-500">{dispatchStatusLabel(row.dispatchStatus)}</span>
+                        </span>
+                      );
+                    },
+                  },
                   {
                     key: 'priority',
                     label: 'Priority',
@@ -377,6 +402,7 @@ export default function ProductionOrdersPage() {
         title={detail?.order.orderNumber || 'Order'}
         subtitle={detail?.order.buyer || detail?.order.orderNote}
         status={detail ? orderStatusLabel(detail.order.status) : undefined}
+        wide
         open={Boolean(detail)}
         onClose={() => setDetail(null)}
       >

@@ -1,4 +1,5 @@
 import React from 'react';
+import { CompletedQueueTable, CompletedRow } from '../shared/CompletedQueueTable';
 import { EmptyQueue, QueueTabs } from '../shared/QueueTabs';
 import { ActiveCut, UpcomingRoll } from './types';
 
@@ -21,11 +22,13 @@ const cellClass = 'border border-gray-200 px-1.5 py-2.5 text-[12px] text-gray-90
 export function UpcomingRollsTable({
   rolls,
   active,
+  completed = [],
   onOpenRoll,
   onOpenActive,
 }: {
   rolls: UpcomingRoll[];
   active: ActiveCut[];
+  completed?: CompletedRow[];
   onOpenRoll: (roll: UpcomingRoll) => void;
   onOpenActive: (cut: ActiveCut) => void;
 }) {
@@ -33,6 +36,7 @@ export function UpcomingRollsTable({
     <QueueTabs
       upcomingCount={rolls.length}
       receivedCount={active.length}
+      completedCount={completed.length}
       upcoming={(
       <div className="min-h-[300px] overflow-x-auto">
         <table className="w-full border-collapse border border-gray-200">
@@ -109,6 +113,7 @@ export function UpcomingRollsTable({
       ) : (
         <EmptyQueue text="Nothing has been received on this floor yet." />
       )}
+      completed={<CompletedQueueTable rows={completed} codeLabel="Roll" getCode={(row) => row.rollBarcode || row.barcode || ''} />}
     />
   );
 }

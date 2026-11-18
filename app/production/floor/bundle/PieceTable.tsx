@@ -1,4 +1,5 @@
 import React from 'react';
+import { CompletedQueueTable, CompletedRow } from '../shared/CompletedQueueTable';
 import { EmptyQueue, QueueTabs } from '../shared/QueueTabs';
 import { BundleRow, CutPieceRow } from './types';
 
@@ -12,12 +13,14 @@ export function PieceTable({
   pieces,
   active,
   ready,
+  completed = [],
   onOpen,
   onPlace,
 }: {
   pieces: CutPieceRow[];
   active: CutPieceRow[];
   ready: BundleRow[];
+  completed?: CompletedRow[];
   onOpen: (piece: CutPieceRow) => void;
   onPlace: (bundle: BundleRow) => void;
 }) {
@@ -25,6 +28,7 @@ export function PieceTable({
     <QueueTabs
       upcomingCount={pieces.length + ready.length}
       receivedCount={active.length}
+      completedCount={completed.length}
       upcoming={(
     <div className="grid gap-4">
       <div className="min-h-[300px] overflow-x-auto">
@@ -96,7 +100,7 @@ export function PieceTable({
         ) : (
           <p className="text-[11px] text-gray-500">
             No closed bundle is waiting for a rack.{' '}
-            <a className="font-bold text-purple-600 hover:text-purple-700" href="/catalog/storage-racks">
+            <a className="font-bold text-purple-600 hover:text-purple-700" href="/catalog/production-racks">
               Bundle racks
             </a>
           </p>
@@ -131,6 +135,14 @@ export function PieceTable({
       ) : (
         <EmptyQueue text="Nothing has been received on this floor yet." />
       )}
+      completed={
+        <CompletedQueueTable
+          rows={completed}
+          codeLabel="Bundle"
+          showM4
+          emptyText="No bundles placed on a rack yet (last two weeks)."
+        />
+      }
     />
   );
 }

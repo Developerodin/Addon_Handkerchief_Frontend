@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FactoryDrawer, DrawerSection } from '@/shared/components/factory/FactoryDrawer';
 import { factoryRequest } from '@/shared/services/factoryApi';
-import { listMachines, listStorageRacks, Machine, StorageRack } from '@/shared/services/phase3CatalogService';
+import { listMachines, listProductionRacks, Machine, ProductionRack } from '@/shared/services/phase3CatalogService';
 import { CutBundle } from './types';
 
 const fieldClass =
@@ -31,7 +31,7 @@ export function CutJobDrawer({
   const [tableBarcode, setTableBarcode] = useState('');
   const [destination, setDestination] = useState('');
   const [machines, setMachines] = useState<Machine[]>([]);
-  const [racks, setRacks] = useState<StorageRack[]>([]);
+  const [racks, setRacks] = useState<ProductionRack[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const jobKey = bundle?.id || '';
@@ -48,7 +48,7 @@ export function CutJobDrawer({
 
   useEffect(() => {
     if (!jobKey) return;
-    Promise.all([listMachines({ page: 1, limit: 200, status: 'active' }), listStorageRacks({ page: 1, limit: 200, status: 'active' })])
+    Promise.all([listMachines({ page: 1, limit: 200, status: 'active' }), listProductionRacks({ page: 1, limit: 200, status: 'active' })])
       .then(([machinePage, rackPage]) => {
         setMachines(machinePage.results || []);
         setRacks((rackPage.results || []).filter((rack) => rack.stockType === 'bundles'));
@@ -190,7 +190,7 @@ export function CutJobDrawer({
             {!racks.length ? (
               <p className="text-[12px] text-gray-600">
                 No bundles racks are in the catalog.{' '}
-                <Link className="font-bold text-purple-600 hover:text-purple-700" href="/catalog/storage-racks">
+                <Link className="font-bold text-purple-600 hover:text-purple-700" href="/catalog/production-racks">
                   Bundle racks
                 </Link>
               </p>

@@ -34,7 +34,7 @@ export const getFirstAvailableRoute = (permissions: NavigationPermissions | null
     { path: '/catalog/attributes', key: 'Attributes Master' },
     { path: '/catalog/machines', key: 'Machines & Configuration' },
     { path: '/catalog/workers', key: 'Workers / Operators' },
-    { path: '/catalog/storage-racks', key: 'Storage Racks' },
+    { path: '/catalog/production-racks', key: 'Storage Racks' },
     { path: '/catalog/containers', key: 'Containers Master' },
     { path: '/catalog/label-templates', key: 'Label Templates & Device Registry' },
   ];

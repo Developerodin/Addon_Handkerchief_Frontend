@@ -1,4 +1,5 @@
 import React from 'react';
+import { CompletedQueueTable, CompletedRow } from '../shared/CompletedQueueTable';
 import { EmptyQueue, QueueTabs } from '../shared/QueueTabs';
 import { CutBundle } from './types';
 
@@ -11,16 +12,19 @@ const cellClass = 'border border-gray-200 px-1.5 py-2.5 text-[12px] text-gray-90
 export function CutBundleTable({
   bundles,
   active,
+  completed = [],
   onOpen,
 }: {
   bundles: CutBundle[];
   active: CutBundle[];
+  completed?: CompletedRow[];
   onOpen: (bundle: CutBundle) => void;
 }) {
   return (
     <QueueTabs
       upcomingCount={bundles.length}
       receivedCount={active.length}
+      completedCount={completed.length}
       upcoming={(
       <div className="min-h-[300px] overflow-x-auto">
         <table className="w-full border-collapse border border-gray-200">
@@ -93,6 +97,7 @@ export function CutBundleTable({
       ) : (
         <EmptyQueue text="Nothing has been received on this floor yet." />
       )}
+      completed={<CompletedQueueTable rows={completed} codeLabel="Bundle" />}
     />
   );
 }

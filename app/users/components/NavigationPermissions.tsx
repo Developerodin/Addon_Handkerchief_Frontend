@@ -83,13 +83,12 @@ const SIDEBAR_SECTIONS: { title: string; icon: string; rows: { key: TopKey; labe
     ],
   },
   {
-    title: 'Warehouse',
+    title: 'Packing & Dispatch',
     icon: 'ri-archive-line',
     rows: [
-      { key: 'Warehouse / Orders', label: 'Client orders' },
-      { key: 'Warehouse / Packing', label: 'Packing' },
-      { key: 'Warehouse / Boxes', label: 'Boxes' },
-      { key: 'Warehouse / Dispatch', label: 'Dispatch' },
+      { key: 'Packing & Dispatch / Packing', label: 'Packing' },
+      { key: 'Packing & Dispatch / Boxes', label: 'Boxes' },
+      { key: 'Packing & Dispatch / Dispatch', label: 'Dispatch' },
     ],
   },
   {

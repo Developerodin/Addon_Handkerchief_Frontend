@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FactoryDrawer, DrawerSection } from '@/shared/components/factory/FactoryDrawer';
 import { factoryRequest } from '@/shared/services/factoryApi';
-import { listMachines, listStorageRacks, Machine, StorageRack } from '@/shared/services/phase3CatalogService';
+import { listMachines, listProductionRacks, Machine, ProductionRack } from '@/shared/services/phase3CatalogService';
 import { SelvagePiece } from './types';
 
 /**
@@ -27,7 +27,7 @@ export function SelvageJobDrawer({
   const [destination, setDestination] = useState('');
   const [extraScan, setExtraScan] = useState('');
   const [machines, setMachines] = useState<Machine[]>([]);
-  const [racks, setRacks] = useState<StorageRack[]>([]);
+  const [racks, setRacks] = useState<ProductionRack[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const onTable = pieces.some((row) => row.status === 'in-work');
@@ -40,7 +40,7 @@ export function SelvageJobDrawer({
     setDestination('');
     setExtraScan('');
     setError('');
-    Promise.all([listMachines({ page: 1, limit: 200, status: 'active' }), listStorageRacks({ page: 1, limit: 200, status: 'active' })])
+    Promise.all([listMachines({ page: 1, limit: 200, status: 'active' }), listProductionRacks({ page: 1, limit: 200, status: 'active' })])
       .then(([machinePage, rackPage]) => {
         setMachines((machinePage.results || []).filter((row) => row.barcode));
         setRacks((rackPage.results || []).filter((row) => row.stockType === 'pieces'));
@@ -237,7 +237,7 @@ export function SelvageJobDrawer({
             {!racks.length ? (
               <p className="text-[12px] text-gray-600">
                 No pieces racks are in the catalog.{' '}
-                <Link className="text-purple-600 hover:text-purple-700" href="/catalog/storage-racks">
+                <Link className="text-purple-600 hover:text-purple-700" href="/catalog/production-racks">
                   Add a rack
                 </Link>
                 . A code that already exists can still be scanned.
