@@ -17,6 +17,7 @@ export default function EmbroideryPage() {
       start="rack-machine"
       place="bundles"
       stationLabel="Machine"
+      floorStage="embroidery"
       thread
     />
   );

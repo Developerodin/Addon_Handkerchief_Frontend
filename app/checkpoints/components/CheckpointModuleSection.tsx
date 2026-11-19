@@ -41,7 +41,7 @@ export default function CheckpointSheetTabs({
     <div
       role="tablist"
       aria-label="Checkpoint modules"
-      className="flex items-end gap-0.5 overflow-x-auto border-t border-[#c8ccd3] bg-[#e8eaee] px-2 pt-1 dark:border-[#3a3a3c] dark:bg-[#2c2c2e]"
+      className="flex items-end gap-0.5 overflow-x-auto border-b border-[#c8ccd3] bg-[#e8eaee] px-2 pb-1 dark:border-[#3a3a3c] dark:bg-[#2c2c2e]"
       onKeyDown={moveTab}
     >
       {modules.map((module) => {

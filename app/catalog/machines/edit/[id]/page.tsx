@@ -5,7 +5,7 @@ import { toast, Toaster } from 'react-hot-toast';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
 import { UiFormFooter } from '@/shared/components/ui';
-import { PROCESS_DEPARTMENTS, MACHINE_TYPE_OPTIONS } from '@/shared/constants/handkerchiefCatalog';
+import { EQUIPMENT_ROLE_OPTIONS, PRODUCTION_FLOOR_OPTIONS } from '@/shared/constants/productionFloors';
 import { userService, type User } from '@/shared/services/userService';
 import { getMachine, listWorkers, updateMachine, type Worker } from '@/shared/services/phase3CatalogService';
 
@@ -30,10 +30,9 @@ function EditMachinePage({ params }: { params: { id: string } }) {
   const [formData, setFormData] = useState({
     name: '',
     code: '',
-    machineType: '',
     makeModel: '',
-    department: '',
     floor: '',
+    equipmentRole: 'machine' as 'machine' | 'table',
     capacityPerShift: '',
     maintenanceIntervalMonths: '',
     lastMaintenanceDate: '',
@@ -41,7 +40,6 @@ function EditMachinePage({ params }: { params: { id: string } }) {
     maintenanceNotes: '',
     assignedSupervisor: '',
     assignedOperator: '',
-    barcode: '',
     status: 'active' as 'active' | 'inactive',
   });
 
@@ -70,10 +68,9 @@ function EditMachinePage({ params }: { params: { id: string } }) {
         setFormData({
           name: data.name || '',
           code: data.code || '',
-          machineType: data.machineType || '',
           makeModel: data.makeModel || '',
-          department: data.department || '',
           floor: data.floor || '',
+          equipmentRole: data.equipmentRole === 'table' ? 'table' : 'machine',
           capacityPerShift: data.capacityPerShift !== undefined ? String(data.capacityPerShift) : '',
           maintenanceIntervalMonths: data.maintenanceIntervalMonths !== undefined ? String(data.maintenanceIntervalMonths) : '',
           lastMaintenanceDate: formatDateInput(data.lastMaintenanceDate),
@@ -81,7 +78,6 @@ function EditMachinePage({ params }: { params: { id: string } }) {
           maintenanceNotes: data.maintenanceNotes || '',
           assignedSupervisor: getSupervisorId(data.assignedSupervisor),
           assignedOperator: getSupervisorId(data.assignedOperator),
-          barcode: data.barcode || '',
           status: data.status || 'active',
         });
       } catch (error) {
@@ -131,10 +127,9 @@ function EditMachinePage({ params }: { params: { id: string } }) {
       await updateMachine(params.id, {
         name: formData.name.trim(),
         code: formData.code.trim(),
-        machineType: formData.machineType || undefined,
         makeModel: formData.makeModel.trim(),
-        department: formData.department || undefined,
         floor: formData.floor.trim(),
+        equipmentRole: formData.equipmentRole,
         capacityPerShift,
         maintenanceIntervalMonths,
         lastMaintenanceDate: formData.lastMaintenanceDate || null,
@@ -142,7 +137,6 @@ function EditMachinePage({ params }: { params: { id: string } }) {
         maintenanceNotes: formData.maintenanceNotes.trim(),
         assignedSupervisor: formData.assignedSupervisor || null,
         assignedOperator: formData.assignedOperator || null,
-        barcode: formData.barcode.trim(),
         status: formData.status,
       });
       toast.success('Machine updated successfully', { id: loadingToast });
@@ -186,28 +180,31 @@ function EditMachinePage({ params }: { params: { id: string } }) {
             <input type="text" id="code" name="code" className="form-control" value={formData.code} onChange={handleInputChange} />
           </div>
           <div className="form-group">
-            <label htmlFor="machineType" className="form-label">Machine Type</label>
-            <select id="machineType" name="machineType" className="form-select" value={formData.machineType} onChange={handleInputChange}>
-              {MACHINE_TYPE_OPTIONS.map((opt) => (
-                <option key={opt.value || 'empty'} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
             <label htmlFor="makeModel" className="form-label">Make / Model</label>
             <input type="text" id="makeModel" name="makeModel" className="form-control" value={formData.makeModel} onChange={handleInputChange} />
           </div>
           <div className="form-group">
-            <label htmlFor="department" className="form-label">Department</label>
-            <select id="department" name="department" className="form-select" value={formData.department} onChange={handleInputChange}>
-              {PROCESS_DEPARTMENTS.map((opt) => (
-                <option key={opt.value || 'empty'} value={opt.value}>{opt.label}</option>
+            <label htmlFor="floor" className="form-label">Production floor</label>
+            <select id="floor" name="floor" className="form-select" value={formData.floor} onChange={handleInputChange}>
+              <option value="">Select floor</option>
+              {PRODUCTION_FLOOR_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
           </div>
           <div className="form-group">
-            <label htmlFor="floor" className="form-label">Floor</label>
-            <input type="text" id="floor" name="floor" className="form-control" value={formData.floor} onChange={handleInputChange} />
+            <label htmlFor="equipmentRole" className="form-label">Equipment type</label>
+            <select
+              id="equipmentRole"
+              name="equipmentRole"
+              className="form-select"
+              value={formData.equipmentRole}
+              onChange={handleInputChange}
+            >
+              {EQUIPMENT_ROLE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
             <label htmlFor="capacityPerShift" className="form-label">Capacity Per Shift</label>
@@ -228,18 +225,6 @@ function EditMachinePage({ params }: { params: { id: string } }) {
           <div className="form-group md:col-span-2">
             <label htmlFor="maintenanceNotes" className="form-label">Maintenance Notes</label>
             <textarea id="maintenanceNotes" name="maintenanceNotes" className="form-control" value={formData.maintenanceNotes} onChange={handleInputChange} rows={3} />
-          </div>
-          <div className="form-group">
-            <label htmlFor="barcode" className="form-label">Barcode</label>
-            <input
-              type="text"
-              id="barcode"
-              name="barcode"
-              className="form-control"
-              aria-label="Machine barcode"
-              value={formData.barcode}
-              onChange={handleInputChange}
-            />
           </div>
           <div className="form-group">
             <label htmlFor="assignedSupervisor" className="form-label">Assigned Supervisor</label>

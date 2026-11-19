@@ -14,6 +14,8 @@ export interface CatalogQueryParams {
   search?: string;
   sortBy?: string;
   status?: string;
+  floor?: string;
+  equipmentRole?: 'machine' | 'table';
 }
 
 type IdRow = { id: string; _id?: string };
@@ -40,6 +42,8 @@ function createCatalogApi<T extends IdRow>(resourcePath: string) {
     if (params.search?.trim()) searchParams.set('search', params.search.trim());
     if (params.sortBy) searchParams.set('sortBy', params.sortBy);
     if (params.status) searchParams.set('status', params.status);
+    if (params.floor?.trim()) searchParams.set('floor', params.floor.trim());
+    if (params.equipmentRole) searchParams.set('equipmentRole', params.equipmentRole);
     const query = searchParams.toString();
     const response = await fetch(`${BASE}${query ? `?${query}` : ''}`, {
       headers: { Accept: 'application/json' },
@@ -109,6 +113,7 @@ export interface Machine {
   makeModel?: string;
   department?: string;
   floor?: string;
+  equipmentRole?: 'machine' | 'table';
   capacityPerShift?: number;
   maintenanceIntervalMonths?: number;
   lastMaintenanceDate?: string | null;

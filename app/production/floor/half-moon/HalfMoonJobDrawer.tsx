@@ -4,7 +4,9 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FactoryDrawer, DrawerSection } from '@/shared/components/factory/FactoryDrawer';
 import { factoryRequest } from '@/shared/services/factoryApi';
-import { listMachines, listProductionRacks, Machine, ProductionRack } from '@/shared/services/phase3CatalogService';
+import { listProductionRacks, Machine, ProductionRack } from '@/shared/services/phase3CatalogService';
+import { floorEquipmentFilter } from '@/shared/constants/productionFloors';
+import { loadFloorMachines } from '../shared/floorCatalogCache';
 import { HalfMoonPiece } from './types';
 
 /**
@@ -40,9 +42,12 @@ export function HalfMoonJobDrawer({
     setDestination('');
     setExtraScan('');
     setError('');
-    Promise.all([listMachines({ page: 1, limit: 200, status: 'active' }), listProductionRacks({ page: 1, limit: 200, status: 'active' })])
-      .then(([machinePage, rackPage]) => {
-        setMachines((machinePage.results || []).filter((row) => row.barcode));
+    Promise.all([
+      loadFloorMachines(floorEquipmentFilter('half-moon')),
+      listProductionRacks({ page: 1, limit: 200, status: 'active' }),
+    ])
+      .then(([machineRows, rackPage]) => {
+        setMachines(machineRows.filter((row) => row.barcode));
         setRacks((rackPage.results || []).filter((row) => row.stockType === 'pieces'));
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load machines'));

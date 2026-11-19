@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { toast, Toaster } from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud';
@@ -9,6 +9,7 @@ import CatalogListShell from '@/shared/components/catalog/CatalogListShell';
 import { buildCatalogTableColumns, catalogHelpBlock } from '@/shared/components/catalog/catalogListHelpers';
 import { UiTableColumn } from '@/shared/components/ui';
 import { PRODUCTION_STOCK_TYPE_OPTIONS, STOCK_TYPE_OPTIONS } from '@/shared/constants/handkerchiefCatalog';
+import { PRODUCTION_FLOOR_OPTIONS, productionFloorLabel } from '@/shared/constants/productionFloors';
 import {
   ProductionRack,
   createProductionRack,
@@ -16,6 +17,9 @@ import {
   listProductionRacks,
   updateProductionRack,
 } from '@/shared/services/phase3CatalogService';
+import { RackPrintItem } from '@/shared/utils/qzRackPrint';
+import { RackPrintSettingsModal } from '@/app/store/racks/RackPrintSettingsModal';
+import { productionRackPrintItem } from './productionRackPrint';
 
 interface ExcelRow {
   'ID'?: string;
@@ -65,7 +69,7 @@ const toExportRow = (rack: ProductionRack) => ({
 const dataColumns: UiTableColumn<ProductionRack>[] = [
   { key: 'code', label: 'Code', render: (row) => <span className="font-bold text-gray-900">{row.code}</span> },
   { key: 'name', label: 'Name', render: (row) => row.name },
-  { key: 'floor', label: 'Floor', render: (row) => row.floor || '—' },
+  { key: 'floor', label: 'Floor', render: (row) => productionFloorLabel(row.floor) || row.floor || '—' },
   { key: 'zone', label: 'Zone', render: (row) => row.zone || '—' },
   { key: 'stockType', label: 'Stock Type', render: (row) => stockTypeLabel(row.stockType) },
   { key: 'capacity', label: 'Capacity', render: (row) => row.capacity ?? '—' },
@@ -74,11 +78,40 @@ const dataColumns: UiTableColumn<ProductionRack>[] = [
 export default function ProductionRacksPage() {
   const { canCreate, canUpdate, canDelete, canImport, guardDelete } = useCatalogCrud('production-racks');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filterFloor, setFilterFloor] = useState('');
+  const [printQueue, setPrintQueue] = useState<RackPrintItem[] | null>(null);
+
+  const fetchRacks = useCallback(
+    async (params: { page: number; limit: number; search: string }) => {
+      const data = await listProductionRacks({
+        page: params.page,
+        limit: params.limit,
+        search: params.search,
+        ...(filterFloor ? { floor: filterFloor } : {}),
+      });
+      return {
+        results: data.results,
+        totalPages: data.totalPages,
+        totalResults: data.totalResults,
+      };
+    },
+    [filterFloor],
+  );
 
   const list = useCatalogListState<ProductionRack>({
-    fetchFn: listProductionRacks,
+    fetchFn: fetchRacks,
     errorMessage: 'Failed to fetch production racks',
   });
+
+  useEffect(() => {
+    list.setCurrentPage(1);
+    list.clearSelection();
+  }, [filterFloor]);
+
+  const hasActiveFilters = Boolean(filterFloor);
+  const filterFieldClass =
+    'rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[11px] font-medium text-gray-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary';
 
   const handleDelete = async (id: string) => {
     if (!guardDelete()) return;
@@ -250,6 +283,26 @@ export default function ProductionRacksPage() {
     }
   };
 
+  const openPrint = (racks: ProductionRack[]) => {
+    const rows = racks.map(productionRackPrintItem).filter((row) => row.barcode);
+    if (!rows.length) {
+      toast.error('No barcode to print. Rack needs a code.');
+      return;
+    }
+    setPrintQueue(rows);
+  };
+
+  const openBulkPrint = () => {
+    const selected = list.selectedIds.length
+      ? list.rows.filter((row) => list.selectedIds.includes(row.id))
+      : list.rows;
+    if (!selected.length) {
+      toast.error('No racks on this page to print');
+      return;
+    }
+    openPrint(selected);
+  };
+
   const columns = buildCatalogTableColumns<ProductionRack>({
     dataColumns,
     segment: 'production-racks',
@@ -257,6 +310,7 @@ export default function ProductionRacksPage() {
     canUpdate,
     canDelete,
     onDelete: handleDelete,
+    onPrint: (row) => openPrint([row]),
   });
 
   return (
@@ -292,6 +346,65 @@ export default function ProductionRacksPage() {
         canCreate={canCreate}
         addHref="/catalog/production-racks/add"
         addLabel="Add Rack"
+        extraToolbarActions={(
+          <>
+            <button
+              type="button"
+              className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-[11px] font-bold ${
+                hasActiveFilters || filtersOpen
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+              aria-expanded={filtersOpen}
+              aria-label="Filter production racks"
+              onClick={() => setFiltersOpen((open) => !open)}
+            >
+              <i className="ri-filter-3-line" aria-hidden />
+              Filters
+              {hasActiveFilters ? <span className="rounded-full bg-primary px-1.5 text-[9px] text-white">On</span> : null}
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-[11px] font-bold text-white"
+              aria-label="Print rack barcodes"
+              onClick={openBulkPrint}
+            >
+              <i className="ri-barcode-line" aria-hidden />
+              Print barcode
+            </button>
+          </>
+        )}
+        toolbarFooter={
+          filtersOpen ? (
+            <div className="flex flex-wrap items-end gap-3 border-t border-gray-100 pt-3">
+              <label className="flex min-w-[160px] flex-col gap-1 text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                Production floor
+                <select
+                  className={filterFieldClass}
+                  aria-label="Filter by production floor"
+                  value={filterFloor}
+                  onChange={(event) => setFilterFloor(event.target.value)}
+                >
+                  <option value="">All floors</option>
+                  {PRODUCTION_FLOOR_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {hasActiveFilters ? (
+                <button
+                  type="button"
+                  className="rounded-md border border-gray-200 px-2.5 py-1.5 text-[11px] font-medium text-gray-600 hover:bg-gray-50"
+                  onClick={() => setFilterFloor('')}
+                >
+                  Clear filters
+                </button>
+              ) : null}
+            </div>
+          ) : null
+        }
         canDelete={canDelete}
         selectedCount={list.selectedIds.length}
         onBulkDelete={handleDeleteSelected}
@@ -318,6 +431,9 @@ export default function ProductionRacksPage() {
         emptyIcon="ri-archive-line"
         emptyAddLabel="Add First Rack"
       />
+      {printQueue ? (
+        <RackPrintSettingsModal racks={printQueue} onClose={() => setPrintQueue(null)} />
+      ) : null}
     </>
   );
 }

@@ -17,6 +17,7 @@ export default function StickerPage() {
       start="rack-machine"
       place="bundles"
       stationLabel="Table"
+      floorStage="sticker"
     />
   );
 }

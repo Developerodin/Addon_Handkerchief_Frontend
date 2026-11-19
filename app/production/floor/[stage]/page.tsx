@@ -8,7 +8,9 @@ import { UiButton, UiFormFooter } from '@/shared/components/ui';
 import { floorStageBySlug } from '@/shared/constants/factoryStages';
 import { useFactoryList } from '@/shared/hooks/useFactoryList';
 import { BundleRow, factoryRequest, ProductionOrderRow } from '@/shared/services/factoryApi';
-import { listMachines, Machine } from '@/shared/services/phase3CatalogService';
+import { Machine } from '@/shared/services/phase3CatalogService';
+import { floorEquipmentFilter } from '@/shared/constants/productionFloors';
+import { loadFloorMachines } from '../shared/floorCatalogCache';
 
 interface PrintedBundle {
   barcode: string;
@@ -48,10 +50,11 @@ export default function FloorStagePage() {
   const remaining = received - sent;
 
   useEffect(() => {
-    listMachines({ limit: 200, page: 1 })
-      .then((data) => setMachines((data.results || []).filter((machine) => machine.barcode)))
+    if (!stage?.stage) return;
+    loadFloorMachines(floorEquipmentFilter(stage.stage))
+      .then((rows) => setMachines(rows.filter((machine) => machine.barcode)))
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load machines'));
-  }, []);
+  }, [stage?.stage]);
 
   if (!stage) {
     return <p className="p-6">Unknown floor stage.</p>;

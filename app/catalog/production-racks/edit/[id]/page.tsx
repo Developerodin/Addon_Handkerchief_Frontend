@@ -6,6 +6,7 @@ import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermissio
 import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
 import { UiFormFooter } from '@/shared/components/ui';
 import { PRODUCTION_STOCK_TYPE_OPTIONS } from '@/shared/constants/handkerchiefCatalog';
+import { PRODUCTION_FLOOR_OPTIONS } from '@/shared/constants/productionFloors';
 import {
   getProductionRack,
   updateProductionRack,
@@ -22,7 +23,6 @@ function EditProductionRackPage({ params }: { params: { id: string } }) {
     zone: '',
     stockType: '' as '' | 'fabric' | 'wip-bundle' | 'finished-carton',
     capacity: '',
-    barcode: '',
     status: 'active' as 'active' | 'inactive',
   });
 
@@ -37,7 +37,6 @@ function EditProductionRackPage({ params }: { params: { id: string } }) {
           zone: data.zone || '',
           stockType: data.stockType || '',
           capacity: data.capacity !== undefined ? String(data.capacity) : '',
-          barcode: data.barcode || '',
           status: data.status || 'active',
         });
       } catch (error) {
@@ -83,7 +82,6 @@ function EditProductionRackPage({ params }: { params: { id: string } }) {
         zone: formData.zone.trim(),
         stockType: formData.stockType || undefined,
         capacity,
-        barcode: formData.barcode.trim(),
         status: formData.status,
       });
       toast.success('Production rack updated successfully', { id: loadingToast });
@@ -127,8 +125,13 @@ function EditProductionRackPage({ params }: { params: { id: string } }) {
             <input type="text" id="name" name="name" className="form-control" value={formData.name} onChange={handleInputChange} required />
           </div>
           <div className="form-group">
-            <label htmlFor="floor" className="form-label">Floor</label>
-            <input type="text" id="floor" name="floor" className="form-control" value={formData.floor} onChange={handleInputChange} />
+            <label htmlFor="floor" className="form-label">Production floor</label>
+            <select id="floor" name="floor" className="form-select" value={formData.floor} onChange={handleInputChange}>
+              <option value="">Select floor</option>
+              {PRODUCTION_FLOOR_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
             <label htmlFor="zone" className="form-label">Zone</label>
@@ -146,10 +149,6 @@ function EditProductionRackPage({ params }: { params: { id: string } }) {
           <div className="form-group">
             <label htmlFor="capacity" className="form-label">Capacity</label>
             <input type="number" id="capacity" name="capacity" className="form-control" min="0" value={formData.capacity} onChange={handleInputChange} />
-          </div>
-          <div className="form-group">
-            <label htmlFor="barcode" className="form-label">Barcode</label>
-            <input type="text" id="barcode" name="barcode" className="form-control" value={formData.barcode} onChange={handleInputChange} />
           </div>
           <div className="form-group">
             <label htmlFor="status" className="form-label">Status</label>

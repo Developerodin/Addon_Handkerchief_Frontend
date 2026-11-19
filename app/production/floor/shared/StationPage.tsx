@@ -7,6 +7,7 @@ import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermissio
 import { FactoryDrawer, DrawerSection } from '@/shared/components/factory/FactoryDrawer';
 import { factoryRequest } from '@/shared/services/factoryApi';
 import { Container, Machine, ProductionRack } from '@/shared/services/phase3CatalogService';
+import { floorEquipmentFilter } from '@/shared/constants/productionFloors';
 import { loadFloorBundleContainers, loadFloorMachines, loadFloorStorageRacks } from './floorCatalogCache';
 import { CompletedQueueTable, CompletedRow } from './CompletedQueueTable';
 import { EmptyQueue, QueueTabs } from './QueueTabs';
@@ -55,6 +56,7 @@ export function StationPage({
   start,
   place,
   stationLabel,
+  floorStage,
   thread,
 }: {
   title: string;
@@ -65,6 +67,8 @@ export function StationPage({
   start: StartMode;
   place: PlaceMode;
   stationLabel: string;
+  /** Process.floor code for catalog machine filtering */
+  floorStage: string;
   thread?: boolean;
 }) {
   const [board, setBoard] = useState<FloorBoard>({ results: [], active: [], counts: EMPTY });
@@ -182,6 +186,7 @@ export function StationPage({
             start={start}
             place={place}
             stationLabel={stationLabel}
+            floorStage={floorStage}
             thread={thread}
             miss={miss}
             onClose={() => setJob(null)}
@@ -266,7 +271,7 @@ const BundleTable = memo(function BundleTable({
  * Start and put-away for one bundle.
  */
 function JobDrawer({
-  bundle, waiting, base, title, start, place, stationLabel, thread, miss, onClose, onChanged,
+  bundle, waiting, base, title, start, place, stationLabel, floorStage, thread, miss, onClose, onChanged,
 }: {
   bundle: FloorBundle | null;
   waiting: FloorBundle[];
@@ -275,6 +280,7 @@ function JobDrawer({
   start: StartMode;
   place: PlaceMode;
   stationLabel: string;
+  floorStage: string;
   thread?: boolean;
   miss: string;
   onClose: () => void;
@@ -317,7 +323,11 @@ function JobDrawer({
     let cancelled = false;
     const tasks: Promise<void>[] = [];
     if (needsMachines) {
-      tasks.push(loadFloorMachines().then((rows) => { if (!cancelled) setMachines(rows); }));
+      tasks.push(
+        loadFloorMachines(floorEquipmentFilter(floorStage, stationLabel)).then((rows) => {
+          if (!cancelled) setMachines(rows);
+        })
+      );
     }
     if (needsRacks) {
       const stock = place === 'packing' ? 'packing' : 'bundles';
@@ -337,7 +347,7 @@ function JobDrawer({
     return () => {
       cancelled = true;
     };
-  }, [bundle, needsContainers, needsMachines, needsRacks, place]);
+  }, [bundle, floorStage, needsContainers, needsMachines, needsRacks, place, stationLabel]);
 
   if (!bundle) return null;
 

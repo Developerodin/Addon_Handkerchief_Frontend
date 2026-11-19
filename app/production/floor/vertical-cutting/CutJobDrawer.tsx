@@ -4,7 +4,9 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FactoryDrawer, DrawerSection } from '@/shared/components/factory/FactoryDrawer';
 import { factoryRequest } from '@/shared/services/factoryApi';
-import { Container, listContainers, listMachines, listProductionRacks, Machine, ProductionRack } from '@/shared/services/phase3CatalogService';
+import { Container, listContainers, listProductionRacks, Machine, ProductionRack } from '@/shared/services/phase3CatalogService';
+import { floorEquipmentFilter } from '@/shared/constants/productionFloors';
+import { loadFloorMachines } from '../shared/floorCatalogCache';
 import { PieceLabel } from './PieceLabel';
 import { ActiveCut, CutPieceRow, UpcomingRoll } from './types';
 
@@ -45,12 +47,12 @@ export function CutJobDrawer({
     setPieces(isActive(job) ? job.pieces : []);
     setMachineBarcode(isActive(job) ? job.machineBarcode : '');
     Promise.all([
-      listMachines({ page: 1, limit: 200, status: 'active' }),
+      loadFloorMachines(floorEquipmentFilter('vertical-cut')),
       listContainers({ page: 1, limit: 200, status: 'active' }),
       listProductionRacks({ page: 1, limit: 200, status: 'active' }),
     ])
-      .then(([machinePage, containerPage, rackPage]) => {
-        setMachines((machinePage.results || []).filter((row) => row.barcode));
+      .then(([machineRows, containerPage, rackPage]) => {
+        setMachines(machineRows.filter((row) => row.barcode));
         setContainers((containerPage.results || []).filter((row) => row.type === 'pieces'));
         setRacks((rackPage.results || []).filter((row) => row.stockType === 'pieces'));
       })

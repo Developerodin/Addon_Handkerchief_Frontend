@@ -8,6 +8,7 @@ interface CatalogRowActionsProps {
   editHref: string;
   onDelete: () => void;
   onReplicate?: () => void;
+  onPrint?: () => void;
   deleteDisabled?: boolean;
   deleteLoading?: boolean;
   replicateLoading?: boolean;
@@ -18,6 +19,7 @@ export default function CatalogRowActions({
   editHref,
   onDelete,
   onReplicate,
+  onPrint,
   deleteDisabled,
   deleteLoading,
   replicateLoading,
@@ -30,6 +32,15 @@ export default function CatalogRowActions({
     <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
       {canUpdate && (
         <UiIconButton href={editHref} icon="ri-pencil-line" tone="edit" title="Edit" aria-label="Edit" />
+      )}
+      {onPrint && (
+        <UiIconButton
+          icon="ri-barcode-line"
+          tone="default"
+          title="Print barcode"
+          aria-label="Print barcode"
+          onClick={onPrint}
+        />
       )}
       {canCreate && onReplicate && (
         <UiIconButton

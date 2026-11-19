@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { toast, Toaster } from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { useCatalogCrud } from '@/shared/hooks/useCatalogCrud';
@@ -8,7 +8,11 @@ import { useCatalogListState } from '@/shared/hooks/useCatalogListState';
 import CatalogListShell from '@/shared/components/catalog/CatalogListShell';
 import { buildCatalogTableColumns, catalogHelpBlock } from '@/shared/components/catalog/catalogListHelpers';
 import { UiTableColumn } from '@/shared/components/ui';
-import { PROCESS_DEPARTMENTS, MACHINE_TYPE_OPTIONS } from '@/shared/constants/handkerchiefCatalog';
+import {
+  EQUIPMENT_ROLE_OPTIONS,
+  PRODUCTION_FLOOR_OPTIONS,
+  productionFloorLabel,
+} from '@/shared/constants/productionFloors';
 import { userService, type User } from '@/shared/services/userService';
 import {
   Machine,
@@ -18,6 +22,17 @@ import {
   listMachines,
   updateMachine,
 } from '@/shared/services/phase3CatalogService';
+import { MachinePrintItem } from '@/shared/utils/qzMachinePrint';
+import { MachinePrintSettingsModal } from './MachinePrintSettingsModal';
+
+function machinePrintItem(machine: Machine): MachinePrintItem {
+  const barcode = (machine.barcode || machine.id || '').trim();
+  return {
+    name: machine.name,
+    barcode,
+    floorLabel: productionFloorLabel(machine.floor) || machine.floor || '—',
+  };
+}
 
 interface ExcelRow {
   'ID'?: string;
@@ -55,12 +70,6 @@ const formatDate = (value?: string | null): string => {
   return value.split('T')[0];
 };
 
-const departmentLabel = (value?: string) =>
-  PROCESS_DEPARTMENTS.find((d) => d.value === value)?.label || value || '—';
-
-const machineTypeLabel = (value?: string) =>
-  MACHINE_TYPE_OPTIONS.find((d) => d.value === value)?.label || value || '—';
-
 const toExportRow = (machine: Machine, userEmailById: Map<string, string>) => ({
   'ID': machine.id,
   'Name': machine.name,
@@ -81,20 +90,61 @@ const toExportRow = (machine: Machine, userEmailById: Map<string, string>) => ({
 const dataColumns: UiTableColumn<Machine>[] = [
   { key: 'name', label: 'Name', render: (row) => <span className="font-bold text-gray-900">{row.name}</span> },
   { key: 'code', label: 'Code', render: (row) => row.code || '—' },
-  { key: 'machineType', label: 'Type', render: (row) => machineTypeLabel(row.machineType) },
-  { key: 'department', label: 'Department', render: (row) => departmentLabel(row.department) },
-  { key: 'floor', label: 'Floor', render: (row) => row.floor || '—' },
+  { key: 'floor', label: 'Floor', render: (row) => productionFloorLabel(row.floor) || '—' },
+  {
+    key: 'equipmentRole',
+    label: 'Equipment',
+    render: (row) => (row.equipmentRole === 'table' ? 'Table' : row.equipmentRole === 'machine' ? 'Machine' : '—'),
+  },
   { key: 'supervisor', label: 'Supervisor', render: (row) => getUserDisplay(row.assignedSupervisor) },
 ];
 
 export default function MachinesPage() {
   const { canCreate, canUpdate, canDelete, canImport, guardDelete } = useCatalogCrud('machines');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [printQueue, setPrintQueue] = useState<MachinePrintItem[] | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filterFloor, setFilterFloor] = useState('');
+  const [filterEquipment, setFilterEquipment] = useState<'machine' | 'table' | ''>('');
+
+  const fetchMachines = useCallback(
+    async (params: { page: number; limit: number; search: string }) => {
+      const data = await listMachines({
+        page: params.page,
+        limit: params.limit,
+        search: params.search,
+        ...(filterFloor ? { floor: filterFloor } : {}),
+        ...(filterEquipment ? { equipmentRole: filterEquipment } : {}),
+      });
+      return {
+        results: data.results,
+        totalPages: data.totalPages,
+        totalResults: data.totalResults,
+      };
+    },
+    [filterFloor, filterEquipment],
+  );
 
   const list = useCatalogListState<Machine>({
-    fetchFn: listMachines,
+    fetchFn: fetchMachines,
     errorMessage: 'Failed to fetch machines',
   });
+
+  useEffect(() => {
+    list.setCurrentPage(1);
+    list.clearSelection();
+  }, [filterFloor, filterEquipment]);
+
+  const hasActiveFilters = Boolean(filterFloor || filterEquipment);
+
+  const clearFilters = () => {
+    setFilterFloor('');
+    setFilterEquipment('');
+    list.setCurrentPage(1);
+  };
+
+  const filterFieldClass =
+    'rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[11px] font-medium text-gray-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary';
 
   const handleDelete = async (id: string) => {
     if (!guardDelete()) return;
@@ -312,6 +362,28 @@ export default function MachinesPage() {
     }
   };
 
+  const openPrint = (machines: Machine[]) => {
+    const rows = machines
+      .map(machinePrintItem)
+      .filter((row) => row.barcode);
+    if (!rows.length) {
+      toast.error('No barcode to print. Save the machine so it gets a scan id.');
+      return;
+    }
+    setPrintQueue(rows);
+  };
+
+  const openBulkPrint = () => {
+    const selected = list.selectedIds.length
+      ? list.rows.filter((row) => list.selectedIds.includes(row.id))
+      : list.rows;
+    if (!selected.length) {
+      toast.error('No machines on this page to print');
+      return;
+    }
+    openPrint(selected);
+  };
+
   const columns = buildCatalogTableColumns<Machine>({
     dataColumns,
     segment: 'machines',
@@ -319,6 +391,7 @@ export default function MachinesPage() {
     canUpdate,
     canDelete,
     onDelete: handleDelete,
+    onPrint: (row) => openPrint([row]),
   });
 
   return (
@@ -337,7 +410,7 @@ export default function MachinesPage() {
         }}
         helpContent={catalogHelpBlock(
           'Machines & Configuration',
-          'Manage production machines — type, department, capacity, maintenance schedules, and assigned supervisors.',
+          'Manage production machines — floor, equipment type, capacity, maintenance, and supervisors.',
           [
             'Search, paginate, and export machines',
             'Import via Excel (upsert by ID or name)',
@@ -354,6 +427,83 @@ export default function MachinesPage() {
         canCreate={canCreate}
         addHref="/catalog/machines/add"
         addLabel="Add Machine"
+        extraToolbarActions={(
+          <>
+            <button
+              type="button"
+              className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-[11px] font-bold ${
+                hasActiveFilters || filtersOpen
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+              aria-expanded={filtersOpen}
+              aria-label="Filter machines"
+              onClick={() => setFiltersOpen((open) => !open)}
+            >
+              <i className="ri-filter-3-line" aria-hidden />
+              Filters
+              {hasActiveFilters ? <span className="rounded-full bg-primary px-1.5 text-[9px] text-white">On</span> : null}
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-[11px] font-bold text-white"
+              aria-label="Print machine barcodes"
+              onClick={openBulkPrint}
+            >
+              <i className="ri-barcode-line" aria-hidden />
+              Print barcode
+            </button>
+          </>
+        )}
+        toolbarFooter={
+          filtersOpen ? (
+            <div className="flex flex-wrap items-end gap-3 border-t border-gray-100 pt-3">
+              <label className="flex min-w-[160px] flex-col gap-1 text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                Production floor
+                <select
+                  className={filterFieldClass}
+                  aria-label="Filter by production floor"
+                  value={filterFloor}
+                  onChange={(event) => setFilterFloor(event.target.value)}
+                >
+                  <option value="">All floors</option>
+                  {PRODUCTION_FLOOR_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex min-w-[140px] flex-col gap-1 text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                Equipment
+                <select
+                  className={filterFieldClass}
+                  aria-label="Filter by equipment type"
+                  value={filterEquipment}
+                  onChange={(event) =>
+                    setFilterEquipment(event.target.value as '' | 'machine' | 'table')
+                  }
+                >
+                  <option value="">Machine & table</option>
+                  {EQUIPMENT_ROLE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {hasActiveFilters ? (
+                <button
+                  type="button"
+                  className="rounded-md border border-gray-200 px-2.5 py-1.5 text-[11px] font-medium text-gray-600 hover:bg-gray-50"
+                  onClick={clearFilters}
+                >
+                  Clear filters
+                </button>
+              ) : null}
+            </div>
+          ) : null
+        }
         canDelete={canDelete}
         selectedCount={list.selectedIds.length}
         onBulkDelete={handleDeleteSelected}
@@ -380,6 +530,9 @@ export default function MachinesPage() {
         emptyIcon="ri-settings-3-line"
         emptyAddLabel="Add First Machine"
       />
+      {printQueue ? (
+        <MachinePrintSettingsModal machines={printQueue} onClose={() => setPrintQueue(null)} />
+      ) : null}
     </>
   );
 }

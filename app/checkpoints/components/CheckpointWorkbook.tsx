@@ -25,7 +25,7 @@ interface CheckpointWorkbookProps {
 }
 
 /**
- * One module as a sheet: toolbar, frozen grid, and workbook tabs.
+ * One module as a sheet: workbook tabs, toolbar, and frozen grid.
  */
 export default function CheckpointWorkbook({
   modules,
@@ -65,6 +65,13 @@ export default function CheckpointWorkbook({
       className="mb-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[#c8ccd3] bg-white shadow-sm dark:border-[#3a3a3c] dark:bg-[#1c1c1e]"
       aria-label={`${selected.name} checklist`}
     >
+      <CheckpointSheetTabs
+        modules={modules}
+        selectedId={selected.id}
+        canManage={canManage}
+        onSelect={onSelect}
+        onAddModule={onAddModule}
+      />
       <CheckpointSheetBar
         name={selected.name}
         done={done}
@@ -93,13 +100,6 @@ export default function CheckpointWorkbook({
           onLogs={onLogs}
         />
       </div>
-      <CheckpointSheetTabs
-        modules={modules}
-        selectedId={selected.id}
-        canManage={canManage}
-        onSelect={onSelect}
-        onAddModule={onAddModule}
-      />
     </section>
   );
 }

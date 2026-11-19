@@ -5,7 +5,6 @@ import Seo from '@/shared/layout-components/seo/seo';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { FactoryDrawer, DrawerSection } from '@/shared/components/factory/FactoryDrawer';
 import { factoryRequest } from '@/shared/services/factoryApi';
-import { listProductionRacks, ProductionRack } from '@/shared/services/phase3CatalogService';
 import { FloorBundle } from '@/app/production/floor/shared/StationPage';
 import { CompletedQueueTable, CompletedRow } from '@/app/production/floor/shared/CompletedQueueTable';
 import { EmptyQueue, QueueTabs } from '@/app/production/floor/shared/QueueTabs';
@@ -20,7 +19,7 @@ interface Board {
 }
 
 /**
- * Final QC for a thread-cut bundle. Six counts must sum to the bundle.
+ * Final QC for a thread-cut bundle. Enter defect qty; good is computed from bundle total.
  */
 export default function FinalQcPage() {
   const [rows, setRows] = useState<FloorBundle[]>([]);
@@ -125,37 +124,37 @@ function Tile({ label, value }: { label: string; value: number }) {
 }
 
 /**
- * Six counts and a rack for each defect that is above zero.
+ * Defect grades only; good qty is derived from the bundle total.
  */
 function QcDrawer({ bundle, onClose, onChanged }: { bundle: FloorBundle | null; onClose: () => void; onChanged: () => Promise<void> }) {
-  const [good, setGood] = useState('0');
   const [grades, setGrades] = useState<Record<string, string>>({ long: '0', hemming: '0', sporting: '0', diving: '0', rejection: '0' });
-  const [racks, setRacks] = useState<Record<string, string>>({ long: '', hemming: '', sporting: '', diving: '', rejection: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [rackOptions, setRackOptions] = useState<ProductionRack[]>([]);
 
   useEffect(() => {
     if (!bundle) return;
-    setGood(String(bundle.qty));
     setGrades({ long: '0', hemming: '0', sporting: '0', diving: '0', rejection: '0' });
-    setRacks({ long: '', hemming: '', sporting: '', diving: '', rejection: '' });
     setError('');
-    listProductionRacks({ page: 1, limit: 200, status: 'active' })
-      .then((page) => setRackOptions(page.results || []))
-      .catch(() => setRackOptions([]));
   }, [bundle]);
 
   if (!bundle) return null;
 
+  const defectSum = GRADES.reduce((sum, grade) => sum + (Number(grades[grade]) || 0), 0);
+  const good = Math.max(0, (bundle.qty || 0) - defectSum);
+  const sumOk = defectSum <= (bundle.qty || 0);
+
   /**
-   * Saves the six counts for this bundle.
+   * Saves defect counts; good is computed server-side.
    */
   const save = async () => {
+    if (!sumOk) {
+      setError(`Defects cannot exceed bundle qty ${bundle.qty}.`);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
-      const body: Record<string, unknown> = { bundleBarcode: bundle.barcode, good: Number(good), racks };
+      const body: Record<string, unknown> = { bundleBarcode: bundle.barcode };
       for (const grade of GRADES) body[grade] = Number(grades[grade] || 0);
       await factoryRequest('/quality/final-qc', { method: 'POST', body: JSON.stringify(body) });
       await onChanged();
@@ -171,43 +170,32 @@ function QcDrawer({ bundle, onClose, onChanged }: { bundle: FloorBundle | null; 
     <FactoryDrawer open title="Final QC" subtitle={bundle.barcode} onClose={onClose}>
       <DrawerSection title={bundle.orderNumber || 'Bundle'}>
         <form className="grid gap-3 p-3" onSubmit={(event) => { event.preventDefault(); save().catch(() => undefined); }}>
-          <p className="text-[12px] text-gray-600">Counts must sum to {bundle.qty}.</p>
-          <label className="text-[11px] font-bold text-[#495057]" htmlFor="fqGood">Good</label>
-          <input id="fqGood" aria-label="Good quantity" className={fieldClass} inputMode="numeric" value={good} onChange={(event) => setGood(event.target.value)} required />
+          <p className="text-[12px] text-gray-600">
+            Enter defect qty only. Good is <strong>{good}</strong> of <strong>{bundle.qty}</strong> (auto).
+          </p>
+          <p className={`text-[11px] font-medium ${sumOk ? 'text-green-700' : 'text-red-600'}`} aria-live="polite">
+            Defects: {defectSum} · Good to ironing: {good}
+          </p>
           {GRADES.map((grade) => (
-            <div key={grade} className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[11px] font-bold capitalize text-[#495057]" htmlFor={`fq-${grade}`}>{grade}</label>
-                <input id={`fq-${grade}`} aria-label={`${grade} quantity`} className={fieldClass} inputMode="numeric" value={grades[grade]} onChange={(event) => setGrades((current) => ({ ...current, [grade]: event.target.value }))} />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-[#495057]" htmlFor={`fq-rack-${grade}`}>Rack</label>
-                <input
-                  id={`fq-rack-${grade}`}
-                  aria-label={`${grade} rack`}
-                  className={fieldClass}
-                  value={racks[grade]}
-                  autoComplete="off"
-                  onChange={(event) => setRacks((current) => ({ ...current, [grade]: event.target.value }))}
-                />
-                <select
-                  aria-label={`${grade} rack list`}
-                  className={`${fieldClass} mt-1`}
-                  value={racks[grade]}
-                  onChange={(event) => setRacks((current) => ({ ...current, [grade]: event.target.value }))}
-                >
-                  <option value="">Select rack</option>
-                  {rackOptions.map((rack) => (
-                    <option key={rack.id} value={rack.code}>
-                      {rack.name} · {rack.code}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div key={grade}>
+              <label className="text-[11px] font-bold capitalize text-[#495057]" htmlFor={`fq-${grade}`}>
+                {grade} (defect qty)
+              </label>
+              <input
+                id={`fq-${grade}`}
+                aria-label={`${grade} defect quantity`}
+                className={fieldClass}
+                inputMode="numeric"
+                min={0}
+                value={grades[grade]}
+                onChange={(event) => setGrades((current) => ({ ...current, [grade]: event.target.value }))}
+              />
             </div>
           ))}
           <p className="text-[11px] text-gray-600">After save, good bundles stay on their rack and show under Production → Ironing → Upcoming.</p>
-          <button type="submit" className="rounded bg-purple-600 px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-60" disabled={loading}>Save</button>
+          <button type="submit" className="rounded bg-purple-600 px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-60" disabled={loading || !sumOk}>
+            Save
+          </button>
           {error ? <p className="text-[12px] text-red-600" role="alert">{error}</p> : null}
         </form>
       </DrawerSection>

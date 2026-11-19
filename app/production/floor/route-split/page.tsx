@@ -17,6 +17,7 @@ export default function RouteSplitPage() {
       start="none"
       place="count"
       stationLabel="Count"
+      floorStage="iron-after"
     />
   );
 }

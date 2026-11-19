@@ -6,19 +6,19 @@ import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermissio
 import { CatalogMasterFormPage } from '@/shared/components/catalog/CatalogMasterFormPage';
 import { UiFormFooter } from '@/shared/components/ui';
 import { PRODUCTION_STOCK_TYPE_OPTIONS } from '@/shared/constants/handkerchiefCatalog';
+import { PRODUCTION_FLOOR_OPTIONS } from '@/shared/constants/productionFloors';
 import { createProductionRack } from '@/shared/services/phase3CatalogService';
 
-const AddStorageRackPage = () => {
+const AddProductionRackPage = () => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     code: '',
     name: '',
-    floor: 'production',
+    floor: '',
     zone: '',
     stockType: '' as '' | 'fabric' | 'wip-bundle' | 'finished-carton',
     capacity: '',
-    barcode: '',
     status: 'active' as 'active' | 'inactive',
   });
 
@@ -53,7 +53,6 @@ const AddStorageRackPage = () => {
         zone: formData.zone.trim(),
         stockType: formData.stockType || undefined,
         capacity,
-        barcode: formData.barcode.trim(),
         status: formData.status,
       });
       toast.success('Production rack created successfully');
@@ -86,8 +85,13 @@ const AddStorageRackPage = () => {
             <input type="text" id="name" name="name" className="form-control" placeholder="Rack name" value={formData.name} onChange={handleInputChange} required />
           </div>
           <div className="form-group">
-            <label htmlFor="floor" className="form-label">Floor</label>
-            <input type="text" id="floor" name="floor" className="form-control" placeholder="Floor" value={formData.floor} onChange={handleInputChange} />
+            <label htmlFor="floor" className="form-label">Production floor</label>
+            <select id="floor" name="floor" className="form-select" value={formData.floor} onChange={handleInputChange}>
+              <option value="">Select floor</option>
+              {PRODUCTION_FLOOR_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
             <label htmlFor="zone" className="form-label">Zone</label>
@@ -105,10 +109,6 @@ const AddStorageRackPage = () => {
           <div className="form-group">
             <label htmlFor="capacity" className="form-label">Capacity</label>
             <input type="number" id="capacity" name="capacity" className="form-control" min="0" placeholder="Capacity" value={formData.capacity} onChange={handleInputChange} />
-          </div>
-          <div className="form-group">
-            <label htmlFor="barcode" className="form-label">Barcode</label>
-            <input type="text" id="barcode" name="barcode" className="form-control" placeholder="Barcode" value={formData.barcode} onChange={handleInputChange} />
           </div>
           <div className="form-group">
             <label htmlFor="status" className="form-label">Status</label>

@@ -17,6 +17,7 @@ export function buildCatalogTableColumns<T extends { id: string | number; status
   getEditHref?: (row: T) => string;
   onDelete: (id: string) => void;
   onReplicate?: (row: T) => void;
+  onPrint?: (row: T) => void;
   replicateLoadingId?: string | null;
   deleteDisabled?: (row: T) => boolean;
   deleteLoading?: (row: T) => boolean;
@@ -31,7 +32,7 @@ export function buildCatalogTableColumns<T extends { id: string | number; status
     });
   }
 
-  if (options.canUpdate || options.canDelete || options.canReplicate) {
+  if (options.canUpdate || options.canDelete || options.canReplicate || options.onPrint) {
     cols.push({
       key: 'actions',
       label: 'Actions',
@@ -43,6 +44,7 @@ export function buildCatalogTableColumns<T extends { id: string | number; status
           editHref={options.getEditHref?.(row) ?? `${options.basePath}/edit/${row.id}`}
           onDelete={() => options.onDelete(String(row.id))}
           onReplicate={options.canReplicate && options.onReplicate ? () => options.onReplicate!(row) : undefined}
+          onPrint={options.onPrint ? () => options.onPrint!(row) : undefined}
           replicateLoading={options.replicateLoadingId === row.id}
           deleteDisabled={options.deleteDisabled?.(row)}
           deleteLoading={options.deleteLoading?.(row)}

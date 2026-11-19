@@ -4,7 +4,9 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FactoryDrawer, DrawerSection } from '@/shared/components/factory/FactoryDrawer';
 import { factoryRequest } from '@/shared/services/factoryApi';
-import { listMachines, listProductionRacks, Machine, ProductionRack } from '@/shared/services/phase3CatalogService';
+import { listProductionRacks, Machine, ProductionRack } from '@/shared/services/phase3CatalogService';
+import { floorEquipmentFilter } from '@/shared/constants/productionFloors';
+import { loadFloorMachines } from '../shared/floorCatalogCache';
 import { CutBundle } from './types';
 
 const fieldClass =
@@ -48,9 +50,12 @@ export function CutJobDrawer({
 
   useEffect(() => {
     if (!jobKey) return;
-    Promise.all([listMachines({ page: 1, limit: 200, status: 'active' }), listProductionRacks({ page: 1, limit: 200, status: 'active' })])
-      .then(([machinePage, rackPage]) => {
-        setMachines(machinePage.results || []);
+    Promise.all([
+      loadFloorMachines(floorEquipmentFilter('thread-cutting')),
+      listProductionRacks({ page: 1, limit: 200, status: 'active' }),
+    ])
+      .then(([machineRows, rackPage]) => {
+        setMachines(machineRows);
         setRacks((rackPage.results || []).filter((rack) => rack.stockType === 'bundles'));
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Could not load tables'));

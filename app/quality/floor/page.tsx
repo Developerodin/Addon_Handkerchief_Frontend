@@ -163,6 +163,7 @@ export default function FloorChecksPage() {
   const bundleQty = selected?.qty ?? orderBundles.find((b) => b.id === bundleId)?.qty ?? 0;
   const sum = (Number(goodQty) || 0) + (Number(m2Qty) || 0) + (Number(m4Qty) || 0);
   const sumOk = bundleQty > 0 && sum === bundleQty;
+  const toNextFloor = (Number(goodQty) || 0);
 
   const pickable = useMemo(
     () => [...(board.results || []), ...(board.pendingPlacement || [])],
@@ -413,6 +414,9 @@ export default function FloorChecksPage() {
                   <CompletedQueueTable
                     rows={board.completed || []}
                     codeLabel="Bundle"
+                    qtyIsTransferable
+                    qtyColumnLabel="To next floor"
+                    showGood
                     showM2
                     showM4
                     showNextStep
@@ -512,22 +516,56 @@ export default function FloorChecksPage() {
                     </p>
                   </div>
                   <p className="text-[11px] text-gray-600">
-                    Good + M2 + M4 must equal <strong>{bundleQty}</strong>. M2 and M4 are recorded but still count toward the bundle total.
+                    Good + M2 + M4 must equal <strong>{bundleQty}</strong> (labeled bundle size). Only <strong>Good</strong> moves to
+                    horizontal hemming; M2 and M4 do not transfer.
                   </p>
                   <label>
-                    <span className={labelClass}>Good qty</span>
-                    <input className={fieldClass} type="number" min={0} value={goodQty} onChange={(e) => setGoodQty(e.target.value)} />
-                  </label>
-                  <label>
                     <span className={labelClass}>M2 qty</span>
-                    <input className={fieldClass} type="number" min={0} value={m2Qty} onChange={(e) => setM2Qty(e.target.value)} />
+                    <input
+                      className={fieldClass}
+                      type="number"
+                      min={0}
+                      value={m2Qty}
+                      onChange={(e) => {
+                        const m2 = Math.max(0, Number(e.target.value) || 0);
+                        const m4 = Math.max(0, Number(m4Qty) || 0);
+                        setM2Qty(e.target.value);
+                        setGoodQty(String(Math.max(0, bundleQty - m2 - m4)));
+                      }}
+                    />
                   </label>
                   <label>
                     <span className={labelClass}>M4 qty</span>
-                    <input className={fieldClass} type="number" min={0} value={m4Qty} onChange={(e) => setM4Qty(e.target.value)} />
+                    <input
+                      className={fieldClass}
+                      type="number"
+                      min={0}
+                      value={m4Qty}
+                      onChange={(e) => {
+                        const m4 = Math.max(0, Number(e.target.value) || 0);
+                        const m2 = Math.max(0, Number(m2Qty) || 0);
+                        setM4Qty(e.target.value);
+                        setGoodQty(String(Math.max(0, bundleQty - m2 - m4)));
+                      }}
+                    />
+                  </label>
+                  <label>
+                    <span className={labelClass}>Good qty (to next floor)</span>
+                    <input
+                      className={fieldClass}
+                      type="number"
+                      min={0}
+                      value={goodQty}
+                      onChange={(e) => setGoodQty(e.target.value)}
+                    />
                   </label>
                   <p className={`text-[11px] font-medium ${sumOk ? 'text-green-700' : 'text-red-600'}`}>
-                    Total: {sum} / {bundleQty} {sumOk ? '✓' : ''}
+                    Split: {sum} / {bundleQty} {sumOk ? '✓' : ''}
+                    {sumOk ? (
+                      <span className="ml-2 text-gray-700">
+                        → <strong>{toNextFloor}</strong> pcs to horizontal hemming
+                      </span>
+                    ) : null}
                   </p>
                   <div className="flex justify-between gap-2 border-t border-gray-200 pt-3">
                     <UiButton type="button" variant="secondary" onClick={() => setStep('pick')}>

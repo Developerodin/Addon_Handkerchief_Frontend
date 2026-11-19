@@ -159,6 +159,7 @@ export default function SinglePiecePage() {
           piece={job}
           placeBundle={placeBundle}
           waiting={board.results}
+          active={board.active}
           openBundles={board.openBundles}
           onClose={() => {
             setJob(null);

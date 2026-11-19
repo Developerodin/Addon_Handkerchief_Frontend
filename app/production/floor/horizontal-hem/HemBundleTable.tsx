@@ -30,7 +30,7 @@ export function HemBundleTable({
         <table className="w-full border-collapse border border-gray-200">
           <thead>
             <tr className="bg-gray-50/30">
-              {['Bundle', 'Order', 'Qty', 'Rack'].map((label, index) => (
+              {['Bundle', 'Order', 'Good qty', 'Rack'].map((label, index) => (
                 <th key={label} className={`${headClass} ${index === 0 ? 'pl-[10px]' : ''}`}>
                   {label}
                 </th>
@@ -71,7 +71,7 @@ export function HemBundleTable({
           <table className="w-full border-collapse border border-gray-200">
             <thead>
               <tr className="bg-gray-50/30">
-                {['Bundle', 'Order', 'Qty', 'Machine'].map((label) => (
+                {['Bundle', 'Order', 'Good qty', 'Machine'].map((label) => (
                   <th key={label} className={headClass}>
                     {label}
                   </th>

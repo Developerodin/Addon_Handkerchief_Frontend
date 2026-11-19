@@ -17,6 +17,7 @@ export interface BundleRow {
   orderNumber: string;
   number: number;
   qty: number;
+  m4Qty?: number;
   closed: boolean;
   rackCode: string;
   checkedGood: boolean;

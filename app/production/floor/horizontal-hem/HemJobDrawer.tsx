@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FactoryDrawer, DrawerSection } from '@/shared/components/factory/FactoryDrawer';
 import { factoryRequest } from '@/shared/services/factoryApi';
 import { Machine, ProductionRack } from '@/shared/services/phase3CatalogService';
+import { floorEquipmentFilter } from '@/shared/constants/productionFloors';
 import { loadFloorMachines, loadFloorStorageRacks } from '../shared/floorCatalogCache';
 import { HemBundle } from './types';
 
@@ -52,7 +53,10 @@ export function HemJobDrawer({
   useEffect(() => {
     if (!bundle) return;
     let cancelled = false;
-    Promise.all([loadFloorMachines(), loadFloorStorageRacks()])
+    Promise.all([
+      loadFloorMachines(floorEquipmentFilter('horizontal-hem')),
+      loadFloorStorageRacks(),
+    ])
       .then(([machineRows, rackRows]) => {
         if (cancelled) return;
         setMachines(machineRows);

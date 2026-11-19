@@ -17,6 +17,7 @@ export default function IronAfterPage() {
       start="rack-machine"
       place="bundles"
       stationLabel="Iron"
+      floorStage="iron-after"
     />
   );
 }

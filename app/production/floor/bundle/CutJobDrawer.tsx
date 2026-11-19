@@ -1,10 +1,14 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FactoryDrawer, DrawerSection } from '@/shared/components/factory/FactoryDrawer';
 import { factoryRequest } from '@/shared/services/factoryApi';
-import { listMachines, listProductionRacks, Machine, ProductionRack } from '@/shared/services/phase3CatalogService';
+import { listProductionRacks, Machine, ProductionRack } from '@/shared/services/phase3CatalogService';
+import { floorEquipmentFilter } from '@/shared/constants/productionFloors';
+import { loadFloorMachines } from '../shared/floorCatalogCache';
 import { BundleLabel } from './BundleLabel';
+import { formatBundleProjection, projectPourGood, SINGLE_PIECE_BUNDLE_SIZE } from './bundleProjection';
+import { emptyPieceCount, goodQtyFromEntry, m4QtyFromEntry, type PieceCountEntry } from './pieceCounts';
 import { BundleRow, CutPieceRow, CutResult } from './types';
 
 const fieldClass =
@@ -17,6 +21,7 @@ export function CutJobDrawer({
   piece,
   placeBundle,
   waiting,
+  active,
   openBundles,
   onClose,
   onChanged,
@@ -24,6 +29,7 @@ export function CutJobDrawer({
   piece: CutPieceRow | null;
   placeBundle: BundleRow | null;
   waiting: CutPieceRow[];
+  active: CutPieceRow[];
   openBundles: BundleRow[];
   onClose: () => void;
   onChanged: () => Promise<void>;
@@ -33,7 +39,8 @@ export function CutJobDrawer({
   const [rackCode, setRackCode] = useState('');
   const [extraScan, setExtraScan] = useState('');
   const [tableBarcode, setTableBarcode] = useState('');
-  const [counts, setCounts] = useState<Record<string, { good: string; m4: string }>>({});
+  const [counts, setCounts] = useState<Record<string, PieceCountEntry>>({});
+  const [leftoverM4Qty, setLeftoverM4Qty] = useState('');
   const [labels, setLabels] = useState<BundleRow[]>([]);
   const [openBundle, setOpenBundle] = useState<BundleRow | null>(null);
   const [destRack, setDestRack] = useState('');
@@ -47,7 +54,17 @@ export function CutJobDrawer({
 
   useEffect(() => {
     if (!jobKey) return;
-    setPieces(piece ? [piece] : []);
+    if (piece) {
+      const onTable =
+        piece.status === 'in-work'
+          ? active.filter(
+              (row) => row.status === 'in-work' && row.orderId === piece.orderId && row.machineBarcode === piece.machineBarcode
+            )
+          : [piece];
+      setPieces(onTable.length ? onTable : [piece]);
+    } else {
+      setPieces([]);
+    }
     setPhase(placeBundle ? 'done' : piece?.status === 'in-work' ? 'count' : 'start');
     setLabels(placeBundle ? [placeBundle] : []);
     setOpenBundle(openBundles.find((row) => row.orderId === (piece?.orderId || placeBundle?.orderId)) || null);
@@ -59,19 +76,64 @@ export function CutJobDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobKey]);
 
+  const orderId = piece?.orderId || placeBundle?.orderId || '';
+
+  useEffect(() => {
+    if (!orderId || phase === 'start') return;
+    const latest = openBundles.find((row) => row.orderId === orderId) || null;
+    setOpenBundle(latest);
+  }, [openBundles, orderId, phase]);
+
   useEffect(() => {
     if (!jobKey) return;
-    Promise.all([listMachines({ page: 1, limit: 200, status: 'active' }), listProductionRacks({ page: 1, limit: 200, status: 'active' })])
-      .then(([machinePage, rackPage]) => {
-        setMachines(machinePage.results || []);
+    Promise.all([
+      loadFloorMachines(floorEquipmentFilter('single-piece-cutting')),
+      listProductionRacks({ page: 1, limit: 200, status: 'active' }),
+    ])
+      .then(([machineRows, rackPage]) => {
+        setMachines(machineRows);
         setRacks(rackPage.results || []);
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Could not load tables'));
   }, [jobKey]);
 
+  const orderBundleRows = useMemo(() => {
+    const byId = new Map<string, BundleRow>();
+    for (const row of labels) {
+      if (row.orderId === orderId) byId.set(row.id, row);
+    }
+    for (const row of openBundles) {
+      if (row.orderId === orderId) byId.set(row.id, row);
+    }
+    if (openBundle?.orderId === orderId) byId.set(openBundle.id, openBundle);
+    return [...byId.values()].sort((a, b) => (a.number || 0) - (b.number || 0));
+  }, [labels, openBundles, openBundle, orderId]);
+
+  const cutPreview = useMemo(() => {
+    if (phase !== 'count') return null;
+    const openQty = openBundle?.qty || 0;
+    let sealedFull = 0;
+    let openAfter = openQty;
+    let cursorOpen = openQty;
+    for (const row of pieces) {
+      const entry = counts[row.barcode] || emptyPieceCount();
+      const good = goodQtyFromEntry(entry);
+      if (!Number.isInteger(good) || good < 0) continue;
+      const step = projectPourGood(cursorOpen, good);
+      sealedFull += step.sealedFull;
+      openAfter = step.openAfter;
+      cursorOpen = step.openAfter;
+    }
+    return { sealedFull, openAfter, text: formatBundleProjection(sealedFull, openAfter) };
+  }, [phase, pieces, counts, openBundle?.qty]);
+
+  const printableBundles = useMemo(
+    () => labels.filter((row) => row.closed && row.barcode),
+    [labels]
+  );
+
   if (!piece && !placeBundle) return null;
 
-  const orderId = piece?.orderId || placeBundle?.orderId || '';
   const bundleRacks = racks.filter((rack) => rack.stockType === 'bundles');
 
   /**
@@ -92,6 +154,47 @@ export function CutJobDrawer({
     setPieces((rows) => [...rows, match]);
     setExtraScan('');
     setError('');
+  };
+
+  /**
+   * Adds another hemmed piece onto the same table while counting.
+   */
+  const addPieceToTable = async () => {
+    const needle = extraScan.trim().toLowerCase();
+    const match = waiting.find((row) => row.barcode.toLowerCase() === needle);
+    if (!match) {
+      setError('This piece is not on a rack for single piece cutting');
+      return;
+    }
+    if (match.orderId !== orderId) {
+      setError('Pieces on one table must be the same order');
+      return;
+    }
+    if (pieces.some((row) => row.barcode === match.barcode)) return;
+    const machineBarcode = pieces[0]?.machineBarcode || tableBarcode;
+    if (!machineBarcode) {
+      setError('Table is required');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const started = await factoryRequest<CutPieceRow[]>('/production/single-piece/start', {
+        method: 'POST',
+        body: JSON.stringify({
+          pieceBarcodes: [match.barcode],
+          rackCode: match.rackCode,
+          machineBarcode,
+        }),
+      });
+      setPieces((rows) => [...rows, ...started.map((row) => ({ ...row, status: 'in-work' as const }))]);
+      setExtraScan('');
+      await onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not add this piece');
+    } finally {
+      setLoading(false);
+    }
   };
 
   /**
@@ -122,18 +225,85 @@ export function CutJobDrawer({
   /**
    * Cuts the table pieces. Full bundles of 60 come back with a barcode.
    */
+  const pieceEntry = (barcode: string): PieceCountEntry => counts[barcode] || emptyPieceCount();
+
+  const addBundleLine = (barcode: string) => {
+    setCounts((current) => {
+      const entry = current[barcode] || emptyPieceCount();
+      return { ...current, [barcode]: { ...entry, bundleLines: [...entry.bundleLines, SINGLE_PIECE_BUNDLE_SIZE] } };
+    });
+  };
+
+  const updateBundleLine = (barcode: string, index: number, value: string) => {
+    if (value !== '' && !/^\d+$/.test(value)) return;
+    if (value !== '') {
+      const qty = Number(value);
+      if (qty < 1 || qty > SINGLE_PIECE_BUNDLE_SIZE) return;
+    }
+    setCounts((current) => {
+      const entry = current[barcode] || emptyPieceCount();
+      const bundleLines = [...entry.bundleLines];
+      bundleLines[index] = value === '' ? SINGLE_PIECE_BUNDLE_SIZE : Number(value);
+      return { ...current, [barcode]: { ...entry, bundleLines } };
+    });
+  };
+
+  const removeBundleLine = (barcode: string, index: number) => {
+    setCounts((current) => {
+      const entry = current[barcode] || emptyPieceCount();
+      return { ...current, [barcode]: { ...entry, bundleLines: entry.bundleLines.filter((_, i) => i !== index) } };
+    });
+  };
+
+  const reclassifyLeftoverAsM4 = async (all: boolean) => {
+    if (!orderId || !openBundle?.qty) {
+      setError('There is no leftover good quantity in the open bundle');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const body: { orderId: string; all?: boolean; qty?: number } = { orderId };
+      if (all) {
+        body.all = true;
+      } else {
+        const qty = Number(leftoverM4Qty);
+        if (!Number.isInteger(qty) || qty < 1 || qty > openBundle.qty) {
+          setError(`Enter leftover qty between 1 and ${openBundle.qty}`);
+          setLoading(false);
+          return;
+        }
+        body.qty = qty;
+      }
+      const updated = await factoryRequest<BundleRow>('/production/single-piece/open/reclassify-m4', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      setOpenBundle(updated);
+      setLeftoverM4Qty('');
+      await onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not mark leftover as M4');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const cut = async () => {
-    const rows = pieces.map((row) => ({
-      barcode: row.barcode,
-      goodQty: Number(counts[row.barcode]?.good ?? ''),
-      m4Qty: Number(counts[row.barcode]?.m4 ?? ''),
-    }));
+    const rows = pieces.map((row) => {
+      const entry = pieceEntry(row.barcode);
+      return {
+        barcode: row.barcode,
+        goodQty: goodQtyFromEntry(entry),
+        m4Qty: m4QtyFromEntry(entry),
+      };
+    });
     if (rows.some((row) => !Number.isInteger(row.goodQty) || !Number.isInteger(row.m4Qty) || row.goodQty < 0 || row.m4Qty < 0)) {
-      setError('Count must be a whole number');
+      setError('Bundle, leftover, and M4 must be whole numbers');
       return;
     }
     if (rows.some((row) => row.goodQty === 0 && row.m4Qty === 0)) {
-      setError('Count is required');
+      setError('Add at least one bundle line, leftover good, or M4');
       return;
     }
     setLoading(true);
@@ -143,7 +313,12 @@ export function CutJobDrawer({
         method: 'POST',
         body: JSON.stringify({ pieces: rows }),
       });
-      setLabels(result.closed || []);
+      const closed = result.closed || [];
+      setLabels((rows) => {
+        const byId = new Map(rows.map((row) => [row.id, row]));
+        for (const row of closed) byId.set(row.id, row);
+        return [...byId.values()].sort((a, b) => (a.number || 0) - (b.number || 0));
+      });
       setOpenBundle((result.open || []).find((row) => row.orderId === orderId) || null);
       setPhase('done');
       await onChanged();
@@ -157,7 +332,7 @@ export function CutJobDrawer({
   /**
    * Closes the open bundle at the counted quantity.
    */
-  const closeBundle = async () => {
+  const closeBundle = async (options?: { continueCutting?: boolean }) => {
     setLoading(true);
     setError('');
     try {
@@ -167,7 +342,7 @@ export function CutJobDrawer({
       });
       setLabels((rows) => [...rows, closed]);
       setOpenBundle(null);
-      setPhase('done');
+      setPhase(options?.continueCutting ? 'count' : 'done');
       await onChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not close the bundle');
@@ -177,10 +352,21 @@ export function CutJobDrawer({
   };
 
   /**
+   * Closes the partial open bundle early and keeps counting.
+   */
+  const sealPartialOpenBundle = () => {
+    if (!openBundle || openBundle.qty < 1) {
+      setError('Put at least one good handkerchief in the open bundle before sealing it');
+      return;
+    }
+    closeBundle({ continueCutting: true }).catch(() => undefined);
+  };
+
+  /**
    * Puts the printed bundles on a bundles rack.
    */
   const place = async () => {
-    const codes = labels.map((row) => row.barcode).filter(Boolean);
+    const codes = printableBundles.map((row) => row.barcode);
     if (!codes.length) {
       setError('Close the bundle before putting it on a rack');
       return;
@@ -268,37 +454,162 @@ export function CutJobDrawer({
               cut().catch(() => undefined);
             }}
           >
-            <p className="text-[12px] font-bold text-gray-900" aria-live="polite">
-              Open bundle {openBundle?.qty || 0} / 60
-            </p>
-            {pieces.map((row) => (
-              <fieldset key={row.barcode} className="grid gap-2 border border-gray-200 p-2">
-                <legend className="px-1 font-mono text-[11px] font-bold text-gray-900">{row.barcode}</legend>
-                <label className="text-[11px] font-bold text-[#495057]" htmlFor={`good-${row.barcode}`}>
-                  Good handkerchiefs
-                </label>
-                <input
-                  id={`good-${row.barcode}`}
-                  aria-label={`Good handkerchiefs ${row.barcode}`}
-                  className={fieldClass}
-                  inputMode="numeric"
-                  value={counts[row.barcode]?.good ?? ''}
-                  onChange={(event) => setCounts((current) => ({ ...current, [row.barcode]: { good: event.target.value, m4: current[row.barcode]?.m4 ?? '' } }))}
-                  required
+            <div className="rounded border border-purple-100 bg-purple-50/60 p-2">
+              <p className="text-[12px] font-bold text-gray-900" aria-live="polite">
+                Leftover good (open bundle): {openBundle?.qty || 0} / 60
+                {openBundle?.number ? ` · bundle #${openBundle.number}` : ''}
+              </p>
+              <p className="text-[10px] text-gray-600">Next piece on this order uses leftover good before starting new 60s.</p>
+              <p className="mt-1 text-[10px] text-gray-600">
+                One piece can fill many bundles: enter total good count (e.g. 600 → 10 bundles of 60) and press Cut.
+              </p>
+              {cutPreview?.text ? (
+                <p className="mt-1 text-[11px] font-bold text-purple-800" aria-live="polite">
+                  Cut will create: {cutPreview.text}
+                </p>
+              ) : null}
+              {orderBundleRows.length ? (
+                <ul className="mt-2 grid gap-1 border-t border-purple-100 pt-2">
+                  {orderBundleRows.map((bundle) => (
+                    <li key={bundle.id} className="flex flex-wrap items-baseline justify-between gap-2 text-[11px] text-gray-800">
+                      <span className="font-mono font-bold">{bundle.closed && bundle.barcode ? bundle.barcode : `Bundle #${bundle.number || '—'}`}</span>
+                      <span>
+                        {bundle.closed && bundle.qty === SINGLE_PIECE_BUNDLE_SIZE
+                          ? '60 in bundle'
+                          : `${bundle.qty} pcs`}
+                        {(bundle.m4Qty || 0) > 0 ? ` · M4 ${bundle.m4Qty}` : ''}
+                        {bundle.closed ? ' · closed' : ' · open leftover'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+            <label className="text-[11px] font-bold text-[#495057]" htmlFor="spCountExtra">
+              Another piece on this table
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="spCountExtra"
+                aria-label="Another piece barcode on table"
+                className={fieldClass}
+                value={extraScan}
+                autoComplete="off"
+                onChange={(event) => setExtraScan(event.target.value)}
+              />
+              <button
+                type="button"
+                className="rounded border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-bold text-[#495057] hover:bg-gray-50 disabled:opacity-60"
+                disabled={loading}
+                onClick={() => addPieceToTable().catch(() => undefined)}
+              >
+                Add piece
+              </button>
+            </div>
+            {openBundle && openBundle.qty > 0 && !openBundle.closed ? (
+              <div className="rounded border border-amber-200 bg-amber-50/80 p-2 text-[11px] text-amber-950">
+                <p className="font-bold">Saved from earlier: {openBundle.qty} good pcs in open bundle #{openBundle.number || '—'}</p>
+                <p className="mt-1 text-[10px]">Use on the next piece cut, or mark as M4 if not reusable.</p>
+                <LabelledLeftoverM4
+                  qty={openBundle.qty}
+                  m4FieldId="spOpenLeftoverM4"
+                  leftoverM4Qty={leftoverM4Qty}
+                  loading={loading}
+                  onQtyChange={setLeftoverM4Qty}
+                  onMarkAll={() => reclassifyLeftoverAsM4(true).catch(() => undefined)}
+                  onMarkPartial={() => reclassifyLeftoverAsM4(false).catch(() => undefined)}
                 />
-                <label className="text-[11px] font-bold text-[#495057]" htmlFor={`m4-${row.barcode}`}>
-                  M4
-                </label>
-                <input
-                  id={`m4-${row.barcode}`}
-                  aria-label={`M4 ${row.barcode}`}
-                  className={fieldClass}
-                  inputMode="numeric"
-                  value={counts[row.barcode]?.m4 ?? ''}
-                  onChange={(event) => setCounts((current) => ({ ...current, [row.barcode]: { good: current[row.barcode]?.good ?? '', m4: event.target.value } }))}
-                />
-              </fieldset>
-            ))}
+              </div>
+            ) : null}
+            {pieces.map((row) => {
+              const entry = pieceEntry(row.barcode);
+              return (
+                <fieldset key={row.barcode} className="grid gap-2 border border-gray-200 p-2">
+                  <legend className="px-1 font-mono text-[11px] font-bold text-gray-900">
+                    {row.barcode}
+                    {row.rollBarcode ? <span className="ml-2 font-sans font-medium text-gray-500">roll {row.rollBarcode}</span> : null}
+                  </legend>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold text-[#495057]">Bundles (60 each)</span>
+                    <button
+                      type="button"
+                      className="rounded border border-purple-200 bg-white px-2 py-1 text-[10px] font-bold text-purple-700 hover:bg-purple-50"
+                      onClick={() => addBundleLine(row.barcode)}
+                    >
+                      Add bundle
+                    </button>
+                  </div>
+                  {entry.bundleLines.length ? (
+                    <ul className="grid gap-1">
+                      {entry.bundleLines.map((lineQty, index) => (
+                        <li key={`${row.barcode}-${index}`} className="flex items-center gap-2">
+                          <span className="w-16 text-[10px] font-bold text-gray-500">#{index + 1}</span>
+                          <input
+                            aria-label={`Bundle ${index + 1} qty ${row.barcode}`}
+                            className={fieldClass}
+                            inputMode="numeric"
+                            value={lineQty}
+                            onChange={(event) => updateBundleLine(row.barcode, index, event.target.value)}
+                          />
+                          <button
+                            type="button"
+                            className="text-[10px] font-bold text-gray-400 hover:text-red-600"
+                            aria-label={`Remove bundle line ${index + 1}`}
+                            onClick={() => removeBundleLine(row.barcode, index)}
+                          >
+                            Remove
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-[10px] text-gray-500">Add a bundle line for each full 60, or use leftover only.</p>
+                  )}
+                  <label className="text-[11px] font-bold text-[#495057]" htmlFor={`left-${row.barcode}`}>
+                    Leftover good (saved for next piece)
+                  </label>
+                  <input
+                    id={`left-${row.barcode}`}
+                    aria-label={`Leftover good ${row.barcode}`}
+                    className={fieldClass}
+                    inputMode="numeric"
+                    value={entry.leftover}
+                    onChange={(event) =>
+                      setCounts((current) => ({
+                        ...current,
+                        [row.barcode]: { ...pieceEntry(row.barcode), leftover: event.target.value },
+                      }))
+                    }
+                  />
+                  <label className="text-[11px] font-bold text-[#495057]" htmlFor={`m4-${row.barcode}`}>
+                    M4 from this piece (not in bundle qty)
+                  </label>
+                  <input
+                    id={`m4-${row.barcode}`}
+                    aria-label={`M4 ${row.barcode}`}
+                    className={fieldClass}
+                    inputMode="numeric"
+                    value={entry.m4}
+                    onChange={(event) =>
+                      setCounts((current) => ({
+                        ...current,
+                        [row.barcode]: { ...pieceEntry(row.barcode), m4: event.target.value },
+                      }))
+                    }
+                  />
+                  {(() => {
+                    const good = goodQtyFromEntry(entry);
+                    if (!Number.isInteger(good) || good <= 0) return null;
+                    const projected = projectPourGood(openBundle?.qty || 0, good);
+                    return (
+                      <p className="text-[10px] font-medium text-purple-800">
+                        From this piece: {entry.bundleLines.length} bundle line(s) · {formatBundleProjection(projected.sealedFull, projected.openAfter)}
+                      </p>
+                    );
+                  })()}
+                </fieldset>
+              );
+            })}
             <button type="submit" className="rounded bg-purple-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm hover:bg-purple-700 disabled:opacity-60" disabled={loading}>
               Cut
             </button>
@@ -310,20 +621,62 @@ export function CutJobDrawer({
             >
               Close bundle
             </button>
+            <button
+              type="button"
+              className="rounded border border-purple-200 bg-white px-3 py-1.5 text-[11px] font-bold text-purple-700 hover:bg-purple-50 disabled:opacity-60"
+              disabled={loading || (openBundle?.qty || 0) < 1}
+              onClick={sealPartialOpenBundle}
+            >
+              Seal partial open bundle
+            </button>
           </form>
         </DrawerSection>
       ) : null}
       {phase === 'done' ? (
         <DrawerSection title="Bundle">
           <div className="grid gap-3 p-3">
-            {openBundle && !openBundle.closed ? (
-              <p className="text-[12px] font-bold text-gray-900">Open bundle {openBundle.qty} / 60</p>
+            {openBundle && !openBundle.closed && openBundle.qty > 0 ? (
+              <div className="rounded border border-amber-200 bg-amber-50/80 p-2">
+                <p className="text-[12px] font-bold text-gray-900">
+                  Leftover good: {openBundle.qty} pcs in open bundle #{openBundle.number || '—'}
+                </p>
+                <p className="text-[10px] text-gray-600">Scan the next piece on this order to use this qty, or mark as M4.</p>
+                <LabelledLeftoverM4
+                  qty={openBundle.qty}
+                  m4FieldId="spDoneLeftoverM4"
+                  leftoverM4Qty={leftoverM4Qty}
+                  loading={loading}
+                  onQtyChange={setLeftoverM4Qty}
+                  onMarkAll={() => reclassifyLeftoverAsM4(true).catch(() => undefined)}
+                  onMarkPartial={() => reclassifyLeftoverAsM4(false).catch(() => undefined)}
+                />
+              </div>
             ) : null}
-            {labels.map((bundle) => (
+            {orderBundleRows.length > 1 ? (
+              <ul className="grid gap-1 rounded border border-gray-100 bg-gray-50/80 p-2">
+                {orderBundleRows.map((bundle) => (
+                  <li key={bundle.id} className="flex flex-wrap justify-between gap-2 text-[11px] text-gray-800">
+                    <span className="font-mono font-bold">{bundle.barcode || `Bundle #${bundle.number}`}</span>
+                    <span>
+                      {bundle.closed && bundle.qty === SINGLE_PIECE_BUNDLE_SIZE ? '60 in bundle' : `${bundle.qty} pcs`}
+                      {(bundle.m4Qty || 0) > 0 ? ` · M4 ${bundle.m4Qty}` : ''}
+                      {' · '}
+                      {bundle.closed ? 'closed' : 'open leftover'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {printableBundles.length > 1 ? (
+              <p className="text-[12px] font-bold text-gray-900">
+                {printableBundles.length} bundles to print (60 pcs each unless partial was closed)
+              </p>
+            ) : null}
+            {printableBundles.map((bundle) => (
               <div key={bundle.id} className="grid gap-2">
                 <BundleLabel bundle={bundle} printing={printId === bundle.id} />
                 <button type="button" className="rounded border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-bold text-[#495057] hover:bg-gray-50" onClick={() => printLabel(bundle.id)}>
-                  Print
+                  Print {bundle.barcode}
                 </button>
               </div>
             ))}
@@ -369,5 +722,55 @@ export function CutJobDrawer({
         </p>
       ) : null}
     </FactoryDrawer>
+  );
+}
+
+function LabelledLeftoverM4({
+  qty,
+  m4FieldId,
+  leftoverM4Qty,
+  loading,
+  onQtyChange,
+  onMarkAll,
+  onMarkPartial,
+}: {
+  qty: number;
+  m4FieldId: string;
+  leftoverM4Qty: string;
+  loading: boolean;
+  onQtyChange: (value: string) => void;
+  onMarkAll: () => void;
+  onMarkPartial: () => void;
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap items-end gap-2">
+      <label className="grid min-w-[100px] flex-1 gap-1 text-[10px] font-bold text-[#495057]" htmlFor={m4FieldId}>
+        Mark as M4 (qty)
+        <input
+          id={m4FieldId}
+          aria-label="Leftover quantity to mark as M4"
+          className={fieldClass}
+          inputMode="numeric"
+          value={leftoverM4Qty}
+          onChange={(event) => onQtyChange(event.target.value)}
+        />
+      </label>
+      <button
+        type="button"
+        className="rounded border border-gray-200 bg-white px-2 py-1.5 text-[10px] font-bold text-[#495057] hover:bg-gray-50 disabled:opacity-60"
+        disabled={loading || !leftoverM4Qty.trim()}
+        onClick={onMarkPartial}
+      >
+        Mark qty as M4
+      </button>
+      <button
+        type="button"
+        className="rounded border border-amber-300 bg-white px-2 py-1.5 text-[10px] font-bold text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+        disabled={loading || qty < 1}
+        onClick={onMarkAll}
+      >
+        Mark all {qty} as M4
+      </button>
+    </div>
   );
 }

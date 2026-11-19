@@ -17,6 +17,7 @@ export default function ToGroundPage() {
       start="none"
       place="container"
       stationLabel="Container"
+      floorStage="final-checking"
     />
   );
 }
