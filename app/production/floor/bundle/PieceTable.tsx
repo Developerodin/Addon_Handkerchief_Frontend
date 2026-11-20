@@ -1,6 +1,6 @@
 import React from 'react';
 import { CompletedQueueTable, CompletedRow } from '../shared/CompletedQueueTable';
-import { EmptyQueue, QueueTabs } from '../shared/QueueTabs';
+import { EmptyQueue, QueueTab, QueueTabs } from '../shared/QueueTabs';
 import { BundleRow, CutPieceRow } from './types';
 
 const headClass = 'border border-gray-200 px-1.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-[#495057]';
@@ -14,6 +14,8 @@ export function PieceTable({
   active,
   ready,
   completed = [],
+  queueTab,
+  onQueueTabChange,
   onOpen,
   onPlace,
 }: {
@@ -21,93 +23,92 @@ export function PieceTable({
   active: CutPieceRow[];
   ready: BundleRow[];
   completed?: CompletedRow[];
+  queueTab?: QueueTab;
+  onQueueTabChange?: (tab: QueueTab) => void;
   onOpen: (piece: CutPieceRow) => void;
   onPlace: (bundle: BundleRow) => void;
 }) {
   return (
     <QueueTabs
-      upcomingCount={pieces.length + ready.length}
+      activeTab={queueTab}
+      onTabChange={onQueueTabChange}
+      upcomingCount={pieces.length}
       receivedCount={active.length}
+      processCount={ready.length}
       completedCount={completed.length}
       upcoming={(
-    <div className="grid gap-4">
-      <div className="min-h-[300px] overflow-x-auto">
-        <table className="w-full border-collapse border border-gray-200">
-          <thead>
-            <tr className="bg-gray-50/30">
-              {['Piece', 'Order', 'Roll', 'Rack'].map((label, index) => (
-                <th key={label} className={`${headClass} ${index === 0 ? 'pl-[10px]' : ''}`}>
-                  {label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {pieces.length ? (
-              pieces.map((piece) => (
-                <tr key={piece.barcode} className="transition-colors hover:bg-gray-50/50">
-                  <td className={`${cellClass} pl-[10px]`}>
-                    <button type="button" className="font-medium text-purple-600 hover:text-purple-700" onClick={() => onOpen(piece)}>
-                      {piece.barcode}
-                    </button>
-                  </td>
-                  <td className={cellClass}>{piece.orderNumber || piece.orderId.slice(-6)}</td>
-                  <td className={`${cellClass} text-gray-600`}>{piece.rollBarcode || '—'}</td>
-                  <td className={`${cellClass} pr-[10px]`}>{piece.rackCode || '—'}</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={4} className="border border-gray-200 py-20 text-center">
-                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-50">
-                    <i className="ri-inbox-line text-xl text-gray-200" aria-hidden />
-                  </div>
-                  <p className="text-xs font-bold text-gray-400">DATA EMPTY</p>
-                  <p className="mt-1 text-[11px] text-gray-400">No hemmed piece is waiting on a rack.</p>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      <div className="overflow-x-auto">
-        <h2 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[#495057]">Closed bundles</h2>
-        {ready.length ? (
+        <div className="min-h-[300px] overflow-x-auto">
           <table className="w-full border-collapse border border-gray-200">
             <thead>
               <tr className="bg-gray-50/30">
-                {['Bundle', 'Order', 'Qty'].map((label) => (
-                  <th key={label} className={headClass}>
+                {['Piece', 'Order', 'Roll', 'Rack'].map((label, index) => (
+                  <th key={label} className={`${headClass} ${index === 0 ? 'pl-[10px]' : ''}`}>
                     {label}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {ready.map((bundle) => (
-                <tr key={bundle.id} className="transition-colors hover:bg-gray-50/50">
-                  <td className={`${cellClass} pl-[10px]`}>
-                    <button type="button" className="font-mono font-medium text-purple-600 hover:text-purple-700" onClick={() => onPlace(bundle)}>
-                      {bundle.barcode}
-                    </button>
+              {pieces.length ? (
+                pieces.map((piece) => (
+                  <tr key={piece.barcode} className="transition-colors hover:bg-gray-50/50">
+                    <td className={`${cellClass} pl-[10px]`}>
+                      <button type="button" className="font-medium text-purple-600 hover:text-purple-700" onClick={() => onOpen(piece)}>
+                        {piece.barcode}
+                      </button>
+                    </td>
+                    <td className={cellClass}>{piece.orderNumber || piece.orderId.slice(-6)}</td>
+                    <td className={`${cellClass} text-gray-600`}>{piece.rollBarcode || '—'}</td>
+                    <td className={`${cellClass} pr-[10px]`}>{piece.rackCode || '—'}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="border border-gray-200 py-20 text-center">
+                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-50">
+                      <i className="ri-inbox-line text-xl text-gray-200" aria-hidden />
+                    </div>
+                    <p className="text-xs font-bold text-gray-400">DATA EMPTY</p>
+                    <p className="mt-1 text-[11px] text-gray-400">No hemmed piece is waiting on a rack.</p>
                   </td>
-                  <td className={cellClass}>{bundle.orderNumber || bundle.orderId.slice(-6)}</td>
-                  <td className={cellClass}>{bundle.qty}</td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
-        ) : (
-          <p className="text-[11px] text-gray-500">
-            No closed bundle is waiting for a rack.{' '}
-            <a className="font-bold text-purple-600 hover:text-purple-700" href="/catalog/production-racks">
-              Bundle racks
-            </a>
-          </p>
-        )}
-      </div>
-    </div>
+        </div>
       )}
+      process={
+        ready.length ? (
+          <div className="min-h-[300px] overflow-x-auto">
+            <table className="w-full border-collapse border border-gray-200">
+              <thead>
+                <tr className="bg-gray-50/30">
+                  {['Bundle', 'Order', 'Qty'].map((label, index) => (
+                    <th key={label} className={`${headClass} ${index === 0 ? 'pl-[10px]' : ''}`}>
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {ready.map((bundle) => (
+                  <tr key={bundle.id} className="transition-colors hover:bg-gray-50/50">
+                    <td className={`${cellClass} pl-[10px]`}>
+                      <button type="button" className="font-mono font-medium text-purple-600 hover:text-purple-700" onClick={() => onPlace(bundle)}>
+                        {bundle.barcode}
+                      </button>
+                    </td>
+                    <td className={cellClass}>{bundle.orderNumber || bundle.orderId.slice(-6)}</td>
+                    <td className={`${cellClass} pr-[10px]`}>{bundle.qty}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyQueue text="No closed bundles yet. Save a cut to create bundles, then put them on a rack from here." />
+        )
+      }
       received={active.length ? (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse border border-gray-200">

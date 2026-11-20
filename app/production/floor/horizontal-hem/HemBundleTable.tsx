@@ -97,7 +97,14 @@ export function HemBundleTable({
       ) : (
         <EmptyQueue text="Nothing has been received on this floor yet." />
       )}
-      completed={<CompletedQueueTable rows={completed} codeLabel="Bundle" />}
+      completed={(
+        <CompletedQueueTable
+          rows={completed}
+          codeLabel="Bundle"
+          showNextStep
+          hemHref="/production/floor/inline-check"
+        />
+      )}
     />
   );
 }

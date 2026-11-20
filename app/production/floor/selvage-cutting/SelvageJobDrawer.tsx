@@ -14,12 +14,10 @@ import { SelvagePiece } from './types';
  */
 export function SelvageJobDrawer({
   piece,
-  waiting,
   onClose,
   onChanged,
 }: {
   piece: SelvagePiece | null;
-  waiting: SelvagePiece[];
   onClose: () => void;
   onChanged: () => Promise<void>;
 }) {
@@ -27,20 +25,20 @@ export function SelvageJobDrawer({
   const [rackCode, setRackCode] = useState('');
   const [machineBarcode, setMachineBarcode] = useState('');
   const [destination, setDestination] = useState('');
-  const [extraScan, setExtraScan] = useState('');
   const [machines, setMachines] = useState<Machine[]>([]);
   const [racks, setRacks] = useState<ProductionRack[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const onTable = pieces.some((row) => row.status === 'in-work');
 
+  const jobKey = piece?.barcode || '';
+
   useEffect(() => {
-    if (!piece) return;
+    if (!jobKey || !piece) return;
     setPieces([piece]);
     setRackCode(piece.rackCode || '');
     setMachineBarcode(piece.machineBarcode || '');
     setDestination('');
-    setExtraScan('');
     setError('');
     Promise.all([
       loadFloorMachines(floorEquipmentFilter('selvage')),
@@ -51,28 +49,10 @@ export function SelvageJobDrawer({
         setRacks((rackPage.results || []).filter((row) => row.stockType === 'pieces'));
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load machines'));
-  }, [piece]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when a different piece is opened
+  }, [jobKey]);
 
   if (!piece) return null;
-
-  /**
-   * Adds another waiting piece that is on the same rack.
-   */
-  const addPiece = () => {
-    const code = extraScan.trim().toLowerCase();
-    const match = waiting.find((row) => row.barcode.toLowerCase() === code);
-    if (!match) {
-      setError('That piece is not waiting on a rack');
-      return;
-    }
-    if (match.rackCode !== rackCode.trim().toUpperCase() && match.rackCode !== rackCode.trim()) {
-      setError('This piece is not on that rack');
-      return;
-    }
-    setPieces((current) => (current.some((row) => row.barcode === match.barcode) ? current : [...current, match]));
-    setExtraScan('');
-    setError('');
-  };
 
   /**
    * Moves the selected pieces from the rack onto the table.
@@ -81,32 +61,16 @@ export function SelvageJobDrawer({
     setLoading(true);
     setError('');
     try {
-      const started = await factoryRequest<Array<{ barcode: string; orderId?: string; rollBarcode?: string; rackCode?: string; machineBarcode?: string }>>(
-        '/production/selvage/start',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            pieceBarcodes: pieces.map((row) => row.barcode),
-            rackCode: rackCode.trim(),
-            machineBarcode: machineBarcode.trim(),
-          }),
-        }
-      );
-      setPieces(
-        started.map((row) => {
-          const known = pieces.find((item) => item.barcode === row.barcode);
-          return {
-            barcode: row.barcode,
-            orderId: String(row.orderId || known?.orderId || ''),
-            orderNumber: known?.orderNumber || '',
-            rollBarcode: row.rollBarcode || known?.rollBarcode || '',
-            rackCode: row.rackCode || known?.rackCode || '',
-            machineBarcode: row.machineBarcode || machineBarcode.trim(),
-            status: 'in-work' as const,
-          };
-        })
-      );
+      await factoryRequest('/production/selvage/start', {
+        method: 'POST',
+        body: JSON.stringify({
+          pieceBarcodes: pieces.map((row) => row.barcode),
+          rackCode: rackCode.trim(),
+          machineBarcode: machineBarcode.trim(),
+        }),
+      });
       await onChanged();
+      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start selvage');
     } finally {
@@ -168,32 +132,12 @@ export function SelvageJobDrawer({
             <input
               id="currentRack"
               aria-label="Current rack"
-              className="w-full rounded border border-gray-200 px-3 py-1.5 text-[11px] font-medium text-[#495057] focus:border-purple-300 focus:ring-0"
+              className="w-full cursor-not-allowed rounded border border-gray-200 bg-gray-50 px-3 py-1.5 text-[11px] font-medium text-[#495057]"
               value={rackCode}
               autoComplete="off"
-              onChange={(event) => setRackCode(event.target.value)}
-              required
+              readOnly
+              disabled
             />
-            <label className="text-[11px] font-bold text-[#495057]" htmlFor="extraPiece">
-              Another piece on this rack
-            </label>
-            <div className="flex gap-2">
-              <input
-                id="extraPiece"
-                aria-label="Another piece barcode"
-                className="w-full rounded border border-gray-200 px-3 py-1.5 text-[11px] font-medium text-[#495057] focus:border-purple-300 focus:ring-0"
-                value={extraScan}
-                autoComplete="off"
-                onChange={(event) => setExtraScan(event.target.value)}
-              />
-              <button
-                type="button"
-                className="rounded border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-bold text-[#495057] hover:bg-gray-50"
-                onClick={addPiece}
-              >
-                Add
-              </button>
-            </div>
             <label className="text-[11px] font-bold text-[#495057]" htmlFor="machineBarcode">
               Table or machine
             </label>

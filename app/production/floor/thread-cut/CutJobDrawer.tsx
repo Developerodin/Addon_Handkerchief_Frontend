@@ -17,19 +17,16 @@ const fieldClass =
  */
 export function CutJobDrawer({
   bundle,
-  waiting,
   onClose,
   onChanged,
 }: {
   bundle: CutBundle | null;
-  waiting: CutBundle[];
   onClose: () => void;
   onChanged: () => Promise<void>;
 }) {
   const [bundles, setBundles] = useState<CutBundle[]>([]);
   const [onTable, setOnTable] = useState(false);
   const [rackCode, setRackCode] = useState('');
-  const [extraScan, setExtraScan] = useState('');
   const [tableBarcode, setTableBarcode] = useState('');
   const [destination, setDestination] = useState('');
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -46,7 +43,8 @@ export function CutJobDrawer({
     setTableBarcode(bundle.machineBarcode || '');
     setDestination('');
     setError('');
-  }, [jobKey, bundle]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when a different bundle is opened
+  }, [jobKey]);
 
   useEffect(() => {
     if (!jobKey) return;
@@ -64,33 +62,13 @@ export function CutJobDrawer({
   if (!bundle) return null;
 
   /**
-   * Adds another hemmed bundle from the same order on this rack.
-   */
-  const addBundle = () => {
-    const needle = extraScan.trim().toLowerCase();
-    const match = waiting.find((row) => row.barcode.toLowerCase() === needle);
-    if (!match) {
-      setError('This bundle is not on a rack for thread cutting');
-      return;
-    }
-    if (match.orderId !== bundle.orderId) {
-      setError('Bundles on one table must be the same order');
-      return;
-    }
-    if (bundles.some((row) => row.barcode === match.barcode)) return;
-    setBundles((rows) => [...rows, match]);
-    setExtraScan('');
-    setError('');
-  };
-
-  /**
    * Puts the selected bundles on the table.
    */
   const start = async () => {
     setLoading(true);
     setError('');
     try {
-      const started = await factoryRequest<CutBundle[]>('/production/thread-cut/start', {
+      await factoryRequest('/production/thread-cut/start', {
         method: 'POST',
         body: JSON.stringify({
           bundleBarcodes: bundles.map((row) => row.barcode),
@@ -98,9 +76,8 @@ export function CutJobDrawer({
           machineBarcode: tableBarcode,
         }),
       });
-      setBundles(started.map((row) => ({ ...bundles.find((current) => current.barcode === row.barcode), ...row })));
-      setOnTable(true);
       await onChanged();
+      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start');
     } finally {
@@ -155,16 +132,15 @@ export function CutJobDrawer({
             <label className="text-[11px] font-bold text-[#495057]" htmlFor="tcRack">
               Current rack
             </label>
-            <input id="tcRack" aria-label="Current rack" className={fieldClass} value={rackCode} autoComplete="off" onChange={(event) => setRackCode(event.target.value)} required />
-            <label className="text-[11px] font-bold text-[#495057]" htmlFor="tcExtra">
-              Another bundle on this rack
-            </label>
-            <div className="flex gap-2">
-              <input id="tcExtra" aria-label="Another bundle barcode" className={fieldClass} value={extraScan} autoComplete="off" onChange={(event) => setExtraScan(event.target.value)} />
-              <button type="button" className="rounded border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-bold text-[#495057] hover:bg-gray-50" onClick={addBundle}>
-                Add
-              </button>
-            </div>
+            <input
+              id="tcRack"
+              aria-label="Current rack"
+              className={`${fieldClass} cursor-not-allowed bg-gray-50`}
+              value={rackCode}
+              autoComplete="off"
+              readOnly
+              disabled
+            />
             <label className="text-[11px] font-bold text-[#495057]" htmlFor="tcTable">
               Table
             </label>

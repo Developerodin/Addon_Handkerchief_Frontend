@@ -17,21 +17,17 @@ const fieldClass =
  */
 export function HemJobDrawer({
   bundle,
-  waiting,
   onClose,
   onChanged,
 }: {
   bundle: HemBundle | null;
-  waiting: HemBundle[];
   onClose: () => void;
   onChanged: () => Promise<void>;
 }) {
   const [bundles, setBundles] = useState<HemBundle[]>([]);
   const [onMachine, setOnMachine] = useState(false);
   const [rackCode, setRackCode] = useState('');
-  const [extraScan, setExtraScan] = useState('');
   const [machineBarcode, setMachineBarcode] = useState('');
-  const [threadUsed, setThreadUsed] = useState('');
   const [destination, setDestination] = useState('');
   const [machines, setMachines] = useState<Machine[]>([]);
   const [racks, setRacks] = useState<ProductionRack[]>([]);
@@ -45,10 +41,10 @@ export function HemJobDrawer({
     setOnMachine(!bundle.rackCode && Boolean(bundle.machineBarcode));
     setRackCode(bundle.rackCode || '');
     setMachineBarcode(bundle.machineBarcode || '');
-    setThreadUsed('');
     setDestination('');
     setError('');
-  }, [jobKey, bundle]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when a different bundle is opened
+  }, [jobKey]);
 
   useEffect(() => {
     if (!bundle) return;
@@ -75,27 +71,6 @@ export function HemJobDrawer({
   const thread = bundles[0]?.sewingThread || { lines: [], perPiece: 0 };
   const handkerchiefs = bundles.reduce((sum, row) => sum + (row.qty || 0), 0);
   const expected = thread.perPiece * handkerchiefs;
-  const overPin = thread.lines.length > 0 && threadUsed !== '' && Number(threadUsed) > expected;
-
-  /**
-   * Adds another checked bundle from the same order on this rack.
-   */
-  const addBundle = () => {
-    const needle = extraScan.trim().toLowerCase();
-    const match = waiting.find((row) => row.barcode.toLowerCase() === needle);
-    if (!match) {
-      setError('This bundle is not on a rack for horizontal hemming');
-      return;
-    }
-    if (match.orderId !== bundle.orderId) {
-      setError('Bundles on one machine must be the same order');
-      return;
-    }
-    if (bundles.some((row) => row.barcode === match.barcode)) return;
-    setBundles((rows) => [...rows, match]);
-    setExtraScan('');
-    setError('');
-  };
 
   /**
    * Puts the selected bundles on the machine.
@@ -104,7 +79,7 @@ export function HemJobDrawer({
     setLoading(true);
     setError('');
     try {
-      const started = await factoryRequest<HemBundle[]>('/production/horizontal-hem/start', {
+      await factoryRequest('/production/horizontal-hem/start', {
         method: 'POST',
         body: JSON.stringify({
           bundleBarcodes: bundles.map((row) => row.barcode),
@@ -112,15 +87,8 @@ export function HemJobDrawer({
           machineBarcode,
         }),
       });
-      setBundles(
-        started.map((row) => ({
-          ...bundles.find((current) => current.barcode === row.barcode),
-          ...row,
-          sewingThread: bundles.find((current) => current.barcode === row.barcode)?.sewingThread || thread,
-        }))
-      );
-      setOnMachine(true);
       await onChanged();
+      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start');
     } finally {
@@ -132,10 +100,6 @@ export function HemJobDrawer({
    * Records the hem, the thread used, and the bundles rack.
    */
   const place = async () => {
-    if (threadUsed === '' || Number.isNaN(Number(threadUsed)) || Number(threadUsed) < 0) {
-      setError('Thread quantity is required');
-      return;
-    }
     setLoading(true);
     setError('');
     try {
@@ -144,7 +108,7 @@ export function HemJobDrawer({
         body: JSON.stringify({
           bundleBarcodes: bundles.map((row) => row.barcode),
           rackCode: destination,
-          threadQuantity: Number(threadUsed),
+          threadQuantity: expected,
         }),
       });
       await onChanged();
@@ -180,16 +144,15 @@ export function HemJobDrawer({
             <label className="text-[11px] font-bold text-[#495057]" htmlFor="hhRack">
               Current rack
             </label>
-            <input id="hhRack" aria-label="Current rack" className={fieldClass} value={rackCode} autoComplete="off" onChange={(event) => setRackCode(event.target.value)} required />
-            <label className="text-[11px] font-bold text-[#495057]" htmlFor="hhExtra">
-              Another bundle on this rack
-            </label>
-            <div className="flex gap-2">
-              <input id="hhExtra" aria-label="Another bundle barcode" className={fieldClass} value={extraScan} autoComplete="off" onChange={(event) => setExtraScan(event.target.value)} />
-              <button type="button" className="rounded border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-bold text-[#495057] hover:bg-gray-50" onClick={addBundle}>
-                Add
-              </button>
-            </div>
+            <input
+              id="hhRack"
+              aria-label="Current rack"
+              className={`${fieldClass} cursor-not-allowed bg-gray-50`}
+              value={rackCode}
+              autoComplete="off"
+              readOnly
+              disabled
+            />
             <label className="text-[11px] font-bold text-[#495057]" htmlFor="hhMachine">
               Machine
             </label>
@@ -216,7 +179,7 @@ export function HemJobDrawer({
               place().catch(() => undefined);
             }}
           >
-            <p className="text-[12px] text-gray-600">The hem is done. Enter the sewing thread used, then scan the bundles rack.</p>
+            <p className="text-[12px] text-gray-600">The hem is done. Sewing thread is from the order pin. Scan the bundles rack.</p>
             {thread.lines.length ? (
               <ul className="grid gap-1 text-[12px] text-gray-700">
                 {thread.lines.map((line) => (
@@ -228,9 +191,6 @@ export function HemJobDrawer({
             ) : (
               <p className="text-[12px] text-gray-600">No sewing thread is pinned on this order.</p>
             )}
-            <p className="text-[12px] text-gray-600">
-              Expected for {handkerchiefs} handkerchief{handkerchiefs === 1 ? '' : 's'}: {expected}
-            </p>
             <label className="text-[11px] font-bold text-[#495057]" htmlFor="hhThread">
               Thread used
             </label>
@@ -238,14 +198,14 @@ export function HemJobDrawer({
               id="hhThread"
               aria-label="Thread used"
               type="number"
-              min="0"
-              step="any"
-              className={fieldClass}
-              value={threadUsed}
-              onChange={(event) => setThreadUsed(event.target.value)}
-              required
+              className={`${fieldClass} cursor-not-allowed bg-gray-50`}
+              value={expected}
+              readOnly
+              disabled
             />
-            {overPin ? <p className="text-[12px] text-amber-700">Over the pinned quantity. It will be stored and the pin stays as it is.</p> : null}
+            <p className="text-[10px] text-gray-500">
+              {handkerchiefs} handkerchief{handkerchiefs === 1 ? '' : 's'} × {thread.perPiece} per piece
+            </p>
             {!racks.length ? (
               <p className="text-[12px] text-gray-600">
                 No bundles racks are in the catalog.{' '}

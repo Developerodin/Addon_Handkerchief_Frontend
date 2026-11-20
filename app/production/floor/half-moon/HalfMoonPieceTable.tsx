@@ -97,7 +97,14 @@ export function HalfMoonPieceTable({
       ) : (
         <EmptyQueue text="Nothing has been received on this floor yet." />
       )}
-      completed={<CompletedQueueTable rows={completed} codeLabel="Piece" getCode={(row) => row.barcode || ''} />}
+      completed={
+        <CompletedQueueTable
+          rows={completed}
+          codeLabel="Piece"
+          getCode={(row) => row.barcode || ''}
+          showQty={false}
+        />
+      }
     />
   );
 }

@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { DrawerSection } from '@/shared/components/factory/FactoryDrawer';
 import { factoryPage, OrderLogRow } from '@/shared/services/factoryApi';
 
-const ACTIONS = ['issued', 'returned', 'vendor-return', 'rack', 'floor-complete', 'bundle-check', 'packing', 'box-rack', 'dispatch', 'po-status', 'grn'];
+const ACTIONS = ['issued', 'returned', 'vendor-return', 'rack', 'floor-complete', 'bundle-check-inspect', 'bundle-check', 'packing', 'box-rack', 'dispatch', 'po-status', 'grn'];
 
 /**
  * Loads activity rows for one order, or every order when orderId is omitted.

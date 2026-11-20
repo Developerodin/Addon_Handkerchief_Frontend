@@ -137,7 +137,7 @@ export default function ThreadCuttingPage() {
             )}
           </div>
         </div>
-        <CutJobDrawer bundle={job} waiting={board.results} onClose={() => setJob(null)} onChanged={load} />
+        <CutJobDrawer bundle={job} onClose={() => setJob(null)} onChanged={load} />
       </div>
     </RequireCrudPermission>
   );

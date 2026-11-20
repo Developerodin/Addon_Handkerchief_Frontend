@@ -1,6 +1,12 @@
-import { ADDON_COMPANY } from '@/shared/constants/addonCompany';
-import { downloadHtmlDocument, escapeHtml, printHtmlDocument } from '@/shared/utils/printHtmlDocument';
+import { factoryRequest } from '@/shared/services/factoryApi';
+import {
+  downloadDispatchChallanDocument,
+  printDispatchChallanDocument,
+  type DispatchChallanBoxRow,
+  type DispatchChallanSnapshot,
+} from '@/shared/utils/dispatchChallanPrint';
 
+/** @deprecated use DispatchChallanBoxRow — kept for order drawer lists */
 export interface DispatchChallanBox {
   barcode: string;
   pieceQty: number;
@@ -18,55 +24,111 @@ export interface DispatchChallanOrder {
   dispatchStatus: string;
 }
 
-function documentBody(order: DispatchChallanOrder, boxes: DispatchChallanBox[], heading: string) {
-  const totalPieces = boxes.reduce((sum, row) => sum + (Number(row.pieceQty) || 0), 0);
-  const totalWeight = boxes.reduce((sum, row) => sum + (Number(row.scaleWeight) || 0), 0);
-  const rows = boxes
-    .map(
-      (row) =>
-        `<tr>
-<td>${escapeHtml(row.barcode)}</td>
-<td class="num">${row.bundleCount}</td>
-<td class="num">${row.pieceQty}</td>
-<td class="num">${row.scaleWeight > 0 ? row.scaleWeight : '—'}</td>
-<td>${escapeHtml(row.rackCode || '—')}</td>
-<td>${escapeHtml(row.vehicleNumber || '—')}</td>
-</tr>`
-    )
-    .join('');
-  return `
-<h1>${escapeHtml(heading)}</h1>
-<p class="company">${escapeHtml(ADDON_COMPANY.name)}</p>
-<p>Production order <strong>${escapeHtml(order.orderNumber)}</strong></p>
-<p>Buyer ${escapeHtml(order.buyer || '—')}</p>
-<p>Target qty ${order.targetQty} · Dispatched ${order.dispatchedQty} · Status ${escapeHtml(order.dispatchStatus)}</p>
-<table>
-<thead><tr><th>Box barcode</th><th>Bundles</th><th>Pieces</th><th>Weight (kg)</th><th>Rack</th><th>Vehicle</th></tr></thead>
-<tbody>${rows || '<tr><td colspan="6">No boxes</td></tr>'}</tbody>
-</table>
-<p>${boxes.length} box(es) · ${totalPieces} pieces · ${totalWeight > 0 ? `${totalWeight} kg` : '—'}</p>
-<p class="sign">Authorised signatory</p>`;
+export interface ShipmentChallanSource {
+  id?: string;
+  productionOrderId?: string;
+  shipmentCode: string;
+  challanNumber?: string;
+  orderNumber: string;
+  buyer?: string;
+  vehicleNumber?: string;
+  pieceQty: number;
+  status: string;
+  dispatchedAt?: string | null;
+  targetQty?: number;
+  dispatchedQty?: number;
+  boxLines: { boxBarcode: string; pieceQty: number; scaleWeight: number; rackCode?: string }[];
 }
 
-const extraStyle = `
-.company{font-size:13px;font-weight:600}
-.num{text-align:right}
-.sign{margin-top:48px}
-`;
-
-function wrappedBody(order: DispatchChallanOrder, boxes: DispatchChallanBox[], heading: string) {
-  return `<style>${extraStyle}</style>${documentBody(order, boxes, heading)}`;
+function snapshotFromShipment(shipment: ShipmentChallanSource): DispatchChallanSnapshot {
+  const lines = shipment.boxLines || [];
+  const boxes: DispatchChallanBoxRow[] = lines.map((line) => ({
+    barcode: line.boxBarcode,
+    pieceQty: line.pieceQty,
+    scaleWeight: line.scaleWeight,
+    rackCode: line.rackCode,
+    vehicleNumber: shipment.vehicleNumber,
+  }));
+  return {
+    challanNumber: shipment.challanNumber || shipment.shipmentCode,
+    shipmentCode: shipment.shipmentCode,
+    dispatchDate: shipment.dispatchedAt || new Date(),
+    orderNumber: shipment.orderNumber || '—',
+    buyer: shipment.buyer,
+    vehicleNumber: shipment.vehicleNumber,
+    dispatchStatus: shipment.status,
+    targetQty: shipment.targetQty,
+    dispatchedQty: shipment.dispatchedQty ?? shipment.pieceQty,
+    boxes,
+  };
 }
 
-/** Printable dispatch challan for boxes tied to one production order. */
-export function printDispatchChallan(order: DispatchChallanOrder, boxes: DispatchChallanBox[], kind: 'challan' | 'note' = 'challan') {
-  const heading = kind === 'challan' ? `Dispatch challan — ${order.orderNumber}` : `Dispatch note — ${order.orderNumber}`;
-  printHtmlDocument(heading, wrappedBody(order, boxes, heading));
+async function enrichShipmentRecord(shipment: ShipmentChallanSource): Promise<ShipmentChallanSource> {
+  let record = shipment;
+  if ((!record.boxLines || !record.boxLines.length) && shipment.id) {
+    record = await factoryRequest<ShipmentChallanSource>(`/warehouse/dispatch/shipments/${shipment.id}`);
+  }
+  if (record.productionOrderId && (record.targetQty == null || record.dispatchedQty == null)) {
+    const pack = await factoryRequest<{ order: DispatchChallanOrder }>(`/warehouse/dispatch/order/${record.productionOrderId}`);
+    record = {
+      ...record,
+      targetQty: pack.order.targetQty,
+      dispatchedQty: pack.order.dispatchedQty,
+      status: record.status || pack.order.dispatchStatus,
+      buyer: record.buyer || pack.order.buyer,
+      orderNumber: record.orderNumber || pack.order.orderNumber,
+    };
+  }
+  return record;
 }
 
-/** Download the same HTML as the challan for archive / PDF. */
-export function downloadDispatchChallan(order: DispatchChallanOrder, boxes: DispatchChallanBox[], kind: 'challan' | 'note' = 'challan') {
-  const heading = kind === 'challan' ? `Dispatch challan — ${order.orderNumber}` : `Dispatch note — ${order.orderNumber}`;
-  const safe = order.orderNumber.replace(/[^\w-]+/g, '_');
-  downloadHtmlDocument(`${safe}-${kind}.html`, heading, wrappedBody(order, boxes, heading));
+/** GRN-style delivery challan print for one dispatch batch. */
+export async function printShipmentBatchChallanById(shipment: ShipmentChallanSource) {
+  await printDispatchChallanDocument(snapshotFromShipment(await enrichShipmentRecord(shipment)));
+}
+
+/** Download HTML challan (same layout as print). */
+export async function downloadShipmentBatchChallan(shipment: ShipmentChallanSource) {
+  await downloadDispatchChallanDocument(snapshotFromShipment(await enrichShipmentRecord(shipment)));
+}
+
+/** Legacy hook — builds a single-batch snapshot from order + box list (open note). */
+export async function printDispatchChallan(order: DispatchChallanOrder, boxes: DispatchChallanBox[]) {
+  await printDispatchChallanDocument({
+    challanNumber: order.orderNumber,
+    shipmentCode: 'NOTE',
+    dispatchDate: new Date(),
+    orderNumber: order.orderNumber,
+    buyer: order.buyer,
+    dispatchStatus: order.dispatchStatus,
+    targetQty: order.targetQty,
+    dispatchedQty: order.dispatchedQty,
+    boxes: boxes.map((row) => ({
+      barcode: row.barcode,
+      pieceQty: row.pieceQty,
+      scaleWeight: row.scaleWeight,
+      rackCode: row.rackCode,
+      vehicleNumber: row.vehicleNumber,
+    })),
+  });
+}
+
+export async function downloadDispatchChallan(order: DispatchChallanOrder, boxes: DispatchChallanBox[]) {
+  await downloadDispatchChallanDocument({
+    challanNumber: order.orderNumber,
+    shipmentCode: 'NOTE',
+    dispatchDate: new Date(),
+    orderNumber: order.orderNumber,
+    buyer: order.buyer,
+    dispatchStatus: order.dispatchStatus,
+    targetQty: order.targetQty,
+    dispatchedQty: order.dispatchedQty,
+    boxes: boxes.map((row) => ({
+      barcode: row.barcode,
+      pieceQty: row.pieceQty,
+      scaleWeight: row.scaleWeight,
+      rackCode: row.rackCode,
+      vehicleNumber: row.vehicleNumber,
+    })),
+  });
 }

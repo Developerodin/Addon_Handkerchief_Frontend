@@ -136,7 +136,7 @@ export default function VerticalHemmingPage() {
             )}
           </div>
         </div>
-        <HemJobDrawer piece={job} waiting={board.results} onClose={() => setJob(null)} onChanged={load} />
+        <HemJobDrawer piece={job} onClose={() => setJob(null)} onChanged={load} />
       </div>
     </RequireCrudPermission>
   );

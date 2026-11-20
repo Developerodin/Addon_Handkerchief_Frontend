@@ -113,7 +113,14 @@ export function UpcomingRollsTable({
       ) : (
         <EmptyQueue text="Nothing has been received on this floor yet." />
       )}
-      completed={<CompletedQueueTable rows={completed} codeLabel="Roll" getCode={(row) => row.rollBarcode || row.barcode || ''} />}
+      completed={
+        <CompletedQueueTable
+          rows={completed}
+          codeLabel="Roll"
+          getCode={(row) => row.rollBarcode || row.barcode || ''}
+          showQty={false}
+        />
+      }
     />
   );
 }

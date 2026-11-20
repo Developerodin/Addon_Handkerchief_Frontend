@@ -6,6 +6,7 @@ import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermissio
 import { factoryRequest } from '@/shared/services/factoryApi';
 import { CutJobDrawer } from './CutJobDrawer';
 import { PieceTable } from './PieceTable';
+import type { QueueTab } from '../shared/QueueTabs';
 import { BundleRow, CutPieceRow, SinglePieceBoard } from './types';
 
 const TILES = [
@@ -27,6 +28,8 @@ export default function SinglePiecePage() {
   const [scan, setScan] = useState('');
   const [job, setJob] = useState<CutPieceRow | null>(null);
   const [placeBundle, setPlaceBundle] = useState<BundleRow | null>(null);
+  const [queueTab, setQueueTab] = useState<QueueTab>('upcoming');
+  const [initialLoad, setInitialLoad] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,6 +52,7 @@ export default function SinglePiecePage() {
       setError(err instanceof Error ? err.message : 'Could not load pieces');
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
   }, []);
 
@@ -132,7 +136,7 @@ export default function SinglePiecePage() {
                 {error}
               </p>
             ) : null}
-            {loading && !board.results.length && !board.active.length ? (
+            {initialLoad && loading ? (
               <div className="flex flex-col items-center py-20">
                 <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-purple-600 opacity-50" />
                 <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">Loading Data</p>
@@ -143,6 +147,8 @@ export default function SinglePiecePage() {
                 active={board.active}
                 ready={board.ready}
                 completed={board.completed}
+                queueTab={queueTab}
+                onQueueTabChange={setQueueTab}
                 onOpen={(row) => {
                   setPlaceBundle(null);
                   setJob(row);
@@ -158,7 +164,6 @@ export default function SinglePiecePage() {
         <CutJobDrawer
           piece={job}
           placeBundle={placeBundle}
-          waiting={board.results}
           active={board.active}
           openBundles={board.openBundles}
           onClose={() => {

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FactoryDrawer, DrawerSection } from '@/shared/components/factory/FactoryDrawer';
 import { factoryRequest } from '@/shared/services/factoryApi';
-import { Container, listContainers, listProductionRacks, Machine, ProductionRack } from '@/shared/services/phase3CatalogService';
+import { listProductionRacks, Machine, ProductionRack } from '@/shared/services/phase3CatalogService';
 import { floorEquipmentFilter } from '@/shared/constants/productionFloors';
 import { loadFloorMachines } from '../shared/floorCatalogCache';
 import { PieceLabel } from './PieceLabel';
@@ -31,10 +31,8 @@ export function CutJobDrawer({
 }) {
   const [machineBarcode, setMachineBarcode] = useState('');
   const [machines, setMachines] = useState<Machine[]>([]);
-  const [containers, setContainers] = useState<Container[]>([]);
   const [racks, setRacks] = useState<ProductionRack[]>([]);
   const [pieces, setPieces] = useState<CutPieceRow[]>([]);
-  const [containerBarcode, setContainerBarcode] = useState('');
   const [rackCode, setRackCode] = useState('');
   const [pieceScan, setPieceScan] = useState('');
   const [error, setError] = useState('');
@@ -48,12 +46,10 @@ export function CutJobDrawer({
     setMachineBarcode(isActive(job) ? job.machineBarcode : '');
     Promise.all([
       loadFloorMachines(floorEquipmentFilter('vertical-cut')),
-      listContainers({ page: 1, limit: 200, status: 'active' }),
       listProductionRacks({ page: 1, limit: 200, status: 'active' }),
     ])
-      .then(([machineRows, containerPage, rackPage]) => {
+      .then(([machineRows, rackPage]) => {
         setMachines(machineRows.filter((row) => row.barcode));
-        setContainers((containerPage.results || []).filter((row) => row.type === 'pieces'));
         setRacks((rackPage.results || []).filter((row) => row.stockType === 'pieces'));
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load machines'));
@@ -61,7 +57,7 @@ export function CutJobDrawer({
 
   if (!job) return null;
   const waiting = pieces.filter((piece) => piece.status === 'cut');
-  const mastersMissing = pieces.length > 0 && containers.length === 0 && racks.length === 0;
+  const mastersMissing = pieces.length > 0 && racks.length === 0;
 
   /**
    * Cuts the roll into the planned piece count.
@@ -88,13 +84,9 @@ export function CutJobDrawer({
   };
 
   /**
-   * Puts the given piece barcodes into the scanned container and rack.
+   * Puts the given piece barcodes onto the scanned rack.
    */
   const place = async (barcodes: string[]) => {
-    if (!containerBarcode.trim()) {
-      setError('Container barcode is required');
-      return;
-    }
     if (!rackCode.trim()) {
       setError('Rack is required');
       return;
@@ -106,7 +98,6 @@ export function CutJobDrawer({
         method: 'POST',
         body: JSON.stringify({
           pieceBarcodes: barcodes,
-          containerBarcode: containerBarcode.trim(),
           rackCode: rackCode.trim(),
         }),
       });
@@ -235,42 +226,13 @@ export function CutJobDrawer({
               >
                 {mastersMissing ? (
                   <p className="text-[12px] text-gray-600">
-                    No pieces racks or pieces containers are in the catalog.{' '}
+                    No pieces racks are in the catalog.{' '}
                     <Link className="text-purple-600 hover:text-purple-700" href="/catalog/production-racks">
                       Add a rack
-                    </Link>{' '}
-                    or{' '}
-                    <Link className="text-purple-600 hover:text-purple-700" href="/catalog/containers">
-                      add a container
                     </Link>
                     . A code that already exists can still be scanned.
                   </p>
                 ) : null}
-                <label className="text-[11px] font-bold text-[#495057]" htmlFor="containerBarcode">
-                  Container
-                </label>
-                <input
-                  id="containerBarcode"
-                  aria-label="Container barcode"
-                  className="w-full rounded border border-gray-200 px-3 py-1.5 text-[11px] font-medium text-[#495057] focus:border-purple-300 focus:ring-0"
-                  value={containerBarcode}
-                  autoComplete="off"
-                  onChange={(event) => setContainerBarcode(event.target.value)}
-                  required
-                />
-                <select
-                  aria-label="Pieces container"
-                  className="w-full rounded border border-gray-200 px-3 py-1.5 text-[11px] font-medium text-[#495057]"
-                  value={containerBarcode}
-                  onChange={(event) => setContainerBarcode(event.target.value)}
-                >
-                  <option value="">Select container</option>
-                  {containers.map((container) => (
-                    <option key={container.id} value={container.barcode || container.code}>
-                      {container.name} · {container.barcode || container.code}
-                    </option>
-                  ))}
-                </select>
                 <label className="text-[11px] font-bold text-[#495057]" htmlFor="rackCode">
                   Rack
                 </label>

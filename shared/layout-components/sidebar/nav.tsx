@@ -312,6 +312,7 @@ const BaseMenuItems: any = [
       { title: "Single piece cutting", type: "link", path: "/production/floor/bundle", active: false, selected: false },
       { title: "Floor checks", type: "link", path: "/quality/floor", active: false, selected: false },
       { title: "Horizontal hemming", type: "link", path: "/production/floor/horizontal-hem", active: false, selected: false },
+      { title: "Inline checking", type: "link", path: "/production/floor/inline-check", active: false, selected: false },
       { title: "Thread cutting", type: "link", path: "/production/floor/thread-cut", active: false, selected: false },
       { title: "Final QC", type: "link", path: "/quality/final-qc", active: false, selected: false },
       { title: "Ironing", type: "link", path: "/production/floor/iron", active: false, selected: false },

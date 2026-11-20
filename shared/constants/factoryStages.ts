@@ -12,6 +12,7 @@ export const FLOOR_STAGES: FloorStage[] = [
   { slug: 'vertical-hem', label: 'Vertical hemming', stage: 'vertical-hem' },
   { slug: 'bundle', label: 'Single piece cutting', stage: 'single-piece-cutting' },
   { slug: 'horizontal-hem', label: 'Horizontal hemming', stage: 'horizontal-hem' },
+  { slug: 'inline-check', label: 'Inline checking', stage: 'inline-check' },
   { slug: 'thread-cut', label: 'Thread cutting', stage: 'thread-cutting' },
   { slug: 'iron', label: 'Ironing', stage: 'iron' },
   { slug: 'embroidery', label: 'Embroidery', stage: 'embroidery' },

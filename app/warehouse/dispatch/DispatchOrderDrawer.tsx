@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { factoryRequest } from '@/shared/services/factoryApi';
 import { OrderLogPanel } from '@/shared/components/factory/OrderLogPanel';
-import { downloadDispatchChallan, printDispatchChallan, type DispatchChallanBox } from './dispatchChallan';
+import { downloadDispatchChallan, printDispatchChallan, printShipmentBatchChallanById, type DispatchChallanBox } from './dispatchChallan';
+import type { DispatchShipmentDetail } from './DispatchShipmentDrawer';
 
 export interface DispatchOrderSummaryRow {
   orderId: string;
@@ -15,6 +16,10 @@ export interface DispatchOrderSummaryRow {
   onRack?: number;
   pipeline?: number;
   boxCount?: number;
+  openShipmentId?: string;
+  openShipmentCode?: string;
+  draftBoxCount?: number;
+  dispatchTrackingClosedAt?: string | null;
 }
 
 interface DispatchPackDetail {
@@ -22,12 +27,16 @@ interface DispatchPackDetail {
   onRack: DispatchChallanBox[];
   dispatched: DispatchChallanBox[];
   pipeline: DispatchChallanBox[];
+  shipments: DispatchShipmentDetail[];
+  openShipment: DispatchShipmentDetail | null;
 }
 
 export interface DispatchOrderDrawerProps {
   orderId: string;
   onClose: () => void;
   onChanged: () => Promise<void>;
+  onOpenShipment: (shipmentId: string) => void;
+  onStartDispatch: (productionOrderId: string) => void;
 }
 
 const dispatchTone = (status: string) => {
@@ -37,22 +46,23 @@ const dispatchTone = (status: string) => {
 };
 
 /**
- * Order-wise dispatch detail: boxes on rack, pipeline, shipped — print challan / note like GRN.
+ * Order-wise dispatch detail: boxes on rack, pipeline, shipped batches — print challan per batch.
  */
-export function DispatchOrderDrawer({ orderId, onClose, onChanged }: DispatchOrderDrawerProps) {
+export function DispatchOrderDrawer({ orderId, onClose, onChanged, onOpenShipment, onStartDispatch }: DispatchOrderDrawerProps) {
   const [detail, setDetail] = useState<DispatchPackDetail | null>(null);
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState<'print' | 'download' | 'note' | ''>('');
-  const [shipBox, setShipBox] = useState<DispatchChallanBox | null>(null);
-  const [vehicle, setVehicle] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [tab, setTab] = useState<'boxes' | 'activity'>('boxes');
+  const [busy, setBusy] = useState('');
+  const [tab, setTab] = useState<'boxes' | 'batches' | 'activity'>('boxes');
+
+  const reload = async () => {
+    const fresh = await factoryRequest<DispatchPackDetail>(`/warehouse/dispatch/order/${orderId}`);
+    setDetail(fresh);
+    return fresh;
+  };
 
   useEffect(() => {
     setDetail(null);
     setError('');
-    setShipBox(null);
-    setVehicle('');
     setTab('boxes');
     factoryRequest<DispatchPackDetail>(`/warehouse/dispatch/order/${orderId}`)
       .then(setDetail)
@@ -60,49 +70,29 @@ export function DispatchOrderDrawer({ orderId, onClose, onChanged }: DispatchOrd
   }, [orderId]);
 
   const order = detail?.order;
-  const printableOnRack = detail?.onRack || [];
-  const allOpenPipeline = [...(detail?.pipeline || []), ...(detail?.onRack || [])];
 
-  const output = async (mode: 'print' | 'download' | 'note') => {
-    if (!order || busy) return;
-    setBusy(mode === 'note' ? 'note' : mode);
-    setError('');
-    try {
-      const boxes = mode === 'note' ? allOpenPipeline : [...printableOnRack, ...(detail?.dispatched || [])];
-      const kind = mode === 'note' ? 'note' : 'challan';
-      if (mode === 'download') downloadDispatchChallan(order, boxes, kind);
-      else printDispatchChallan(order, boxes, kind);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Print failed');
-    } finally {
-      setBusy('');
-    }
+  const printShipment = (shipment: DispatchShipmentDetail) => {
+    printShipmentBatchChallanById(shipment).catch((err) => setError(err instanceof Error ? err.message : 'Print failed'));
   };
 
-  const ship = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!shipBox) return;
-    setSaving(true);
+  const closeTracking = async () => {
+    if (!order) return;
+    const onRack = detail?.onRack.length || 0;
+    const msg =
+      onRack > 0
+        ? `${onRack} box(es) are still on rack. Mark dispatch complete for this order anyway?`
+        : 'Mark dispatch tracking complete for this order?';
+    if (!window.confirm(msg)) return;
+    setBusy('close');
     setError('');
     try {
-      await factoryRequest('/warehouse/dispatch/ship', {
-        method: 'POST',
-        body: JSON.stringify({
-          boxBarcode: shipBox.barcode,
-          vehicleNumber: vehicle,
-          eventId: `ship-${shipBox.barcode}`,
-          site: 'factory',
-        }),
-      });
-      setShipBox(null);
-      setVehicle('');
-      const fresh = await factoryRequest<DispatchPackDetail>(`/warehouse/dispatch/order/${orderId}`);
-      setDetail(fresh);
+      await factoryRequest(`/warehouse/dispatch/order/${orderId}/close-tracking`, { method: 'POST' });
+      await reload();
       await onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Dispatch failed');
+      setError(err instanceof Error ? err.message : 'Could not close tracking');
     } finally {
-      setSaving(false);
+      setBusy('');
     }
   };
 
@@ -124,13 +114,17 @@ export function DispatchOrderDrawer({ orderId, onClose, onChanged }: DispatchOrd
           </button>
         </header>
         <div className="space-y-4 p-4">
-          {error ? <p className="text-sm text-red-600" role="alert">{error}</p> : null}
+          {error ? (
+            <p className="text-sm text-red-600" role="alert">
+              {error}
+            </p>
+          ) : null}
           {!order ? <p className="text-sm text-gray-500">Loading…</p> : null}
           {order ? (
             <>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex gap-1" role="tablist" aria-label="Dispatch sections">
-                  {(['boxes', 'activity'] as const).map((name) => (
+                  {(['boxes', 'batches', 'activity'] as const).map((name) => (
                     <button
                       key={name}
                       type="button"
@@ -139,100 +133,121 @@ export function DispatchOrderDrawer({ orderId, onClose, onChanged }: DispatchOrd
                       className={`rounded px-2 py-1 text-[11px] font-bold ${tab === name ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700'}`}
                       onClick={() => setTab(name)}
                     >
-                      {name === 'boxes' ? 'Boxes' : 'Activity'}
+                      {name === 'boxes' ? 'Boxes' : name === 'batches' ? 'Batches' : 'Activity'}
                     </button>
                   ))}
                 </div>
                 <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${dispatchTone(order.dispatchStatus)}`}>
                   {order.dispatchStatus}
                 </span>
+                {detail?.openShipment ? (
+                  <button type="button" className="rounded border border-purple-200 px-2 py-1 text-[11px] font-bold text-purple-600" onClick={() => onOpenShipment(detail.openShipment!.id)}>
+                    Open {detail.openShipment.shipmentCode}
+                  </button>
+                ) : (
+                  <button type="button" className="rounded bg-purple-600 px-2 py-1 text-[11px] font-bold text-white" onClick={() => onStartDispatch(orderId)}>
+                    New dispatch
+                  </button>
+                )}
+                {!order.dispatchTrackingClosedAt ? (
+                  <button
+                    type="button"
+                    className="rounded border border-gray-200 px-2 py-1 text-[11px] font-bold hover:bg-gray-50 disabled:opacity-50"
+                    disabled={Boolean(busy)}
+                    onClick={closeTracking}
+                  >
+                    {busy === 'close' ? 'Saving…' : 'Mark dispatch complete'}
+                  </button>
+                ) : (
+                  <span className="text-[10px] font-bold uppercase text-gray-500">Tracking closed</span>
+                )}
                 <button
                   type="button"
-                  className="rounded border border-gray-200 px-2 py-1 text-[11px] font-bold hover:bg-gray-50 disabled:opacity-50"
-                  disabled={Boolean(busy)}
-                  onClick={() => output('print')}
+                  className="rounded border border-gray-200 px-2 py-1 text-[11px] font-bold hover:bg-gray-50"
+                  onClick={() => {
+                    const allOpen = [...(detail?.pipeline || []), ...(detail?.onRack || [])];
+                    downloadDispatchChallan(order, allOpen).catch((err) =>
+                      setError(err instanceof Error ? err.message : 'Download failed')
+                    );
+                  }}
                 >
-                  {busy === 'print' ? 'Printing…' : 'Print challan'}
-                </button>
-                <button
-                  type="button"
-                  className="rounded border border-gray-200 px-2 py-1 text-[11px] font-bold hover:bg-gray-50 disabled:opacity-50"
-                  disabled={Boolean(busy)}
-                  onClick={() => output('note')}
-                >
-                  {busy === 'note' ? 'Printing…' : 'Print note'}
-                </button>
-                <button
-                  type="button"
-                  className="rounded border border-gray-200 px-2 py-1 text-[11px] font-bold hover:bg-gray-50 disabled:opacity-50"
-                  disabled={Boolean(busy)}
-                  onClick={() => output('download')}
-                >
-                  {busy === 'download' ? 'Saving…' : 'Download'}
+                  Download note
                 </button>
               </div>
               {tab === 'boxes' ? (
                 <>
-                  <Section title={`On rack (${printableOnRack.length})`} rows={printableOnRack} onShip={setShipBox} shipActive={shipBox?.barcode} />
+                  <Section title={`On rack (${detail?.onRack.length || 0})`} rows={detail?.onRack || []} />
                   <Section title={`Pipeline (${detail?.pipeline.length || 0})`} rows={detail?.pipeline || []} />
-                  <Section title={`Shipped (${detail?.dispatched.length || 0})`} rows={detail?.dispatched || []} />
+                  <Section title={`Shipped boxes (${detail?.dispatched.length || 0})`} rows={detail?.dispatched || []} />
                 </>
-              ) : (
+              ) : null}
+              {tab === 'batches' ? (
+                <section>
+                  <h3 className="mb-2 text-[12px] font-bold text-gray-800">Dispatched batches</h3>
+                  <table className="w-full border-collapse border border-gray-200 text-[11px]">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        {['Code', 'Boxes', 'Pcs', 'Vehicle', ''].map((label) => (
+                          <th key={label} className="border border-gray-200 px-1.5 py-2 text-left font-bold uppercase text-gray-600">
+                            {label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detail?.shipments.length ? (
+                        detail.shipments.map((row) => (
+                          <tr key={row.id}>
+                            <td className="border border-gray-200 px-1.5 py-2 font-mono">{row.shipmentCode}</td>
+                            <td className="border border-gray-200 px-1.5 py-2">{row.boxCount}</td>
+                            <td className="border border-gray-200 px-1.5 py-2">{row.pieceQty}</td>
+                            <td className="border border-gray-200 px-1.5 py-2">{row.vehicleNumber || '—'}</td>
+                            <td className="border border-gray-200 px-1.5 py-2">
+                              <button
+                                type="button"
+                                className="rounded bg-primary px-2 py-1 text-[10px] font-bold text-white"
+                                aria-label={`Print challan ${row.shipmentCode}`}
+                                onClick={() => printShipment(row)}
+                              >
+                                Print
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="border border-gray-200 py-8 text-center text-gray-400">
+                            No dispatched batches yet
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </section>
+              ) : null}
+              {tab === 'activity' ? (
                 <div className="rounded border border-gray-200 p-3">
                   <p className="mb-2 text-[11px] font-bold text-gray-800">Order activity (packing, box, dispatch)</p>
                   <OrderLogPanel orderId={orderId} />
                 </div>
-              )}
+              ) : null}
             </>
           ) : null}
         </div>
-        {shipBox ? (
-          <footer className="mt-auto border-t border-gray-200 p-4">
-            <p className="mb-2 text-[11px] font-bold text-gray-800">Ship {shipBox.barcode}</p>
-            <form className="flex flex-wrap items-end gap-2" onSubmit={ship}>
-              <label className="grid gap-1 text-[11px] font-bold text-gray-700" htmlFor="dispatch-vehicle">
-                Vehicle number
-                <input
-                  id="dispatch-vehicle"
-                  className="w-48 rounded border border-gray-200 px-3 py-1.5 text-[11px]"
-                  value={vehicle}
-                  onChange={(event) => setVehicle(event.target.value)}
-                  required
-                />
-              </label>
-              <button type="submit" className="rounded bg-purple-600 px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50" disabled={saving}>
-                Dispatch box
-              </button>
-              <button type="button" className="rounded border border-gray-200 px-3 py-1.5 text-[11px] font-bold" onClick={() => setShipBox(null)}>
-                Cancel
-              </button>
-            </form>
-          </footer>
-        ) : null}
       </aside>
     </>
   );
 }
 
-function Section({
-  title,
-  rows,
-  onShip,
-  shipActive,
-}: {
-  title: string;
-  rows: DispatchChallanBox[];
-  onShip?: (row: DispatchChallanBox) => void;
-  shipActive?: string;
-}) {
+function Section({ title, rows }: { title: string; rows: DispatchChallanBox[] }) {
   return (
     <section>
       <h3 className="mb-2 text-[12px] font-bold text-gray-800">{title}</h3>
       <table className="w-full border-collapse border border-gray-200 text-[11px]">
         <thead>
           <tr className="bg-gray-50">
-            {['Box', 'Bundles', 'Pcs', 'Kg', 'Rack', onShip ? '' : null].filter(Boolean).map((label) => (
-              <th key={String(label)} className="border border-gray-200 px-1.5 py-2 text-left font-bold uppercase text-gray-600">
+            {['Box', 'Bundles', 'Pcs', 'Kg', 'Rack'].map((label) => (
+              <th key={label} className="border border-gray-200 px-1.5 py-2 text-left font-bold uppercase text-gray-600">
                 {label}
               </th>
             ))}
@@ -241,24 +256,17 @@ function Section({
         <tbody>
           {rows.length ? (
             rows.map((row) => (
-              <tr key={row.barcode} className={shipActive === row.barcode ? 'bg-purple-50' : undefined}>
+              <tr key={row.barcode}>
                 <td className="border border-gray-200 px-1.5 py-2 font-mono">{row.barcode}</td>
                 <td className="border border-gray-200 px-1.5 py-2">{row.bundleCount}</td>
                 <td className="border border-gray-200 px-1.5 py-2">{row.pieceQty}</td>
                 <td className="border border-gray-200 px-1.5 py-2">{row.scaleWeight || '—'}</td>
                 <td className="border border-gray-200 px-1.5 py-2">{row.rackCode || '—'}</td>
-                {onShip ? (
-                  <td className="border border-gray-200 px-1.5 py-2">
-                    <button type="button" className="font-bold text-purple-600" onClick={() => onShip(row)}>
-                      Ship
-                    </button>
-                  </td>
-                ) : null}
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan={onShip ? 6 : 5} className="border border-gray-200 py-8 text-center text-gray-400">
+              <td colSpan={5} className="border border-gray-200 py-8 text-center text-gray-400">
                 None
               </td>
             </tr>

@@ -136,7 +136,7 @@ export default function SelvageCuttingPage() {
             )}
           </div>
         </div>
-        <SelvageJobDrawer piece={job} waiting={board.results} onClose={() => setJob(null)} onChanged={load} />
+        <SelvageJobDrawer piece={job} onClose={() => setJob(null)} onChanged={load} />
       </div>
     </RequireCrudPermission>
   );

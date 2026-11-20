@@ -142,7 +142,7 @@ export default function HorizontalHemmingPage() {
           </div>
         </div>
         {job ? (
-          <HemJobDrawer bundle={job} waiting={board.results} onClose={() => setJob(null)} onChanged={refreshBoard} />
+          <HemJobDrawer bundle={job} onClose={() => setJob(null)} onChanged={refreshBoard} />
         ) : null}
       </div>
     </RequireCrudPermission>

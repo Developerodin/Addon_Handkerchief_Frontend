@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dispatch Challan</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            margin: 10px;
+            color: #000;
+            background-color: #fff;
+            line-height: 1.2;
+        }
+        .doc-container {
+            width: 100%;
+            border: 1px solid #000;
+            box-sizing: border-box;
+            padding: 0;
+        }
+        .header-title {
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+            text-transform: uppercase;
+            padding: 5px 0;
+            border-bottom: 1px solid #000;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        td, th {
+            border: 1px solid #000;
+            padding: 2px 4px;
+            vertical-align: top;
+            word-wrap: break-word;
+        }
+        .label-cell {
+            font-size: 8px;
+            color: #333;
+        }
+        .value-cell {
+            font-weight: bold;
+            font-size: 9px;
+        }
+        .company-name {
+            font-weight: bold;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .items-table th { background-color: #f8f9fa; font-size: 9px; }
+        .footer-section { padding: 6px; border-top: 1px solid #000; }
+        .signature-area {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            border-top: 1px solid #000;
+            padding-top: 5px;
+        }
+        .sig-box { text-align: center; width: 30%; }
+        .sig-box-authorised {
+            border: 1px solid #000;
+            padding: 8px 4px 10px;
+            min-height: 72px;
+            width: 38%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+        .sig-for-company {
+            font-size: 7px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .sig-label { font-weight: bold; }
+        @page { size: auto; margin: 8mm; }
+        @media print {
+            html, body { margin: 0; background: #fff; }
+            .items-table thead { display: table-header-group; }
+        }
+    </style>
+</head>
+<body>
+    <div class="doc-container">
+        <div style="text-align: center; border-bottom: 1px solid #000; padding: 6px 5px;">
+            <div style="font-size: 14px; font-weight: 900; letter-spacing: 0.5px; margin-bottom: 4px;" id="consignee-name">ADDON HOLDINGS PRIVATE LIMITED</div>
+            <div style="font-size: 8px; line-height: 1.35;">
+                <b>Address:</b> <span id="consignee-address"></span><br>
+                <b>H.O:</b> <span id="consignee-head-office"></span><br>
+                <span style="margin-top: 2px; display: inline-block;">
+                    <b>Contact:</b> <span id="consignee-contact"></span> &nbsp;|&nbsp;
+                    <b>GST:</b> <span id="consignee-gst"></span> &nbsp;|&nbsp;
+                    <b>State Code:</b> <span id="consignee-state-code"></span> &nbsp;|&nbsp;
+                    <b>Email:</b> <span id="consignee-email"></span>
+                </span>
+            </div>
+        </div>
+
+        <div class="header-title" id="page-title">DELIVERY / DISPATCH CHALLAN</div>
+
+        <table>
+            <tr>
+                <td colspan="4" rowspan="3" style="width: 50%;">
+                    <div class="label-cell">CONSIGNEE / BUYER</div>
+                    <div class="company-name" id="buyer-name">—</div>
+                    <div id="buyer-address">—</div>
+                </td>
+                <td colspan="2" style="width: 25%;">
+                    <div class="label-cell">CHALLAN NO.</div>
+                    <div class="value-cell" id="challan-no">—</div>
+                </td>
+                <td colspan="2" style="width: 25%;">
+                    <div class="label-cell">BATCH / DSP</div>
+                    <div class="value-cell" id="shipment-code">—</div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <div class="label-cell">PRODUCTION ORDER</div>
+                    <div class="value-cell" id="order-no">—</div>
+                </td>
+                <td colspan="2">
+                    <div class="label-cell">DISPATCH DATE</div>
+                    <div class="value-cell" id="dispatch-date">—</div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <div class="label-cell">VEHICLE NO.</div>
+                    <div class="value-cell" id="vehicle-no">—</div>
+                </td>
+                <td colspan="2">
+                    <div class="label-cell">ORDER DISPATCH STATUS</div>
+                    <div class="value-cell" id="dispatch-status">—</div>
+                </td>
+            </tr>
+        </table>
+
+        <table class="items-table" style="margin-top: -1px;">
+            <thead>
+                <tr>
+                    <th class="text-center" style="width: 6%;">SR</th>
+                    <th style="width: 28%;">BOX BARCODE</th>
+                    <th class="text-right" style="width: 14%;">PIECES</th>
+                    <th class="text-right" style="width: 14%;">WEIGHT (kg)</th>
+                    <th style="width: 18%;">FROM RACK</th>
+                    <th style="width: 20%;">VEHICLE</th>
+                </tr>
+            </thead>
+            <tbody id="boxes-body"></tbody>
+        </table>
+
+        <table style="margin-top: -1px;">
+            <tbody>
+                <tr>
+                    <td class="text-bold" style="width: 70%;">Total boxes</td>
+                    <td class="text-right text-bold" id="total-boxes">0</td>
+                </tr>
+                <tr>
+                    <td class="text-bold">Total pieces (this challan)</td>
+                    <td class="text-right text-bold" id="total-pieces">0</td>
+                </tr>
+                <tr>
+                    <td class="text-bold">Total weight (kg)</td>
+                    <td class="text-right text-bold" id="total-weight">0</td>
+                </tr>
+                <tr>
+                    <td class="text-bold">Cumulative dispatched on order (pcs)</td>
+                    <td class="text-right" id="order-dispatched">—</td>
+                </tr>
+                <tr>
+                    <td class="text-bold">Order target (pcs)</td>
+                    <td class="text-right" id="order-target">—</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="footer-section">
+            <div style="margin-bottom: 8px;">
+                <b>Remarks:</b> <span id="remarks">Goods despatched as per production order. Tax invoice to follow separately.</span>
+            </div>
+            <div class="signature-area">
+                <div class="sig-box"><div class="sig-label">Prepared by</div></div>
+                <div class="sig-box"><div class="sig-label">Checked by</div></div>
+                <div class="sig-box sig-box-authorised">
+                    <div class="sig-for-company">For <span id="signatory-company-name">ADDON HOLDINGS PRIVATE LIMITED</span></div>
+                    <div class="sig-label">Authorised Signatory</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div style="text-align: center; font-size: 11px; margin-top: 8px;"><b>This is a computer generated document.</b></div>
+</body>
+</html>

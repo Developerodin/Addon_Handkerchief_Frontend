@@ -136,7 +136,7 @@ export default function HalfMoonCuttingPage() {
             )}
           </div>
         </div>
-        <HalfMoonJobDrawer piece={job} waiting={board.results} onClose={() => setJob(null)} onChanged={load} />
+        <HalfMoonJobDrawer piece={job} onClose={() => setJob(null)} onChanged={load} />
       </div>
     </RequireCrudPermission>
   );

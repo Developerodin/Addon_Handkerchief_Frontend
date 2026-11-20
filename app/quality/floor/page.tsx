@@ -6,10 +6,10 @@ import Seo from '@/shared/layout-components/seo/seo';
 import RequireCrudPermission from '@/shared/components/auth/RequireCrudPermission';
 import { CompletedQueueTable, CompletedRow } from '@/app/production/floor/shared/CompletedQueueTable';
 import { QueueTab, QueueTabs } from '@/app/production/floor/shared/QueueTabs';
-import { useFactoryList } from '@/shared/hooks/useFactoryList';
-import { BundleRow, factoryRequest, ProductionOrderRow, RollRow } from '@/shared/services/factoryApi';
+import { BundleRow, factoryPage, factoryRequest, ProductionOrderRow, RollRow } from '@/shared/services/factoryApi';
 import { listProductionRacks, ProductionRack } from '@/shared/services/phase3CatalogService';
 import { UiButton } from '@/shared/components/ui';
+import { FloorDefectLogDrawer } from './FloorDefectLogDrawer';
 
 interface UpcomingBundle {
   id: string;
@@ -17,7 +17,13 @@ interface UpcomingBundle {
   orderId: string;
   orderNumber: string;
   qty: number;
+  arrivalQty?: number;
   rackCode: string;
+  floorInspected?: boolean;
+  m2Qty?: number;
+  m4Qty?: number;
+  inspectionGoodQty?: number;
+  articleLabel?: string;
   readyForHorizontalHem?: boolean;
   blockers?: string[];
 }
@@ -26,17 +32,31 @@ interface BundleCheckSaveResult {
   bundleBarcode?: string;
   rackCode?: string;
   readyForHorizontalHem?: boolean;
+  passGoodQty?: number;
+  goodAddedQty?: number;
+  inspectionGoodQty?: number;
+  arrivalQty?: number;
+  m2Qty?: number;
+  m4Qty?: number;
 }
 
 interface FloorCheckBoard {
   results: UpcomingBundle[];
+  awaitingPass?: UpcomingBundle[];
   pendingPlacement?: UpcomingBundle[];
   received?: UpcomingBundle[];
   completed?: CompletedRow[];
-  counts?: { waiting?: number; pendingPlacement?: number; received?: number; completed?: number };
+  counts?: {
+    waiting?: number;
+    inspectNow?: number;
+    awaitingPass?: number;
+    pendingPlacement?: number;
+    received?: number;
+    completed?: number;
+  };
 }
 
-type Step = 'pick' | 'counts' | 'done';
+type Step = 'pick' | 'inspect' | 'pass' | 'done';
 
 const fieldClass =
   'box-border h-9 w-full rounded border border-gray-200 bg-white px-3 text-[12px] font-medium text-gray-900 outline-none focus:border-purple-400';
@@ -110,15 +130,20 @@ function BundleTable({
  * Floor bundle check after single piece cutting. One step at a time: pick bundle, then counts, then next stage hint.
  */
 export default function FloorChecksPage() {
-  const orders = useFactoryList<ProductionOrderRow>('/production/orders', { picklist: '1' }, 100);
+  const [orderRows, setOrderRows] = useState<ProductionOrderRow[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
   const [step, setStep] = useState<Step>('pick');
   const [selected, setSelected] = useState<UpcomingBundle | null>(null);
   const [bundleId, setBundleId] = useState('');
   const [orderId, setOrderId] = useState('');
   const [orderBundles, setOrderBundles] = useState<BundleRow[]>([]);
-  const [goodQty, setGoodQty] = useState('');
   const [m2Qty, setM2Qty] = useState('');
-  const [m4Qty, setM4Qty] = useState('');
+  const [m4Qty, setM4Qty] = useState('0');
+  const [goodAdded, setGoodAdded] = useState('0');
+  const [passQty, setPassQty] = useState('');
+  const [passQtyTouched, setPassQtyTouched] = useState(false);
+  const [inspectionGood, setInspectionGood] = useState(0);
+  const [showDefectLog, setShowDefectLog] = useState(false);
   const [scan, setScan] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -131,23 +156,46 @@ export default function FloorChecksPage() {
   const [lastSave, setLastSave] = useState<BundleCheckSaveResult | null>(null);
   const [queueTab, setQueueTab] = useState<QueueTab>('upcoming');
   const [showFlowHelp, setShowFlowHelp] = useState(false);
+  const [boardLoading, setBoardLoading] = useState(true);
 
-  const loadUpcoming = useCallback(async () => {
-    const data = await factoryRequest<FloorCheckBoard>('/quality/floor/upcoming');
-    setBoard({
-      results: data.results || [],
-      pendingPlacement: data.pendingPlacement || [],
-      received: data.received || [],
-      completed: data.completed || [],
-      counts: {
-        ...(data.counts || {}),
-        completed: data.counts?.completed ?? (data.completed?.length || 0),
-      },
-    });
+  const loadUpcoming = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setBoardLoading(true);
+    try {
+      const data = await factoryRequest<FloorCheckBoard>('/quality/floor/upcoming');
+      setBoard({
+        results: data.results || [],
+        awaitingPass: data.awaitingPass || [],
+        pendingPlacement: data.pendingPlacement || [],
+        received: data.received || [],
+        completed: data.completed || [],
+        counts: {
+          ...(data.counts || {}),
+          completed: data.counts?.completed ?? (data.completed?.length || 0),
+        },
+      });
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load bundles');
+    } finally {
+      if (!opts?.silent) setBoardLoading(false);
+    }
   }, []);
 
+  const ensureOrderPicklist = useCallback(async () => {
+    if (orderRows.length || ordersLoading) return;
+    setOrdersLoading(true);
+    try {
+      const data = await factoryPage<ProductionOrderRow>('/production/orders', 1, 100, '', { picklist: '1' });
+      setOrderRows(data.results || []);
+    } catch {
+      setOrderRows([]);
+    } finally {
+      setOrdersLoading(false);
+    }
+  }, [orderRows.length, ordersLoading]);
+
   useEffect(() => {
-    loadUpcoming().catch((err) => setError(err instanceof Error ? err.message : 'Could not load bundles'));
+    loadUpcoming().catch(() => undefined);
   }, [loadUpcoming]);
 
   useEffect(() => {
@@ -160,14 +208,29 @@ export default function FloorChecksPage() {
       .catch(() => undefined);
   }, [showReject]);
 
-  const bundleQty = selected?.qty ?? orderBundles.find((b) => b.id === bundleId)?.qty ?? 0;
-  const sum = (Number(goodQty) || 0) + (Number(m2Qty) || 0) + (Number(m4Qty) || 0);
-  const sumOk = bundleQty > 0 && sum === bundleQty;
-  const toNextFloor = (Number(goodQty) || 0);
+  const arrivalQty = selected?.arrivalQty ?? selected?.qty ?? orderBundles.find((b) => b.id === bundleId)?.qty ?? 0;
+  const goodAfterInspection = useMemo(() => {
+    const m2 = Math.max(0, Number(m2Qty) || 0);
+    const m4 = Math.max(0, Number(m4Qty) || 0);
+    return Math.max(0, arrivalQty - m2 - m4);
+  }, [arrivalQty, m2Qty, m4Qty]);
+  const defectsTotal = (Number(m2Qty) || 0) + (Number(m4Qty) || 0);
+  const inspectOk = arrivalQty > 0 && defectsTotal <= arrivalQty;
+  const addedNum = Math.max(0, Number(goodAdded) || 0);
+  const baseGoodAfterInspect = inspectionGood > 0 ? inspectionGood : goodAfterInspection;
+  const suggestedPass = baseGoodAfterInspect + addedNum;
+  const displayPassQty =
+    passQtyTouched && passQty !== ''
+      ? passQty
+      : suggestedPass >= 1
+        ? String(suggestedPass)
+        : '';
+  const passNum = Number(displayPassQty);
+  const passOk = inspectOk && Number.isFinite(passNum) && passNum >= 1 && passNum <= suggestedPass;
 
   const pickable = useMemo(
-    () => [...(board.results || []), ...(board.pendingPlacement || [])],
-    [board.pendingPlacement, board.results]
+    () => [...(board.results || []), ...(board.awaitingPass || []), ...(board.pendingPlacement || [])],
+    [board.awaitingPass, board.pendingPlacement, board.results]
   );
 
   const resetFlow = () => {
@@ -176,21 +239,31 @@ export default function FloorChecksPage() {
     setBundleId('');
     setOrderId('');
     setOrderBundles([]);
-    setGoodQty('');
     setM2Qty('');
     setM4Qty('0');
+    setGoodAdded('0');
+    setPassQty('');
+    setPassQtyTouched(false);
+    setInspectionGood(0);
     setError('');
     setLastSave(null);
   };
 
-  const applyBundle = (row: UpcomingBundle) => {
+  const applyBundle = (row: UpcomingBundle, startStep?: Step) => {
     setSelected(row);
     setOrderId(row.orderId);
     setBundleId(row.id);
-    setGoodQty(String(row.qty));
-    setM2Qty('0');
-    setM4Qty('0');
-    setStep('counts');
+    setM2Qty(String(row.m2Qty ?? 0));
+    setM4Qty(String(row.m4Qty ?? 0));
+    setGoodAdded('0');
+    const inspectedGood =
+      row.inspectionGoodQty ?? Math.max(0, (row.arrivalQty ?? row.qty) - (row.m2Qty ?? 0) - (row.m4Qty ?? 0));
+    setInspectionGood(inspectedGood);
+    setPassQtyTouched(false);
+    setPassQty(String(inspectedGood));
+    const nextStep: Step =
+      startStep || (row.floorInspected ? 'pass' : 'inspect');
+    setStep(nextStep);
     setError('');
     factoryRequest<{ bundles: BundleRow[] }>(`/production/orders/${row.orderId}`)
       .then((detail) => setOrderBundles(detail.bundles || []))
@@ -202,7 +275,7 @@ export default function FloorChecksPage() {
     if (!needle) return;
     const hit = pickable.find((row) => row.barcode.toLowerCase() === needle);
     if (hit) {
-      applyBundle(hit);
+      applyBundle(hit, hit.floorInspected ? 'pass' : 'inspect');
       setScan('');
       return;
     }
@@ -215,7 +288,7 @@ export default function FloorChecksPage() {
       return;
     }
     const bundle = orderBundles.find((row) => row.id === bundleId) as BundleRow & { rackCode?: string; closed?: boolean };
-    const order = orders.rows.find((row) => row.id === orderId);
+    const order = orderRows.find((row) => row.id === orderId);
     const qty = Number(bundle?.qty ?? 0);
     if (!bundle || qty < 1) {
       setError('Bundle not found or empty.');
@@ -241,36 +314,67 @@ export default function FloorChecksPage() {
       qty,
       rackCode: bundle.rackCode || '',
     });
-    setGoodQty(String(qty));
     setM2Qty('0');
     setM4Qty('0');
-    setStep('counts');
+    setStep('inspect');
     setError('');
   };
 
-  const saveBundleCheck = async () => {
-    if (!bundleId || !sumOk) {
-      setError(`Good + M2 + M4 must equal ${bundleQty}.`);
+  const saveInspection = async (finishLater: boolean) => {
+    if (!bundleId || !inspectOk) {
+      setError(`M2 + M4 cannot exceed arrival quantity (${arrivalQty}).`);
       return;
     }
     setLoading(true);
     setError('');
     try {
-      const saved = await factoryRequest<BundleCheckSaveResult>('/quality/bundle-checks', {
+      const saved = await factoryRequest<{ inspectionGoodQty: number; arrivalQty: number }>('/quality/bundle-checks/inspect', {
         method: 'POST',
         body: JSON.stringify({
-          eventId: `bdl-${bundleId}-${Date.now()}`,
+          eventId: `bdl-insp-${bundleId}-${Date.now()}`,
           bundleId,
-          goodQty: Number(goodQty),
           m2Qty: Number(m2Qty || 0),
           m4Qty: Number(m4Qty || 0),
         }),
       });
+      setInspectionGood(saved.inspectionGoodQty);
+      await loadUpcoming({ silent: true });
+      if (finishLater) {
+        resetFlow();
+        return;
+      }
+      setStep('pass');
+      setPassQtyTouched(false);
+      setPassQty(String(saved.inspectionGoodQty + (Number(goodAdded) || 0)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save inspection');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const savePass = async () => {
+    if (!bundleId || !passOk) {
+      setError(`Pass quantity must be between 1 and ${suggestedPass} (good after inspection + added).`);
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const saved = await factoryRequest<BundleCheckSaveResult>('/quality/bundle-checks/pass', {
+        method: 'POST',
+        body: JSON.stringify({
+          eventId: `bdl-pass-${bundleId}-${Date.now()}`,
+          bundleId,
+          goodAddedQty: addedNum,
+          passGoodQty: passNum,
+        }),
+      });
       setLastSave(saved);
-      await loadUpcoming();
+      await loadUpcoming({ silent: true });
       setStep('done');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save bundle check');
+      setError(err instanceof Error ? err.message : 'Could not pass bundle');
     } finally {
       setLoading(false);
     }
@@ -295,7 +399,10 @@ export default function FloorChecksPage() {
   };
 
   const upcomingCount =
-    (board.counts?.waiting ?? board.results?.length ?? 0) + (board.counts?.pendingPlacement ?? board.pendingPlacement?.length ?? 0);
+    board.counts?.waiting ??
+    (board.results?.length ?? 0) + (board.pendingPlacement?.length ?? 0);
+  const receivedCount =
+    board.counts?.received ?? (board.awaitingPass?.length ?? 0) + (board.received?.length ?? 0);
   const closedBundles = orderBundles.filter((b) => b.closed !== false || (b.qty ?? 0) > 0);
 
   return (
@@ -318,10 +425,28 @@ export default function FloorChecksPage() {
               </button>
               <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600">{upcomingCount} waiting</span>
             </div>
-            <UiButton type="button" variant="secondary" icon="ri-refresh-line" onClick={() => loadUpcoming().catch(() => undefined)}>
-              Refresh
-            </UiButton>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <UiButton
+                type="button"
+                variant="secondary"
+                icon="ri-refresh-line"
+                loading={boardLoading}
+                onClick={() => loadUpcoming({ silent: board.results.length > 0 }).catch(() => undefined)}
+              >
+                Refresh
+              </UiButton>
+              <UiButton type="button" variant="secondary" icon="ri-file-list-3-line" onClick={() => setShowDefectLog(true)}>
+                Defect log
+              </UiButton>
+            </div>
           </header>
+
+          <FloorDefectLogDrawer
+            open={showDefectLog}
+            onClose={() => setShowDefectLog(false)}
+            orderId={orderId || selected?.orderId}
+            orderNumber={selected?.orderNumber || orderRows.find((o) => o.id === orderId)?.orderNumber}
+          />
 
           {showFlowHelp ? (
             <section className="border-b border-gray-100 bg-purple-50/80 px-4 py-3" aria-label="Floor check workflow">
@@ -338,7 +463,7 @@ export default function FloorChecksPage() {
                   <span className="font-semibold text-gray-900">2.</span> Same screen — <strong>place</strong> closed bundle on a <strong>bundles</strong> rack
                 </li>
                 <li>
-                  <span className="font-semibold text-gray-900">3.</span> Here — click bundle in <strong>Check now</strong>, enter counts, save
+                  <span className="font-semibold text-gray-900">3.</span> Here — <strong>inspect</strong> (M2/M4), optionally top up offline, then <strong>pass</strong> good qty
                 </li>
                 <li>
                   <span className="font-semibold text-gray-900">4.</span>{' '}
@@ -349,8 +474,8 @@ export default function FloorChecksPage() {
                 </li>
               </ol>
               <p className="mt-2 text-[11px] text-gray-600">
-                <strong>Upcoming</strong> = needs your counts · <strong>Received</strong> = saved but blocked (fix before hemming)
-                · <strong>Completed</strong> = saved checks — ready bundles go to Horizontal hemming next.
+                <strong>Upcoming</strong> = inspect M2/M4 · <strong>Received</strong> = inspected, finish top-up and pass (or fix blockers). Swaps between bundles
+                stay on the floor — only totals are stored.
               </p>
             </section>
           ) : null}
@@ -365,7 +490,7 @@ export default function FloorChecksPage() {
             <section aria-label="Bundle queue">
               <QueueTabs
                 upcomingCount={upcomingCount}
-                receivedCount={board.received?.length || 0}
+                receivedCount={receivedCount}
                 completedCount={board.completed?.length || board.counts?.completed || 0}
                 onTabChange={setQueueTab}
                 upcoming={(
@@ -384,31 +509,47 @@ export default function FloorChecksPage() {
                       </div>
                     ) : null}
                     <div>
-                      <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-600">Check now (on rack)</p>
+                      <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-600">Inspect now (on rack)</p>
                       <BundleTable
                         rows={board.results}
                         emptyText="Nothing here yet. Close the bundle, place it on a bundles rack, then refresh."
-                        onPick={(row) => applyBundle(row)}
+                        onPick={(row) => applyBundle(row, 'inspect')}
                       />
                     </div>
                   </div>
                 )}
                 received={(
-                  <>
-                    <p className="mb-2 text-[11px] text-gray-600">
-                      Only bundles that need a fix after save (missing rack, incomplete steps, etc.). Ready bundles are under{' '}
-                      <strong>Completed</strong> and on{' '}
-                      <Link href="/production/floor/horizontal-hem" className="text-purple-700 underline">
-                        Horizontal hemming
-                      </Link>{' '}
-                      → Upcoming.
+                  <div className="grid gap-3">
+                    <p className="text-[11px] text-gray-600">
+                      Inspected bundles waiting for <strong>top-up and pass</strong>, plus any passed bundles that need a fix before hemming.
                     </p>
-                    <BundleTable
-                      rows={board.received || []}
-                      emptyText="No blocked bundles. Saved and ready work is in Completed and Horizontal hemming."
-                      showHandoffStatus
-                    />
-                  </>
+                    {(board.awaitingPass?.length || 0) > 0 ? (
+                      <div className="rounded-md border border-purple-200 bg-purple-50/60 p-3">
+                        <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-purple-900">Awaiting pass (top-up)</p>
+                        <p className="mb-2 text-[11px] text-purple-950">
+                          Defects saved. Add good pieces offline, then enter <strong>good added</strong> and <strong>pass qty</strong>.
+                        </p>
+                        <BundleTable
+                          rows={board.awaitingPass || []}
+                          emptyText=""
+                          onPick={(row) => applyBundle(row, 'pass')}
+                        />
+                      </div>
+                    ) : null}
+                    {(board.received?.length || 0) > 0 ? (
+                      <div>
+                        <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-600">Blocked after pass</p>
+                        <BundleTable
+                          rows={board.received || []}
+                          emptyText=""
+                          showHandoffStatus
+                        />
+                      </div>
+                    ) : null}
+                    {!board.awaitingPass?.length && !board.received?.length ? (
+                      <p className="text-center text-[11px] text-gray-400 py-8">Nothing in received. After inspect, bundles appear here for pass.</p>
+                    ) : null}
+                  </div>
                 )}
                 completed={
                   <CompletedQueueTable
@@ -417,8 +558,10 @@ export default function FloorChecksPage() {
                     qtyIsTransferable
                     qtyColumnLabel="To next floor"
                     showGood
+                    showArrival
                     showM2
                     showM4
+                    showAdded
                     showNextStep
                     emptyText="No floor checks saved in the last two weeks."
                   />
@@ -428,16 +571,17 @@ export default function FloorChecksPage() {
 
             {queueTab === 'completed' ? null : (
             <section aria-label="Bundle check steps" className="rounded-md border border-gray-200 bg-[#F9FAFB] p-4">
-              <ol className="mb-4 flex gap-2 text-[10px] font-bold uppercase tracking-wide">
-                <li className={step === 'pick' ? 'text-purple-700' : 'text-gray-400'}>1. Pick bundle</li>
-                <li className={step === 'counts' ? 'text-purple-700' : 'text-gray-400'}>2. Counts</li>
-                <li className={step === 'done' ? 'text-purple-700' : 'text-gray-400'}>3. Done</li>
+              <ol className="mb-4 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide">
+                <li className={step === 'pick' ? 'text-purple-700' : 'text-gray-400'}>1. Pick</li>
+                <li className={step === 'inspect' ? 'text-purple-700' : 'text-gray-400'}>2. Inspect</li>
+                <li className={step === 'pass' ? 'text-purple-700' : 'text-gray-400'}>3. Pass</li>
+                <li className={step === 'done' ? 'text-purple-700' : 'text-gray-400'}>4. Done</li>
               </ol>
 
               {step === 'pick' ? (
                 <div className="grid gap-3">
                   <p className="text-[12px] text-gray-600">
-                    Scan or <strong>click</strong> a bundle under <strong>Check now (on rack)</strong> on the left.
+                    Scan or <strong>click</strong> a bundle under <strong>Upcoming → Inspect now</strong> or <strong>Received → Awaiting pass</strong>.
                   </p>
                   <form
                     className="flex flex-wrap items-end gap-2"
@@ -454,7 +598,12 @@ export default function FloorChecksPage() {
                       Next
                     </UiButton>
                   </form>
-                  <details className="border-t border-gray-200 pt-3">
+                  <details
+                    className="border-t border-gray-200 pt-3"
+                    onToggle={(e) => {
+                      if (e.currentTarget.open) ensureOrderPicklist().catch(() => undefined);
+                    }}
+                  >
                     <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-wide text-gray-500">
                       Pick by order (only if already on rack)
                     </summary>
@@ -464,6 +613,7 @@ export default function FloorChecksPage() {
                       <select
                         className={fieldClass}
                         value={orderId}
+                        disabled={ordersLoading}
                         onChange={async (e) => {
                           const next = e.target.value;
                           setOrderId(next);
@@ -476,8 +626,8 @@ export default function FloorChecksPage() {
                           setOrderBundles(detail.bundles || []);
                         }}
                       >
-                        <option value="">Select order</option>
-                        {orders.rows.map((order) => (
+                        <option value="">{ordersLoading ? 'Loading orders…' : 'Select order'}</option>
+                        {orderRows.map((order) => (
                           <option key={order.id} value={order.id}>
                             {order.orderNumber || order.id.slice(-6)}
                           </option>
@@ -498,7 +648,7 @@ export default function FloorChecksPage() {
                     </label>
                     <div className="mt-4 flex justify-end">
                       <UiButton type="button" variant="primary" disabled={!orderId || !bundleId} onClick={() => pickFromManual().catch(() => undefined)}>
-                        Next → counts
+                        Next → inspect
                       </UiButton>
                     </div>
                     </div>
@@ -506,73 +656,138 @@ export default function FloorChecksPage() {
                 </div>
               ) : null}
 
-              {step === 'counts' && selected ? (
+              {step === 'inspect' && selected ? (
                 <div className="grid gap-3">
                   <div className="rounded border border-white bg-white p-3 text-[12px] shadow-sm">
                     <p className="font-bold text-gray-900">{selected.barcode || 'Bundle'}</p>
                     <p className="text-gray-600">
-                      {selected.orderNumber} · qty <strong>{bundleQty}</strong>
-                      {selected.rackCode ? ` · rack ${selected.rackCode}` : ' · ⚠ no rack — go place on single piece first'}
+                      {selected.orderNumber}
+                      {selected.articleLabel ? ` · ${selected.articleLabel}` : ''} · arrival <strong>{arrivalQty}</strong>
+                      {selected.rackCode ? ` · rack ${selected.rackCode}` : ' · ⚠ no rack'}
                     </p>
                   </div>
                   <p className="text-[11px] text-gray-600">
-                    Good + M2 + M4 must equal <strong>{bundleQty}</strong> (labeled bundle size). Only <strong>Good</strong> moves to
-                    horizontal hemming; M2 and M4 do not transfer.
+                    Record <strong>M2</strong> and <strong>M4</strong> found in the bundle. This is saved to the defect log with a timestamp.
                   </p>
                   <label>
                     <span className={labelClass}>M2 qty</span>
-                    <input
-                      className={fieldClass}
-                      type="number"
-                      min={0}
-                      value={m2Qty}
-                      onChange={(e) => {
-                        const m2 = Math.max(0, Number(e.target.value) || 0);
-                        const m4 = Math.max(0, Number(m4Qty) || 0);
-                        setM2Qty(e.target.value);
-                        setGoodQty(String(Math.max(0, bundleQty - m2 - m4)));
-                      }}
-                    />
+                    <input className={fieldClass} type="number" min={0} value={m2Qty} onChange={(e) => setM2Qty(e.target.value)} />
                   </label>
                   <label>
                     <span className={labelClass}>M4 qty</span>
+                    <input className={fieldClass} type="number" min={0} value={m4Qty} onChange={(e) => setM4Qty(e.target.value)} />
+                  </label>
+                  <label>
+                    <span className={labelClass}>Good after inspection</span>
+                    <input
+                      className={`${fieldClass} cursor-not-allowed bg-gray-100 text-gray-700`}
+                      type="number"
+                      readOnly
+                      tabIndex={-1}
+                      value={goodAfterInspection}
+                    />
+                  </label>
+                  <p className={`text-[11px] font-medium ${inspectOk ? 'text-green-700' : 'text-red-600'}`}>
+                    Defects: {defectsTotal} / {arrivalQty} {inspectOk ? '✓' : ''}
+                  </p>
+                  <div className="flex flex-wrap justify-between gap-2 border-t border-gray-200 pt-3">
+                    <UiButton type="button" variant="secondary" onClick={() => setStep('pick')}>
+                      Back
+                    </UiButton>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <UiButton
+                        type="button"
+                        variant="secondary"
+                        loading={loading}
+                        disabled={!inspectOk}
+                        onClick={() => saveInspection(true).catch(() => undefined)}
+                      >
+                        Save &amp; finish later
+                      </UiButton>
+                      <UiButton
+                        type="button"
+                        variant="primary"
+                        loading={loading}
+                        disabled={!inspectOk}
+                        onClick={() => saveInspection(false).catch(() => undefined)}
+                      >
+                        Continue → pass
+                      </UiButton>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {step === 'pass' && selected ? (
+                <div className="grid gap-3">
+                  <div className="rounded border border-white bg-white p-3 text-[12px] shadow-sm">
+                    <p className="font-bold text-gray-900">{selected.barcode || 'Bundle'}</p>
+                    <p className="text-gray-600">
+                      After inspection: <strong>{inspectionGood > 0 ? inspectionGood : goodAfterInspection}</strong> good
+                      {' · '}M2 <strong>{m2Qty || 0}</strong> · M4 <strong>{m4Qty || 0}</strong>
+                    </p>
+                  </div>
+                  <p className="text-[11px] text-gray-600">
+                    Pieces moved between bundles stay offline. <strong>Remaining good</strong> is from inspection; add how many good
+                    pieces QC put in; <strong>pass qty</strong> defaults to remaining + added (change only for a partial pass).
+                  </p>
+                  <label>
+                    <span className={labelClass}>Good remaining in bundle (after inspect)</span>
+                    <input
+                      className={`${fieldClass} cursor-not-allowed bg-gray-100 text-gray-700`}
+                      type="number"
+                      min={0}
+                      readOnly
+                      tabIndex={-1}
+                      aria-readonly="true"
+                      value={baseGoodAfterInspect}
+                    />
+                  </label>
+                  <label>
+                    <span className={labelClass}>Good added by QC</span>
                     <input
                       className={fieldClass}
                       type="number"
                       min={0}
-                      value={m4Qty}
+                      value={goodAdded}
                       onChange={(e) => {
-                        const m4 = Math.max(0, Number(e.target.value) || 0);
-                        const m2 = Math.max(0, Number(m2Qty) || 0);
-                        setM4Qty(e.target.value);
-                        setGoodQty(String(Math.max(0, bundleQty - m2 - m4)));
+                        const nextAdded = e.target.value;
+                        setGoodAdded(nextAdded);
+                        const added = Math.max(0, Number(nextAdded) || 0);
+                        setPassQty(String(baseGoodAfterInspect + added));
+                        setPassQtyTouched(false);
                       }}
                     />
                   </label>
                   <label>
-                    <span className={labelClass}>Good qty (to next floor)</span>
+                    <span className={labelClass}>Pass qty (to next floor)</span>
                     <input
                       className={fieldClass}
                       type="number"
-                      min={0}
-                      value={goodQty}
-                      onChange={(e) => setGoodQty(e.target.value)}
+                      min={1}
+                      value={displayPassQty}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        setPassQty(next);
+                        setPassQtyTouched(next !== '');
+                      }}
                     />
                   </label>
-                  <p className={`text-[11px] font-medium ${sumOk ? 'text-green-700' : 'text-red-600'}`}>
-                    Split: {sum} / {bundleQty} {sumOk ? '✓' : ''}
-                    {sumOk ? (
-                      <span className="ml-2 text-gray-700">
-                        → <strong>{toNextFloor}</strong> pcs to horizontal hemming
-                      </span>
-                    ) : null}
+                  <p className="text-[11px] text-gray-500">
+                    Default pass = <strong>{baseGoodAfterInspect}</strong> remaining + <strong>{addedNum}</strong> added ={' '}
+                    <strong>{suggestedPass}</strong>
+                    {arrivalQty === 60 ? ' · Often 60 after top-up.' : ''}
+                    {passQtyTouched && passQty !== '' && Number(passQty) !== suggestedPass ? ' · You edited pass qty.' : null}
+                  </p>
+                  <p className={`text-[11px] font-medium ${passOk ? 'text-green-700' : 'text-red-600'}`}>
+                    Passing <strong>{displayPassQty || '—'}</strong> pcs {passOk ? '✓' : ''}
                   </p>
                   <div className="flex justify-between gap-2 border-t border-gray-200 pt-3">
-                    <UiButton type="button" variant="secondary" onClick={() => setStep('pick')}>
+                    <UiButton type="button" variant="secondary" onClick={() => setStep(selected.floorInspected ? 'pick' : 'inspect')}>
                       Back
                     </UiButton>
-                    <UiButton type="button" variant="primary" loading={loading} disabled={!sumOk} onClick={() => saveBundleCheck().catch(() => undefined)}>
-                      Save bundle check
+                    <UiButton type="button" variant="primary" loading={loading} disabled={!passOk} onClick={() => savePass().catch(() => undefined)}>
+                      Pass to next floor
                     </UiButton>
                   </div>
                 </div>
@@ -580,7 +795,19 @@ export default function FloorChecksPage() {
 
               {step === 'done' ? (
                 <div className="grid gap-3">
-                  <p className="text-[12px] font-semibold text-green-800">Bundle check saved.</p>
+                  <p className="text-[12px] font-semibold text-green-800">Bundle passed to next floor.</p>
+                  <dl className="grid grid-cols-2 gap-x-3 gap-y-1 rounded border border-gray-200 bg-white p-3 text-[11px] text-gray-800">
+                    <dt className="text-gray-500">Arrival</dt>
+                    <dd>{lastSave?.arrivalQty ?? arrivalQty}</dd>
+                    <dt className="text-gray-500">M2 / M4</dt>
+                    <dd>
+                      {lastSave?.m2Qty ?? m2Qty} / {lastSave?.m4Qty ?? m4Qty}
+                    </dd>
+                    <dt className="text-gray-500">Good added</dt>
+                    <dd>{lastSave?.goodAddedQty ?? addedNum}</dd>
+                    <dt className="font-bold text-gray-700">Passing</dt>
+                    <dd className="font-bold text-purple-800">{lastSave?.passGoodQty ?? passNum}</dd>
+                  </dl>
                   {lastSave?.readyForHorizontalHem !== false ? (
                     <div className="rounded border border-emerald-200 bg-emerald-50 p-3 text-[12px] text-emerald-900">
                       <p className="font-semibold">

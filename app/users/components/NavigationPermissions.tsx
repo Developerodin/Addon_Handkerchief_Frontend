@@ -42,6 +42,7 @@ const PRODUCTION_FLOORS: FactoryScreenKey[] = [
   'Production / Vertical hemming',
   'Production / Single piece cutting',
   'Production / Horizontal hemming',
+  'Production / Inline checking',
   'Production / Thread cutting',
   'Production / Move to ground',
   'Production / Ironing',

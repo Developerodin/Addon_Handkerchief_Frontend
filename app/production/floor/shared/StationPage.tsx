@@ -13,13 +13,20 @@ import { CompletedQueueTable, CompletedRow } from './CompletedQueueTable';
 import { EmptyQueue, QueueTabs } from './QueueTabs';
 import { BundleLabel, triggerBundleLabelPrint } from '@/shared/components/factory/BundleLabel';
 
+export interface ThreadHint {
+  lines: { name: string; perPiece: number }[];
+  perPiece: number;
+}
+
 export interface FloorBundle {
   id: string;
   barcode: string;
   orderId: string;
+  lineId?: string;
   orderNumber: string;
   qty: number;
   finalGood: number;
+  threadHint?: ThreadHint;
   packedQty?: number;
   packingSize?: number;
   rackCode: string;
@@ -180,7 +187,6 @@ export function StationPage({
         {job ? (
           <JobDrawer
             bundle={job}
-            waiting={board.results}
             base={base}
             title={title}
             start={start}
@@ -271,10 +277,9 @@ const BundleTable = memo(function BundleTable({
  * Start and put-away for one bundle.
  */
 function JobDrawer({
-  bundle, waiting, base, title, start, place, stationLabel, floorStage, thread, miss, onClose, onChanged,
+  bundle, base, title, start, place, stationLabel, floorStage, thread, miss, onClose, onChanged,
 }: {
   bundle: FloorBundle | null;
-  waiting: FloorBundle[];
   base: string;
   title: string;
   start: StartMode;
@@ -292,9 +297,7 @@ function JobDrawer({
   const [station, setStation] = useState('');
   const [destination, setDestination] = useState('');
   const [count, setCount] = useState('');
-  const [threadQty, setThreadQty] = useState('');
   const [printBarcode, setPrintBarcode] = useState('');
-  const [extra, setExtra] = useState('');
   const [machines, setMachines] = useState<Machine[]>([]);
   const [racks, setRacks] = useState<ProductionRack[]>([]);
   const [containers, setContainers] = useState<Container[]>([]);
@@ -310,9 +313,9 @@ function JobDrawer({
     setStation(bundle.machineBarcode || '');
     setDestination('');
     setCount(String(bundle.finalGood || ''));
-    setThreadQty('');
     setError('');
-  }, [jobKey, bundle, start]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when a different bundle is opened
+  }, [jobKey, start]);
 
   const needsMachines = start !== 'none';
   const needsRacks = place === 'bundles' || place === 'packing' || start === 'rack-machine';
@@ -352,24 +355,9 @@ function JobDrawer({
   if (!bundle) return null;
 
   const codes = () => bundles.map((row) => row.barcode);
-
-  /**
-   * Adds another waiting bundle from the same order.
-   */
-  const addBundle = () => {
-    const match = waiting.find((row) => row.barcode.toLowerCase() === extra.trim().toLowerCase());
-    if (!match) {
-      setError(miss);
-      return;
-    }
-    if (match.orderId !== bundle.orderId) {
-      setError('Bundles on one station must be the same order');
-      return;
-    }
-    if (!bundles.some((row) => row.barcode === match.barcode)) setBundles((rows) => [...rows, match]);
-    setExtra('');
-    setError('');
-  };
+  const threadHint = bundles[0]?.threadHint || { lines: [], perPiece: 0 };
+  const pieces = bundles.reduce((sum, row) => sum + (row.finalGood || row.qty || 0), 0);
+  const threadExpected = threadHint.perPiece * pieces;
 
   /**
    * Starts the bundles on the station.
@@ -382,8 +370,8 @@ function JobDrawer({
         method: 'POST',
         body: JSON.stringify({ bundleBarcodes: codes(), rackCode, machineBarcode: station }),
       });
-      setOnStation(true);
       await onChanged();
+      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start');
     } finally {
@@ -402,7 +390,7 @@ function JobDrawer({
       if (place === 'container') body.containerBarcode = destination;
       else if (place === 'count') body.pieceCount = Number(count);
       else body.rackCode = destination;
-      if (thread) body.threadQuantity = threadQty === '' ? '' : Number(threadQty);
+      if (thread) body.threadQuantity = threadExpected;
       await factoryRequest(place === 'count' ? `${base}/break` : `${base}/place`, { method: 'POST', body: JSON.stringify(body) });
       await onChanged();
       onClose();
@@ -455,22 +443,16 @@ function JobDrawer({
             {start === 'rack-machine' ? (
               <>
                 <label className="text-[11px] font-bold text-[#495057]" htmlFor="stRack">Current rack</label>
-                <input id="stRack" aria-label="Current rack" className={fieldClass} value={rackCode} onChange={(event) => setRackCode(event.target.value)} required />
-                <select aria-label="Bundles rack list" className={fieldClass} value={rackCode} onChange={(event) => setRackCode(event.target.value)}>
-                  <option value="">Select rack</option>
-                  {racks.map((rack) => (
-                    <option key={rack.id} value={rack.code}>
-                      {rack.name} · {rack.code}
-                    </option>
-                  ))}
-                </select>
+                <input
+                  id="stRack"
+                  aria-label="Current rack"
+                  className={`${fieldClass} cursor-not-allowed bg-gray-50`}
+                  value={rackCode}
+                  readOnly
+                  disabled
+                />
               </>
             ) : null}
-            <label className="text-[11px] font-bold text-[#495057]" htmlFor="stExtra">Another bundle</label>
-            <div className="flex gap-2">
-              <input id="stExtra" aria-label="Another bundle barcode" className={fieldClass} value={extra} onChange={(event) => setExtra(event.target.value)} />
-              <button type="button" className="rounded border border-gray-200 px-3 py-1.5 text-[11px] font-bold text-[#495057]" onClick={addBundle}>Add</button>
-            </div>
             <label className="text-[11px] font-bold text-[#495057]" htmlFor="stStation">{stationLabel}</label>
             <input id="stStation" aria-label={`${stationLabel} barcode`} className={fieldClass} value={station} onChange={(event) => setStation(event.target.value)} required />
             <select aria-label={stationLabel} className={fieldClass} value={station} onChange={(event) => setStation(event.target.value)}>
@@ -504,8 +486,32 @@ function JobDrawer({
               <>
                 {thread ? (
                   <>
-                    <label className="text-[11px] font-bold text-[#495057]" htmlFor="stThread">Embroidery thread</label>
-                    <input id="stThread" aria-label="Embroidery thread" className={fieldClass} inputMode="decimal" value={threadQty} onChange={(event) => setThreadQty(event.target.value)} required />
+                    {threadHint.lines.length ? (
+                      <ul className="grid gap-1 text-[12px] text-gray-700">
+                        {threadHint.lines.map((line) => (
+                          <li key={`${line.name}-${line.perPiece}`}>
+                            {line.name} · {line.perPiece} per piece
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-[12px] text-gray-600">No embroidery thread is pinned on this order.</p>
+                    )}
+                    <label className="text-[11px] font-bold text-[#495057]" htmlFor="stThread">
+                      Embroidery thread
+                    </label>
+                    <input
+                      id="stThread"
+                      aria-label="Embroidery thread"
+                      type="number"
+                      className={`${fieldClass} cursor-not-allowed bg-gray-50`}
+                      value={threadExpected}
+                      readOnly
+                      disabled
+                    />
+                    <p className="text-[10px] text-gray-500">
+                      {pieces} piece{pieces === 1 ? '' : 's'} × {threadHint.perPiece} per piece
+                    </p>
                   </>
                 ) : null}
                 <label className="text-[11px] font-bold text-[#495057]" htmlFor="stDest">{place === 'packing' ? 'Packing rack' : 'Bundles rack'}</label>

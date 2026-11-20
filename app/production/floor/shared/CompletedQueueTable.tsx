@@ -22,6 +22,9 @@ export interface CompletedRow {
   transferQty?: number;
   /** Qty frozen when the floor log was written (backend snapshot). */
   qtyAtEvent?: number;
+  arrivalQty?: number;
+  goodAddedQty?: number;
+  passGoodQty?: number;
 }
 
 const headClass = 'border border-gray-200 px-1.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-[#495057]';
@@ -82,7 +85,10 @@ export function CompletedQueueTable({
   showDefectGrades = false,
   qtyIsTransferable = false,
   qtyColumnLabel,
+  showQty = true,
   showNextStep = false,
+  showArrival = false,
+  showAdded = false,
   hemHref = '/production/floor/horizontal-hem',
 }: {
   rows: CompletedRow[];
@@ -96,7 +102,10 @@ export function CompletedQueueTable({
   showDefectGrades?: boolean;
   qtyIsTransferable?: boolean;
   qtyColumnLabel?: string;
+  showQty?: boolean;
   showNextStep?: boolean;
+  showArrival?: boolean;
+  showAdded?: boolean;
   hemHref?: string;
 }) {
   const code = getCode || ((row) => row.barcode || row.rollBarcode || '—');
@@ -108,8 +117,10 @@ export function CompletedQueueTable({
     (showGood ? 1 : 0) +
     (showDefect ? 1 : 0) +
     (showDefectGrades ? 1 : 0) +
-    (showNextStep ? 1 : 0);
-  const colSpan = 5 + extraCols;
+    (showNextStep ? 1 : 0) +
+    (showArrival ? 1 : 0) +
+    (showAdded ? 1 : 0);
+  const colSpan = (showQty ? 5 : 4) + extraCols;
   return (
     <div className="min-h-[240px] overflow-x-auto">
       <table className="w-full border-collapse border border-gray-200">
@@ -118,12 +129,14 @@ export function CompletedQueueTable({
             {[
               'Order',
               codeLabel,
-              qtyLabel,
+              ...(showQty ? [qtyLabel] : []),
               ...(showGood ? ['Good'] : []),
               ...(showDefect ? ['Defect'] : []),
               ...(showDefectGrades ? ['Defects'] : []),
+              ...(showArrival ? ['Arrival'] : []),
               ...(showM2 ? ['M2'] : []),
               ...(showM4 ? ['M4'] : []),
+              ...(showAdded ? ['Added'] : []),
               'Sent to',
               'When',
               ...(showNextStep ? ['Next'] : []),
@@ -137,7 +150,7 @@ export function CompletedQueueTable({
             <tr key={`${code(row)}-${row.completedAt || ''}`}>
               <td className={cellClass}>{row.orderNumber || (row.orderId ? row.orderId.slice(-6) : '—')}</td>
               <td className={`${cellClass} font-mono text-purple-700`}>{code(row)}</td>
-              <td className={cellClass}>{formatQty(row, qtyIsTransferable)}</td>
+              {showQty ? <td className={cellClass}>{formatQty(row, qtyIsTransferable)}</td> : null}
               {showGood ? (
                 <td className={cellClass}>{typeof row.goodQty === 'number' ? row.goodQty : '—'}</td>
               ) : null}
@@ -149,11 +162,17 @@ export function CompletedQueueTable({
                   {formatDefectGrades(row.defectGrades)}
                 </td>
               ) : null}
+              {showArrival ? (
+                <td className={cellClass}>{typeof row.arrivalQty === 'number' && row.arrivalQty > 0 ? row.arrivalQty : '—'}</td>
+              ) : null}
               {showM2 ? (
                 <td className={cellClass}>{typeof row.m2Qty === 'number' ? row.m2Qty : '—'}</td>
               ) : null}
               {showM4 ? (
                 <td className={cellClass}>{typeof row.m4Qty === 'number' ? row.m4Qty : '—'}</td>
+              ) : null}
+              {showAdded ? (
+                <td className={cellClass}>{typeof row.goodAddedQty === 'number' ? row.goodAddedQty : '—'}</td>
               ) : null}
               <td className={cellClass}>{row.transferredTo || '—'}</td>
               <td className={cellClass}>{formatWhen(row.completedAt)}</td>
