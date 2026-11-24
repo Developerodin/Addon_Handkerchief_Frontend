@@ -7,6 +7,7 @@ const protectedPrefixes = [
   '/catalog',
   '/production',
   '/warehouse',
+  '/whm',
   '/quality',
   '/store',
   '/checkpoints',

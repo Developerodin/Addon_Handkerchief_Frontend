@@ -100,6 +100,9 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children
     if (path === '/checkpoints') {
       return true;
     }
+    if (path === '/whm' || path.startsWith('/whm/')) {
+      return true;
+    }
     const factoryKey = Object.keys(FACTORY_ROUTES).find((route) => path === route || path.startsWith(`${route}/`));
     if (factoryKey) {
       return hasCrudPermission(FACTORY_ROUTES[factoryKey], 'read');
